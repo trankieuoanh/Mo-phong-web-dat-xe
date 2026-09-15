@@ -1,0 +1,28 @@
+# dependencies
+node_modules/
+
+# Next.js
+apps/web/.next/
+apps/web/out/
+apps/web/next-env.d.ts
+
+# bien moi truong - KHONG BAO GIO commit
+.env
+.env*.local
+apps/api/.env
+apps/web/.env.local
+
+# service account key Firebase - KHONG BAO GIO commit
+serviceAccount*.json
+*.json.key
+
+# phan tich Python
+analysis/.venv/
+analysis/output/
+analysis/__pycache__/
+analysis/.env
+
+# he dieu hanh / editor
+.DS_Store
+Thumbs.db
+*.log

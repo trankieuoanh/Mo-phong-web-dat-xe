@@ -1,6 +1,8 @@
 # mock-data.md — GSM ride-booking simulation
 
-> Toàn bộ dữ liệu tĩnh của app. Hardcode trong `lib/mock-data.ts`, **không** gọi API để lấy. Các `id` ở đây đi thẳng vào `properties` của event nên **không được đổi tuỳ tiện** — đổi id sẽ làm dữ liệu các phiên cũ không ghép được với phiên mới.
+> Toàn bộ dữ liệu tĩnh của app. Hardcode trong `packages/shared/src/mock-data.ts`, **không** gọi API để lấy. Các `id` ở đây đi thẳng vào `properties` của event nên **không được đổi tuỳ tiện** — đổi id sẽ làm dữ liệu các phiên cũ không ghép được với phiên mới.
+>
+> **Logic tính tiền nằm ở file khác**: `packages/shared/src/pricing.ts` giữ `calcDiscount` (mục 3) và hai công thức tổng tiền (mục 6). Tách ra vì màn confirm hiển thị số tiền còn event `confirm_ride`/`place_order` ghi số tiền — hai chỗ đó bắt buộc ra cùng một con số.
 
 ## Hằng số chung
 

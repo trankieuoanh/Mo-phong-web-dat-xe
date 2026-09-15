@@ -17,65 +17,96 @@ Không có backend thật, không đặt xe thật, không thanh toán. Mọi l�
 | Viết CSS, chọn màu/cỡ chữ/bo góc | `tailwind-theme.md` (giá trị gốc ở `DESIGN.md`) |
 | Viết API route | `api-endpoints.md` |
 | Cấu trúc document Firestore | `db-design.md` |
-| Cài Firebase, biến môi trường | `setup.md` |
+| **Chạy dự án**, cài Firebase, biến môi trường, **tra lỗi** | `setup.md` |
 | Viết script Python | `analysis-spec.md` |
 | Không biết nên làm gì tiếp | `roadmap.md` |
 | Lý do chọn công nghệ | `techstack.md`, `ARCHITECTURE.md` |
 
 ## Lệnh
 
+Chạy từ **thư mục gốc** của monorepo:
+
 ```bash
-npm run dev      # UI + API routes tại localhost:3000
-npm run build    # kiểm tra lỗi TypeScript trước khi demo
+npm install      # npm workspaces — cài cho cả 3 workspace một lần
+npm run dev      # chạy SONG SONG: apps/api (:4000) + apps/web (:3000)
+npm run build    # build apps/web, kiểm tra lỗi TypeScript trước khi demo
 npm run lint
+npm run typecheck
+
+npm run dev:api  # chỉ BE
+npm run dev:web  # chỉ FE
 ```
+
+Trình duyệt luôn vào **`localhost:3000`**. Next.js proxy `/api/*` sang `:4000` qua `rewrites` — không gọi thẳng cổng 4000 từ trình duyệt (lý do ở `apps/web/next.config.ts`).
 
 Không có test tự động — `techstack.md` đã chốt là kiểm thử bằng cách click tay qua từng luồng.
 
 ## Quy tắc không được vi phạm
 
-1. **Không import `firebase-admin` vào client component.** Chỉ `app/api/**` và `lib/firebase-admin.ts` được chạm Firestore. File `lib/firebase-admin.ts` phải có `import 'server-only'` ở dòng đầu.
-2. **Không dùng tiền tố `NEXT_PUBLIC_`** cho bất kỳ biến Firebase nào — tiền tố đó nhúng giá trị vào bundle trình duyệt.
+1. **`apps/web/package.json` không được có `firebase-admin` trong `dependencies`.** Credential Firestore chỉ sống trong `apps/api`. Vì hai app là hai module graph riêng, FE muốn rò credential cũng không import nổi — `npm install` sẽ báo không tìm thấy package. Kiểm tra bằng `grep -r "firebase-admin" apps/web/` → phải rỗng.
+2. **Không dùng tiền tố `NEXT_PUBLIC_`** cho bất kỳ biến Firebase nào — tiền tố đó nhúng giá trị vào bundle trình duyệt. (Biến Firebase giờ nằm ở `apps/api/.env`, nơi `NEXT_PUBLIC_` vốn vô nghĩa — nhưng quy tắc vẫn giữ để không ai copy nhầm sang `apps/web`.)
 3. **`trackEvent` trả `void`, không phải Promise.** Không bao giờ `await` trước khi điều hướng. Chi tiết ở `screen-map.md` mục 4.
 4. **Không tự sinh giá trị màu/spacing/radius mới.** Mọi giá trị phải truy được về token trong `DESIGN.md` qua bảng ở `tailwind-theme.md`.
 5. **Không đổi `id` trong `mock-data.md`** (`addr-home`, `banh-mi-01`, `veh-bike`…). Chúng đi thẳng vào `properties` của event; đổi id làm dữ liệu cũ và mới không ghép được.
-6. **Thêm event mới phải cập nhật `event-taxonomy.md` trước khi code**, kèm `lib/types.ts` và validate trong `app/api/events/route.ts`.
-7. **Không thêm thư viện** ngoài những gì `techstack.md` đã chốt. Không Redux/Zustand (dùng Context), không axios (dùng `fetch`), không thư viện UI component.
+6. **Thêm event mới phải cập nhật `event-taxonomy.md` trước khi code**, kèm `packages/shared/src/types.ts` (union + mảng `EVENT_NAMES`) và `packages/shared/src/screens.ts` nếu là màn mới.
+7. **Không tự gõ `step_index` trong page.** `trackEvent` tra bảng `SCREENS` ở `packages/shared/src/screens.ts`. Chỉ hai ngoại lệ được truyền tay: `add_to_cart` (luôn = 3, dùng helper `trackAddToCart`) và `flow` của `select_flow` ở màn Home.
+8. **Không thêm thư viện** ngoài những gì `techstack.md` đã chốt: Next.js, React, Tailwind (FE); Express, cors, firebase-admin, tsx (BE); concurrently (root, devDependency). Không Redux/Zustand (dùng Context), không axios (dùng `fetch`), không thư viện UI component.
 
-## Cấu trúc thư mục
+## Cấu trúc thư mục — monorepo npm workspaces
 
 ```
-app/
-  layout.tsx            AppProvider + font Inter
-  page.tsx              Home
-  ride/{address,pickup,vehicle,promo,confirm,success}/page.tsx
-  food/page.tsx  food/item/[itemId]/page.tsx  food/{cart,offer,confirm,success}/page.tsx
-  api/events/route.ts   api/health/route.ts
-  globals.css           @theme + class typography
-lib/
-  types.ts              EventName, ScreenName, Flow
-  mock-data.ts          dữ liệu tĩnh + calcDiscount
-  firebase-admin.ts     server-only
-  session.ts            session_id / user_id
-  track.ts              trackEvent + useScreenView
-  app-context.tsx       state ride + cart
-components/             component dùng chung
-analysis/               script Python (ngoài Next.js)
+package.json              workspaces + script dev chạy song song
+tsconfig.base.json        strict, paths → @gsm/shared
+
+apps/web/                 Next.js 15 — CHỈ FE, cổng 3000
+  next.config.ts          transpilePackages + rewrites /api/* → :4000
+  app/
+    layout.tsx            AppProvider + font Inter (subset vietnamese)
+    page.tsx              Home
+    globals.css           @theme + class typography
+    ride/{address,pickup,vehicle,promo,confirm,success}/page.tsx
+    food/page.tsx  food/item/[itemId]/page.tsx  food/{cart,offer,confirm,success}/page.tsx
+  lib/
+    session.ts            session_id / user_id / resetSession
+    track.ts              trackEvent + trackAddToCart + useScreenView
+    app-context.tsx       state ride + cart
+    format.ts             formatVnd
+  components/             ScreenShell, PrimaryButton, BackButton, FlowGuard
+
+apps/api/                 Express + tsx — CHỈ BE, cổng 4000
+  src/server.ts           express + cors + json
+  src/routes/             events.routes.ts, health.routes.ts
+  src/validators/         event.validator.ts  ← whitelist 8 field
+  src/services/           event.service.ts    ← platform + serverTimestamp
+  src/db/firebase-admin.ts
+  .env                    credential Firebase (gitignored)
+
+packages/shared/src/      @gsm/shared — dùng chung web + api, KHÔNG có bước build
+  types.ts                Flow, EventName (19), ScreenName (13), EventPayload
+  screens.ts              SCREENS — bảng route/step_index/flow
+  mock-data.ts            dữ liệu tĩnh
+  pricing.ts              calcDiscount, calcRideTotals, calcFoodTotals
+
+analysis/                 Python — KHÔNG phải npm workspace
 ```
+
+Vì cả `apps/web` lẫn `apps/api` đều nhập `EventName` và `SCREENS` từ `@gsm/shared`, danh sách hợp lệ ở FE và BE **không thể lệch nhau**.
 
 ## Quy ước code
 
-- TypeScript, không dùng `any` cho dữ liệu event — union type trong `lib/types.ts` tồn tại để bắt lỗi gõ sai tên event.
-- Mọi page của 2 luồng là `'use client'`; chỉ `app/api/**` chạy server-side.
+- TypeScript, không dùng `any` cho dữ liệu event — union type trong `packages/shared/src/types.ts` tồn tại để bắt lỗi gõ sai tên event.
+- Mọi page của 2 luồng là `'use client'`. `apps/web` **không có** server-side logic nào; toàn bộ chạy ở `apps/api`.
+- `packages/shared` import nội bộ **không ghi đuôi `.js`** — webpack của Next không resolve `.ts` từ đuôi `.js`, còn `tsx` thì chấp nhận cả hai.
 - **UI toàn bộ bằng tiếng Việt** ("Đặt xe", "Thêm vào giỏ", "Xác nhận"). Tên biến, tên hàm, tên field bằng tiếng Anh.
 - Field trong event và khoá trong `properties`: `snake_case`. Biến trong TypeScript: `camelCase`. Helper `trackEvent` chịu trách nhiệm chuyển đổi.
 - Tiền luôn là **số nguyên VNĐ** trong dữ liệu (`35000`), chỉ format khi hiển thị (`35.000đ`) bằng `Intl.NumberFormat('vi-VN')`.
 - Mobile-first, container `max-width: 480px` — đây là mô phỏng app điện thoại.
 
-## Hai cái bẫy đã biết
+## Ba cái bẫy đã biết
 
 - **React Strict Mode nhân đôi `screen_view`.** `next dev` chạy effect hai lần; không chặn bằng `useRef` thì mọi số liệu funnel sai gấp đôi. Xem `screen-map.md` mục 4.
 - **`initializeApp` gọi nhiều lần khi hot-reload** → `The default Firebase app already exists`. Luôn dùng `getApps()[0] ?? initializeApp(...)`. Xem `setup.md`.
+- **Gọi thẳng `localhost:4000` từ trình duyệt sẽ làm mất event cuối funnel.** POST cross-origin kèm `Content-Type: application/json` kích hoạt preflight `OPTIONS` — 2 round trip cho mỗi event. `confirm_ride` và `place_order` bắn ngay trước `router.push`, không kịp cả hai. Luôn dùng `fetch('/api/events')` qua proxy same-origin.
 
 ## Kiểm tra sau mỗi thay đổi liên quan tới tracking
 

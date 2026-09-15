@@ -11,7 +11,7 @@ events (collection)
  └─ {auto-id} (document)
      ├─ session_id: string
      ├─ user_id: string
-     ├─ flow: "ride" | "food"
+     ├─ flow: "ride" | "food" | "none"   // "none" chi o man home
      ├─ event_name: string
      ├─ screen_name: string
      ├─ previous_screen: string | null
@@ -62,9 +62,9 @@ events (collection)
 
 > Giá trị `screen_name`, `previous_screen`, `step_index` và cấu trúc `properties` của **mọi** event được quy định trong `event-taxonomy.md` — đó là nguồn sự thật, file này chỉ minh hoạ hình dạng document.
 
-`platform` do API route tự gắn, **không** nằm trong request body (xem `api-endpoints.md`).
+`platform` do `apps/api` tự gắn, **không** nằm trong request body (xem `api-endpoints.md`).
 
-## Cách ghi 1 document (trong API route, dùng Admin SDK)
+## Cách ghi 1 document (trong `apps/api/src/services/event.service.ts`, dùng Admin SDK)
 ```js
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
@@ -99,5 +99,7 @@ Firestore tự tạo index đơn giản (theo 1 field), nhưng khi query kết h
 
 ## Về danh sách 17 trường của mentor (chưa confirm)
 Khi có list thật, chỉ cần thêm field vào object khi ghi document — không có bước "migrate schema" như SQL (`ALTER TABLE`). Field nào dùng để lọc/sắp xếp thường xuyên thì để ở top-level document (như `flow`, `session_id`), field đặc thù ít dùng để lọc thì gom vào `properties`.
+
+Cụ thể phải sửa: `EventPayload` trong `packages/shared/src/types.ts`, rồi `apps/api/src/validators/event.validator.ts` (whitelist hiện chỉ lấy đúng 8 field — field mới không thêm vào đây sẽ bị loại im lặng).
 
 Quy trình chi tiết khi list được chốt: xem `event-taxonomy.md` mục 6.

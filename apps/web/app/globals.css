@@ -1,0 +1,76 @@
+@import "tailwindcss";
+
+/**
+ * Nguon: tailwind-theme.md muc 1 (goc o DESIGN.md).
+ * KHONG tu sinh gia tri mau/spacing/radius moi — xem CLAUDE.md quy tac 4.
+ */
+@theme {
+  /* ── colors ── */
+  --color-primary: #00b4b8;
+  --color-primary-dark: #048589;
+  --color-on-primary: #ffffff;
+  --color-ink: #000000;
+  --color-body: #5e5e5e;
+  --color-mute: #afafaf;
+  --color-hairline-mid: #4b4b4b;
+  --color-canvas: #ffffff;
+  --color-canvas-soft: #eafafa;
+  --color-canvas-softer: #f2fcfc;
+  --color-surface-pressed: #cdeeee;
+  --color-link: #0000ee;
+  --color-on-dark: #ffffff;
+
+  /* ── radius ── */
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-pill: 999px;
+  --radius-pill-tab: 36px;
+
+  /* ── spacing: BO SUNG vao thang so cua Tailwind, khong thay the ── */
+  --spacing-xxs: 4px;
+  --spacing-xs: 6px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 20px;
+  --spacing-2xl: 24px;
+  --spacing-3xl: 32px;
+
+  /* ── fonts ── */
+  --font-display: var(--font-inter), system-ui, "Helvetica Neue", Arial, sans-serif;
+  --font-text: var(--font-inter), system-ui, "Helvetica Neue", Arial, sans-serif;
+}
+
+/**
+ * Typography — tailwind-theme.md muc 3.
+ * Tailwind v4 khong sinh san class cho typography token nen khai bao tay.
+ * KHONG letter-spacing: DESIGN.md neu ro he chu khong bao gio gian/siet chu.
+ */
+@layer components {
+  .t-display-xxl { font: 700 52px/64px var(--font-display); }
+  .t-display-xl  { font: 700 36px/44px var(--font-display); }
+  .t-display-lg  { font: 700 32px/40px var(--font-display); }
+  .t-display-md  { font: 700 24px/32px var(--font-display); }
+  .t-display-sm  { font: 700 20px/28px var(--font-display); }
+
+  .t-body-lg        { font: 500 18px/24px var(--font-text); }
+  .t-body-md        { font: 400 16px/24px var(--font-text); }
+  .t-body-md-strong { font: 500 16px/20px var(--font-text); }
+  .t-body-sm        { font: 400 14px/20px var(--font-text); }
+  .t-body-sm-strong { font: 500 14px/16px var(--font-text); }
+  .t-caption        { font: 400 12px/20px var(--font-text); }
+
+  .t-button-large { font: 500 18px/24px var(--font-text); }
+  .t-button-md    { font: 500 16px/20px var(--font-text); }
+
+  /* tailwind-theme.md muc 5 — mac dinh la phang, khong bong.
+     Chi ap cho thanh nut hanh dong dinh day man hinh. */
+  .shadow-level-2 { box-shadow: rgba(0, 0, 0, 0.16) 0px 4px 16px 0px; }
+}
+
+html,
+body {
+  background: var(--color-canvas-softer);
+  color: var(--color-ink);
+}

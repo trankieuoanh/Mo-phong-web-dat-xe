@@ -26,10 +26,10 @@ Mặc định khi build: **lựa chọn 1**. Nếu mentor ưu tiên bám sát nh
 
 ## 1. Khai báo theme (Tailwind v4)
 
-`create-next-app` hiện cài Tailwind v4 — cấu hình bằng `@theme` trong CSS, **không** còn `tailwind.config.ts`.
+Dự án dùng Tailwind v4 — cấu hình bằng `@theme` trong CSS, **không** còn `tailwind.config.ts`. Chỉ có `apps/web/postcss.config.mjs` khai báo plugin `@tailwindcss/postcss`.
 
 ```css
-/* app/globals.css */
+/* apps/web/app/globals.css */
 @import "tailwindcss";
 
 @theme {
@@ -78,7 +78,7 @@ Thang spacing token (`xxs…3xl`) **bổ sung** chứ không thay thế thang s�
 Hai face gốc `UberMove` / `UberMoveText` là font độc quyền, không dùng được. `DESIGN.md` đã chỉ định bản thay thế: **Inter** — weight 700 cho display, 400/500 cho text.
 
 ```ts
-// app/layout.tsx
+// apps/web/app/layout.tsx
 import { Inter } from 'next/font/google';
 const inter = Inter({ subsets: ['latin', 'vietnamese'], variable: '--font-inter' });
 ```
@@ -90,7 +90,7 @@ Bắt buộc có subset `vietnamese` — thiếu nó thì "Bánh mì", "Đặt x
 Tailwind v4 không sinh sẵn class cho typography token, nên khai báo thành component class:
 
 ```css
-/* app/globals.css, sau @theme */
+/* apps/web/app/globals.css, sau @theme */
 @layer components {
   .t-display-xxl    { font: 700 52px/64px var(--font-display); }
   .t-display-xl     { font: 700 36px/44px var(--font-display); }

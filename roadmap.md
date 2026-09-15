@@ -4,7 +4,7 @@ Kế hoạch 6 tuần. Mỗi tuần có **Definition of Done kiểm chứng đư
 
 | Tuần | Trọng tâm | Definition of Done |
 |---|---|---|
-| **1** | Phase 0 + nền UI | `npm run dev` chạy; `/api/health` trả `{"status":"ok"}`; theme token đã vào `globals.css`; màn Home render 2 nút đúng token |
+| **1** | Phase 0 + nền UI | `npm run dev` lên cả 2 process; `curl localhost:4000/api/health` **và** `curl localhost:3000/api/health` đều trả `{"status":"ok"}`; màn Home render 2 nút đúng token |
 | **2** | Firestore + luồng Ride | Click hết 5 bước ride → mở Firebase console thấy đủ document, `step_index` 0→6 đúng `event-taxonomy.md` |
 | **3** | Luồng Food + giỏ hàng | Thêm/xoá/sửa số lượng, đặt đơn xong → `place_order` có `final_total` khớp với số hiển thị trên màn |
 | **4** | `GET /api/events` + hoàn thiện UI | `curl "localhost:3000/api/events?session_id=..."` trả đúng thứ tự bước; app dùng tốt ở khổ 390px |
@@ -15,38 +15,36 @@ Kế hoạch 6 tuần. Mỗi tuần có **Definition of Done kiểm chứng đư
 
 ## Tuần 1 — Nền
 
-1. `create-next-app` theo `setup.md` Phase 0.
-2. `app/api/health/route.ts` — không chạm Firestore.
-3. `globals.css`: khối `@theme` + class typography theo `tailwind-theme.md`.
-4. `lib/types.ts`: union type cho `EventName`, `ScreenName`, `Flow`.
-5. `lib/mock-data.ts`: gõ đủ dữ liệu từ `mock-data.md`.
-6. `app/page.tsx`: Home với 2 nút lớn.
+**Khung monorepo đã dựng sẵn** (`apps/web`, `apps/api`, `packages/shared`, `analysis`), gồm cả `globals.css` với `@theme` + typography, `types.ts`, `screens.ts`, `mock-data.ts`, `pricing.ts`, `/api/health`, và 13 page stub đã nối đúng tracking. Việc còn lại của tuần 1:
 
-> **Chốt `event-taxonomy.md` với mentor trong tuần này.** Sửa taxonomy sau khi đã sinh dữ liệu đồng nghĩa với vứt dữ liệu cũ.
+1. `npm install && npm run dev` — kiểm tra theo `setup.md` Phase 0.
+2. Hoàn thiện giao diện màn Home theo `DESIGN.md`.
+3. Rà `packages/shared/src/mock-data.ts` xem đã khớp `mock-data.md` chưa.
+
+> **Chốt `event-taxonomy.md` với mentor trong tuần này.** Sửa taxonomy sau khi đã sinh dữ liệu đồng nghĩa với vứt dữ liệu cũ. Nhớ hỏi mentor về `flow: "none"` ở màn Home (mục 1 của taxonomy).
 
 ## Tuần 2 — Firestore + Ride
 
-1. Firebase project + `.env.local` + `lib/firebase-admin.ts` (theo `setup.md`).
-2. `POST /api/events` + validate theo `api-endpoints.md`.
-3. `lib/session.ts`, `lib/track.ts`, hook `useScreenView`.
-4. 6 màn luồng ride + guard chống vào thẳng URL giữa luồng.
+1. Firebase project + `apps/api/.env` (theo `setup.md` Phase 1).
+2. Kiểm tra `POST /api/events` ghi được document thật.
+3. Hoàn thiện UI 6 màn luồng ride — **phần tracking đã nối sẵn, không sửa khi làm UI**.
+4. Kiểm tra guard: mở thẳng `/ride/confirm` ở tab mới phải bị đá về `/ride/address` và không sinh event nào.
 
 **Kiểm tra bắt buộc cuối tuần 2:** đi hết luồng một lần rồi đếm document trong console. Số `screen_view` phải **đúng bằng** số màn đã đi qua. Nếu gấp đôi → hook chưa chặn React Strict Mode (xem `screen-map.md` mục 4).
 
 ## Tuần 3 — Food
 
-1. `AppProvider` mở rộng cho giỏ hàng + đồng bộ `sessionStorage`.
-2. 6 màn luồng food, kể cả `/food/item/[itemId]`.
-3. Logic giảm giá dùng chung `calcDiscount` từ `mock-data.md`.
-4. Hai màn success + reset session.
+1. Hoàn thiện UI 6 màn luồng food, kể cả `/food/item/[itemId]`.
+2. Kiểm tra `calcDiscount` trong `packages/shared/src/pricing.ts` cho đủ 3 offer, nhất là `offer-freeship`.
+3. Hai màn success — xác nhận session được reset (mở DevTools xem `gsm_session_id` đổi).
 
 ## Tuần 4 — Đọc dữ liệu + hoàn thiện
 
-1. `GET /api/events` với `session_id` / `flow` / `from` / `to`.
-2. Tạo composite index khi Firestore báo lỗi kèm link.
+1. Kiểm tra `GET /api/events` với đủ 4 tổ hợp param: `session_id` / `flow` / `from` / `to`.
+2. Tạo composite index khi Firestore báo lỗi kèm link (message lỗi được trả nguyên văn, chứa link).
 3. Rà lại toàn bộ UI theo `tailwind-theme.md` — không còn giá trị hardcode ngoài token.
 4. Test khổ 390px và 430px.
-5. `npm run build` sạch lỗi TypeScript.
+5. `npm run build` và `npm run typecheck` sạch lỗi.
 
 ## Tuần 5 — Phân tích
 

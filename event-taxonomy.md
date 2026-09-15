@@ -16,6 +16,16 @@
 - `null` ở màn đầu tiên của session (`home`).
 - Ở lại một màn và bắn nhiều event → `previous_screen` **không đổi**, giữ nguyên giá trị của màn trước.
 
+### `flow` — luồng đang đi, kể cả khi chưa chọn
+Ba giá trị: `"ride"`, `"food"`, `"none"`.
+
+`"none"` chỉ dùng cho hai event ở màn `home` (`screen_view` và `back_to_home`) — lúc đó người dùng **chưa chọn luồng nào**, nên không giá trị nào khác là đúng. Ghi bừa `"ride"` sẽ thổi phồng mọi tỉ lệ "vào Home → chọn ride".
+
+Hệ quả cho script pandas:
+- Đếm funnel từng luồng: lọc `flow != 'none'`.
+- Mẫu số "số người vào Home": đếm `session_id` duy nhất có `flow == 'none'`.
+- `select_flow` **luôn** mang `flow` = giá trị được chọn, không phải `'none'`.
+
 ### `screen_view`
 - Bắn **một lần** khi mỗi màn mount lần đầu trong một lượt điều hướng.
 - Quay lại màn cũ bằng Back → bắn `screen_view` mới (đây là một lượt xem mới).
@@ -33,9 +43,11 @@ Không có event riêng. Một session được coi là bỏ dở khi **không t
 
 ## 2. Bảng màn hình
 
+Bảng này được mã hoá **một lần duy nhất** thành `SCREENS` trong `packages/shared/src/screens.ts`. `trackEvent` tra bảng đó — không page nào gõ tay `step_index`.
+
 | Luồng | `screen_name` | Route | `step_index` |
 |---|---|---|---|
-| chung | `home` | `/` | 0 |
+| chung (`flow: "none"`) | `home` | `/` | 0 |
 | ride | `address_selection` | `/ride/address` | 1 |
 | ride | `pickup_confirm` | `/ride/pickup` | 2 |
 | ride | `vehicle_selection` | `/ride/vehicle` | 3 |
@@ -175,7 +187,7 @@ Không có event riêng. Một session được coi là bỏ dở khi **không t
 
 ---
 
-## 5. Tổng hợp `event_name` (14 giá trị)
+## 5. Tổng hợp `event_name` (19 giá trị)
 
 ```
 screen_view, back, back_to_home, select_flow,
@@ -185,7 +197,7 @@ select_item, change_quantity, add_to_cart,
 remove_from_cart, proceed_to_offer, select_offer, skip_offer, place_order
 ```
 
-Khai báo thành union type trong `lib/types.ts` để TypeScript bắt lỗi gõ sai tên event.
+Khai báo trong `packages/shared/src/types.ts`: union type `EventName` (để TypeScript bắt lỗi gõ sai) **và** mảng `EVENT_NAMES` (để validator ở `apps/api` kiểm tra lúc chạy). Hai thứ này được một type assertion buộc phải khớp nhau — thêm giá trị vào union mà quên thêm vào mảng sẽ lỗi build, nếu không validator sẽ lặng lẽ từ chối một event hoàn toàn hợp lệ.
 
 ---
 
@@ -195,5 +207,5 @@ Schema hiện tại có **9 field top-level** (`session_id`, `user_id`, `flow`, 
 
 1. Field dùng để **lọc/sắp xếp thường xuyên** → thêm vào top-level document.
 2. Field **đặc thù theo loại event** → thêm vào `properties`.
-3. Cập nhật bảng ở mục 3–4 của file này, cập nhật type trong `lib/types.ts`, cập nhật validate trong `app/api/events/route.ts`.
+3. Cập nhật bảng ở mục 3–4 của file này, rồi `packages/shared/src/types.ts` (union `EventName` + mảng `EVENT_NAMES`, và `EventPayload` nếu là field top-level), `packages/shared/src/screens.ts` nếu là màn mới, và `apps/api/src/validators/event.validator.ts` nếu cần luật kiểm tra riêng.
 4. Firestore **không cần migrate** — document cũ thiếu field mới vẫn đọc được, script pandas xử lý bằng `.fillna()`.
