@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation';
 import { SHIPPING_FEE, calcFoodTotals, getFoodItem } from '@gsm/shared';
 import { BackButton } from '@/components/BackButton';
 import { FlowGuard } from '@/components/FlowGuard';
+import { Icon } from '@/components/Icon';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { ScreenShell } from '@/components/ScreenShell';
 import { useApp } from '@/lib/app-context';
@@ -75,6 +76,10 @@ function FoodCartContent() {
 
   return (
     <ScreenShell
+      variant="wide"
+      section="Đặt đồ ăn"
+      tabs={['Đặt món', 'Đang diễn ra', 'Đơn đã lưu']}
+      maxWidth="max-w-[760px]"
       title="Giỏ hàng"
       leading={<BackButton from="food_cart" to="food_menu" href="/food" />}
       footer={<PrimaryButton onClick={proceed}>Tiếp tục</PrimaryButton>}
@@ -89,8 +94,12 @@ function FoodCartContent() {
               key={line.itemId}
               className="flex items-center gap-lg rounded-md bg-canvas-soft p-lg"
             >
-              <div className="flex-1">
-                <span className="t-body-md-strong block">{item.name}</span>
+              <span className="grid size-14 shrink-0 place-items-center rounded-xl bg-canvas">
+                <span className="t-display-sm text-primary-dark">{item.name.charAt(0)}</span>
+              </span>
+
+              <div className="min-w-0 flex-1">
+                <span className="t-body-md-strong block truncate">{item.name}</span>
                 <span className="t-body-md-strong mt-xxs block">
                   {formatVnd(item.price * line.quantity)}
                 </span>
@@ -99,33 +108,31 @@ function FoodCartContent() {
               <div className="flex items-center gap-sm">
                 <QtyButton
                   label="Giảm số lượng"
+                  icon="minus"
                   onClick={() => changeQuantity(line.itemId, line.quantity - 1)}
-                >
-                  −
-                </QtyButton>
+                />
                 <span className="t-body-md-strong w-5 text-center">{line.quantity}</span>
                 <QtyButton
                   label="Tăng số lượng"
+                  icon="plus"
                   onClick={() => changeQuantity(line.itemId, line.quantity + 1)}
-                >
-                  +
-                </QtyButton>
+                />
               </div>
 
               <button
                 type="button"
                 aria-label={`Xoá ${item.name}`}
                 onClick={() => remove(line.itemId)}
-                className="t-caption shrink-0 text-mute underline"
+                className="grid size-11 shrink-0 place-items-center rounded-full text-mute transition-colors hover:bg-canvas hover:text-ink"
               >
-                Xoá
+                <Icon name="trash" size={20} />
               </button>
             </li>
           );
         })}
       </ul>
 
-      <div className="mt-2xl rounded-xl bg-canvas p-2xl">
+      <div className="mt-2xl rounded-xl bg-canvas-soft p-2xl">
         <Row label="Tiền hàng" value={formatVnd(totals.cartTotal)} />
         <Row label="Phí giao hàng" value={formatVnd(SHIPPING_FEE)} />
       </div>
@@ -144,21 +151,21 @@ function Row({ label, value }: { label: string; value: string }) {
 
 function QtyButton({
   label,
+  icon,
   onClick,
-  children,
 }: {
   label: string;
+  icon: 'plus' | 'minus';
   onClick: () => void;
-  children: React.ReactNode;
 }) {
   return (
     <button
       type="button"
       aria-label={label}
       onClick={onClick}
-      className="grid size-11 place-items-center rounded-full bg-canvas text-ink active:bg-surface-pressed"
+      className="grid size-11 place-items-center rounded-full bg-canvas text-ink transition-colors hover:bg-surface-pressed"
     >
-      <span aria-hidden="true">{children}</span>
+      <Icon name={icon} size={20} />
     </button>
   );
 }

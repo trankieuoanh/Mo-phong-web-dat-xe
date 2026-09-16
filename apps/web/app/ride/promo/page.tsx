@@ -15,6 +15,7 @@ import { useState } from 'react';
 import { PROMOS, calcDiscount, getVehicle, isRuleAvailable } from '@gsm/shared';
 import { BackButton } from '@/components/BackButton';
 import { FlowGuard } from '@/components/FlowGuard';
+import { Icon } from '@/components/Icon';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { ScreenShell } from '@/components/ScreenShell';
 import { useApp } from '@/lib/app-context';
@@ -25,7 +26,7 @@ export default function PromoPage() {
   const { ride } = useApp();
   return (
     <FlowGuard
-      ready={Boolean(ride.addressId && ride.vehicleId)}
+      ready={Boolean(ride.destination && ride.vehicleId)}
       fallback="/ride/address"
     >
       <PromoContent />
@@ -87,13 +88,19 @@ function PromoContent() {
 
   return (
     <ScreenShell
+      // Man nay trong spec la mot overlay, khong phai mot buoc co ban do —
+      // nen dung panel hep canh giua thay vi bo cuc 2 cot.
+      variant="wide"
+      section="Di chuyển"
+      tabs={['Đặt xe', 'Đang diễn ra']}
+      maxWidth="max-w-[600px]"
       title="Ưu đãi"
       leading={
         <BackButton
           from="promo_selection"
           to="vehicle_selection"
           href="/ride/vehicle"
-          glyph="×"
+          icon="close"
         />
       }
       footer={
@@ -133,9 +140,16 @@ function PromoContent() {
       </div>
       {codeError ? <p className="t-caption mt-xs text-mute">{codeError}</p> : null}
 
-      <div aria-hidden="true" className="mt-lg rounded-xl bg-canvas-soft p-2xl">
-        <p className="t-body-md-strong">👑 Gói hội viên GSM</p>
-        <p className="t-body-sm mt-xxs text-body">Ưu đãi mỗi chuyến, huỷ bất cứ lúc nào</p>
+      <div aria-hidden="true" className="mt-lg flex items-center gap-lg rounded-xl bg-canvas-soft p-2xl">
+        <span className="grid size-11 shrink-0 place-items-center rounded-full bg-canvas text-primary-dark">
+          <Icon name="crown" size={22} />
+        </span>
+        <span>
+          <span className="t-body-md-strong block">Gói hội viên GSM</span>
+          <span className="t-body-sm mt-xxs block text-body">
+            Ưu đãi mỗi chuyến, huỷ bất cứ lúc nào
+          </span>
+        </span>
       </div>
 
       <ul className="mt-lg flex flex-col gap-md">
@@ -152,7 +166,7 @@ function PromoContent() {
                   setPicked((prev) => (prev === promo.id ? null : promo.id));
                   setCodeError('');
                 }}
-                className={`flex w-full items-center gap-lg rounded-md bg-canvas-soft p-lg text-left text-ink active:bg-surface-pressed disabled:cursor-not-allowed disabled:opacity-50 ${
+                className={`flex w-full items-center gap-lg rounded-md bg-canvas-soft p-lg text-left text-ink transition-colors enabled:hover:bg-surface-pressed disabled:cursor-not-allowed disabled:opacity-50 ${
                   promo.id === picked ? 'ring-2 ring-primary' : ''
                 }`}
               >
@@ -178,7 +192,7 @@ function PromoContent() {
                     promo.id === picked ? 'bg-primary-dark text-on-primary' : 'bg-canvas'
                   }`}
                 >
-                  {promo.id === picked ? '✓' : ''}
+                  {promo.id === picked ? <Icon name="check" size={14} /> : null}
                 </span>
               </button>
             </li>

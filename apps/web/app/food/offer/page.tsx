@@ -52,6 +52,10 @@ function FoodOfferContent() {
 
   return (
     <ScreenShell
+      variant="wide"
+      section="Đặt đồ ăn"
+      tabs={['Đặt món', 'Đang diễn ra', 'Đơn đã lưu']}
+      maxWidth="max-w-[600px]"
       title="Chọn ưu đãi"
       leading={<BackButton from="food_offer_selection" to="food_cart" href="/food/cart" />}
       footer={
@@ -71,7 +75,7 @@ function FoodOfferContent() {
                 type="button"
                 disabled={!available}
                 onClick={() => selectOffer(offer.id, offer.code, discount)}
-                className={`w-full rounded-md bg-canvas-soft p-lg text-left text-ink active:bg-surface-pressed disabled:cursor-not-allowed disabled:opacity-50 ${
+                className={`w-full rounded-md bg-canvas-soft p-lg text-left text-ink transition-colors enabled:hover:bg-surface-pressed disabled:cursor-not-allowed disabled:opacity-50 ${
                   offer.id === offerId ? 'ring-2 ring-primary' : ''
                 }`}
               >

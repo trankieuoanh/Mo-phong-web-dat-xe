@@ -54,11 +54,15 @@ function FoodConfirmContent() {
 
   return (
     <ScreenShell
+      variant="wide"
+      section="Đặt đồ ăn"
+      tabs={['Đặt món', 'Đang diễn ra', 'Đơn đã lưu']}
+      maxWidth="max-w-[600px]"
       title="Xác nhận đơn hàng"
       leading={<BackButton from="food_confirm" to="food_offer_selection" href="/food/offer" />}
       footer={<PrimaryButton onClick={placeOrder}>Đặt đơn</PrimaryButton>}
     >
-      <ul className="rounded-xl bg-canvas p-2xl">
+      <ul className="rounded-xl bg-canvas-soft p-2xl">
         {cart.map((line) => {
           const item = getFoodItem(line.itemId);
           if (!item) return null;
@@ -73,7 +77,7 @@ function FoodConfirmContent() {
         })}
       </ul>
 
-      <div className="mt-lg rounded-xl bg-canvas p-2xl">
+      <div className="mt-lg rounded-xl bg-canvas-soft p-2xl">
         <Row label="Tiền hàng" value={formatVnd(totals.cartTotal)} />
         <Row label="Phí giao hàng" value={formatVnd(totals.shippingFee)} />
         <Row
@@ -81,7 +85,7 @@ function FoodConfirmContent() {
           value={offer ? `− ${formatVnd(totals.discountAmount)}` : 'Không áp dụng'}
         />
 
-        <div className="mt-lg flex items-center justify-between border-t border-surface-pressed pt-lg">
+        <div className="mt-lg flex items-center justify-between border-t border-canvas pt-lg">
           <span className="t-body-md-strong">Tổng cộng</span>
           <span className="t-display-sm">{formatVnd(totals.finalTotal)}</span>
         </div>

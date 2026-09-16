@@ -18,6 +18,7 @@ import {
   type FoodCategory,
 } from '@gsm/shared';
 import { BackButton } from '@/components/BackButton';
+import { Icon } from '@/components/Icon';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { ScreenShell } from '@/components/ScreenShell';
 import { useApp } from '@/lib/app-context';
@@ -64,6 +65,9 @@ export default function FoodMenuPage() {
 
   return (
     <ScreenShell
+      variant="wide"
+      section="Đặt đồ ăn"
+      tabs={['Đặt món', 'Đang diễn ra', 'Đơn đã lưu']}
       title="Đặt đồ ăn"
       leading={<BackButton from="food_menu" to="home" href="/" />}
       footer={
@@ -90,33 +94,40 @@ export default function FoodMenuPage() {
         ))}
       </div>
 
-      <ul className="flex flex-col gap-md">
+      {/* Luoi nhieu cot — tan dung chieu rong cua web desktop.
+          Ban mobile cu la mot cot doc (screen-map.md muc 6). */}
+      <ul className="grid gap-md sm:grid-cols-2 xl:grid-cols-3">
         {items.map((item) => (
-          <li key={item.id} className="flex items-center gap-lg rounded-md bg-canvas-soft p-lg">
-            {/* Khung anh 4:3 voi ky tu dau ten mon — khong dung anh that
-                (mock-data.md muc 4, tailwind-theme.md muc 7). */}
-            <div className="grid aspect-[4/3] w-20 shrink-0 place-items-center rounded-xl bg-canvas">
-              <span className="t-display-md text-primary-dark">{item.name.charAt(0)}</span>
-            </div>
-
+          <li
+            key={item.id}
+            className="flex flex-col overflow-hidden rounded-xl bg-canvas-soft transition-colors hover:bg-surface-pressed"
+          >
             <button
               type="button"
               onClick={() => selectItem(item.id, item.name, item.price)}
-              className="flex-1 text-left"
+              className="flex flex-1 flex-col p-lg text-left"
             >
-              <span className="t-body-md-strong block">{item.name}</span>
+              {/* Khung anh 4:3 voi ky tu dau ten mon — khong dung anh that
+                  (mock-data.md muc 4, tailwind-theme.md muc 7). */}
+              <span className="grid aspect-[4/3] w-full place-items-center rounded-xl bg-canvas">
+                <span className="t-display-lg text-primary-dark">{item.name.charAt(0)}</span>
+              </span>
+
+              <span className="t-body-md-strong mt-lg block">{item.name}</span>
               <span className="t-body-sm mt-xxs block text-body">{item.restaurant}</span>
-              <span className="t-body-md-strong mt-xxs block">{formatVnd(item.price)}</span>
             </button>
 
-            <button
-              type="button"
-              aria-label={`Thêm ${item.name} vào giỏ`}
-              onClick={() => quickAdd(item.id, item.name, item.price)}
-              className="grid size-11 shrink-0 place-items-center rounded-full bg-canvas text-ink active:bg-surface-pressed"
-            >
-              <span aria-hidden="true">+</span>
-            </button>
+            <div className="flex items-center justify-between gap-md px-lg pb-lg">
+              <span className="t-body-md-strong">{formatVnd(item.price)}</span>
+              <button
+                type="button"
+                aria-label={`Thêm ${item.name} vào giỏ`}
+                onClick={() => quickAdd(item.id, item.name, item.price)}
+                className="grid size-11 shrink-0 place-items-center rounded-full bg-canvas text-primary-dark transition-colors hover:bg-primary-dark hover:text-on-primary"
+              >
+                <Icon name="plus" size={20} />
+              </button>
+            </div>
           </li>
         ))}
       </ul>
@@ -137,7 +148,7 @@ function CategoryChip({
     <button
       type="button"
       onClick={onClick}
-      className={`t-body-sm-strong shrink-0 rounded-pill bg-canvas-soft px-lg py-sm text-ink active:bg-surface-pressed ${
+      className={`t-body-sm-strong shrink-0 rounded-pill bg-canvas-soft px-lg py-sm text-ink transition-colors hover:bg-surface-pressed ${
         active ? 'ring-2 ring-primary' : ''
       }`}
     >

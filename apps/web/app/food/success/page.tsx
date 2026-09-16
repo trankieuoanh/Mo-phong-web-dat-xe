@@ -8,6 +8,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { calcFoodTotals, getFoodItem, getOffer } from '@gsm/shared';
+import { Icon } from '@/components/Icon';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { ScreenShell } from '@/components/ScreenShell';
 import { useApp } from '@/lib/app-context';
@@ -42,19 +43,24 @@ export default function FoodSuccessPage() {
 
   return (
     <ScreenShell
+      variant="wide"
+      section="Đặt đồ ăn"
+      tabs={['Đặt món', 'Đang diễn ra', 'Đơn đã lưu']}
+      maxWidth="max-w-[600px]"
       title="Đặt đơn thành công"
       footer={<PrimaryButton onClick={backToHome}>Về trang chủ</PrimaryButton>}
     >
       <div className="flex flex-col items-center py-3xl">
-        <div className="grid size-16 place-items-center rounded-full bg-primary text-on-primary">
-          <span className="t-display-md" aria-hidden="true">
-            ✓
-          </span>
+        <div className="grid size-20 place-items-center rounded-full bg-primary text-on-primary">
+          <Icon name="check" size={40} />
         </div>
         <h2 className="t-display-md mt-lg text-center">Đặt đơn thành công</h2>
+        <p className="t-body-sm mt-xxs text-center text-body">
+          Đơn của bạn đang được nhà hàng chuẩn bị
+        </p>
       </div>
 
-      <div className="rounded-xl bg-canvas p-2xl">
+      <div className="rounded-xl bg-canvas-soft p-2xl">
         <Row label="Số món" value={summary ? `${summary.itemCount} món` : '—'} />
         <Row label="Tổng thanh toán" value={summary?.total ?? '—'} />
       </div>

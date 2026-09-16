@@ -14,6 +14,7 @@ import { useState } from 'react';
 import { calcFoodTotals, getFoodItem } from '@gsm/shared';
 import { BackButton } from '@/components/BackButton';
 import { FlowGuard } from '@/components/FlowGuard';
+import { Icon } from '@/components/Icon';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { ScreenShell } from '@/components/ScreenShell';
 import { useApp } from '@/lib/app-context';
@@ -74,6 +75,10 @@ function FoodItemContent({ itemId }: { itemId: string }) {
 
   return (
     <ScreenShell
+      variant="wide"
+      section="Đặt đồ ăn"
+      tabs={['Đặt món', 'Đang diễn ra', 'Đơn đã lưu']}
+      maxWidth="max-w-[880px]"
       title={item.name}
       leading={<BackButton from="food_item_detail" to="food_menu" href="/food" />}
       footer={
@@ -82,25 +87,26 @@ function FoodItemContent({ itemId }: { itemId: string }) {
         </PrimaryButton>
       }
     >
-      <div className="grid aspect-[4/3] w-full place-items-center rounded-xl bg-canvas-soft">
-        <span className="t-display-md text-primary-dark">{item.name.charAt(0)}</span>
-      </div>
+      {/* Hai cot tren desktop: khung anh trai, thong tin phai. */}
+      <div className="grid gap-2xl md:grid-cols-2">
+        <div className="grid aspect-[4/3] w-full place-items-center rounded-xl bg-canvas-soft">
+          <span className="t-display-xl text-primary-dark">{item.name.charAt(0)}</span>
+        </div>
 
-      <h2 className="t-display-md mt-lg">{item.name}</h2>
-      <p className="t-body-sm mt-xxs text-body">{item.restaurant}</p>
-      <p className="t-body-sm mt-md text-body">{item.description}</p>
-      <p className="t-body-md-strong mt-lg">{formatVnd(item.price)}</p>
+        <div className="flex flex-col">
+          <h2 className="t-display-md">{item.name}</h2>
+          <p className="t-body-sm mt-xxs text-body">{item.restaurant}</p>
+          <p className="t-body-sm mt-md text-body">{item.description}</p>
+          <p className="t-display-sm mt-lg">{formatVnd(item.price)}</p>
 
-      <div className="mt-2xl flex items-center gap-lg">
-        <span className="t-body-sm text-body">Số lượng</span>
-        <div className="flex items-center gap-md">
-          <QtyButton label="Giảm số lượng" onClick={() => changeQuantity(quantity - 1)}>
-            −
-          </QtyButton>
-          <span className="t-body-md-strong w-6 text-center">{quantity}</span>
-          <QtyButton label="Tăng số lượng" onClick={() => changeQuantity(quantity + 1)}>
-            +
-          </QtyButton>
+          <div className="mt-2xl flex items-center gap-lg">
+            <span className="t-body-sm text-body">Số lượng</span>
+            <div className="flex items-center gap-md">
+              <QtyButton label="Giảm số lượng" icon="minus" onClick={() => changeQuantity(quantity - 1)} />
+              <span className="t-body-md-strong w-6 text-center">{quantity}</span>
+              <QtyButton label="Tăng số lượng" icon="plus" onClick={() => changeQuantity(quantity + 1)} />
+            </div>
+          </div>
         </div>
       </div>
     </ScreenShell>
@@ -109,21 +115,21 @@ function FoodItemContent({ itemId }: { itemId: string }) {
 
 function QtyButton({
   label,
+  icon,
   onClick,
-  children,
 }: {
   label: string;
+  icon: 'plus' | 'minus';
   onClick: () => void;
-  children: React.ReactNode;
 }) {
   return (
     <button
       type="button"
       aria-label={label}
       onClick={onClick}
-      className="grid size-11 place-items-center rounded-full bg-canvas-soft text-ink active:bg-surface-pressed"
+      className="grid size-11 place-items-center rounded-full bg-canvas-soft text-ink transition-colors hover:bg-surface-pressed"
     >
-      <span aria-hidden="true">{children}</span>
+      <Icon name={icon} size={20} />
     </button>
   );
 }

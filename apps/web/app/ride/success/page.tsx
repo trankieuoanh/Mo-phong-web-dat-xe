@@ -10,7 +10,8 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { calcRideTotals, getAddress, getPromo, getVehicle } from '@gsm/shared';
+import { calcRideTotals, getPromo, getVehicle } from '@gsm/shared';
+import { Icon } from '@/components/Icon';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { ScreenShell } from '@/components/ScreenShell';
 import { useApp } from '@/lib/app-context';
@@ -25,6 +26,7 @@ export default function RideSuccessPage() {
   // Chup lai tom tat TRUOC khi xoa draft — neu doc truc tiep tu `ride` thi
   // man hinh se trong rong ngay sau khi clearRide() chay.
   const [summary, setSummary] = useState<{
+    pickup: string;
     destination: string;
     vehicle: string;
     total: string;
@@ -38,7 +40,8 @@ export default function RideSuccessPage() {
     const totals = calcRideTotals(vehicle?.basePrice ?? 0, promo);
 
     setSummary({
-      destination: getAddress(ride.addressId ?? '')?.label ?? '—',
+      pickup: ride.pickup?.label ?? '—',
+      destination: ride.destination?.label ?? '—',
       vehicle: vehicle?.name ?? '—',
       total: formatVnd(totals.finalPrice),
     });
@@ -58,19 +61,25 @@ export default function RideSuccessPage() {
 
   return (
     <ScreenShell
+      variant="wide"
+      section="Di chuyển"
+      tabs={['Đặt xe', 'Đang diễn ra']}
+      maxWidth="max-w-[600px]"
       title="Đặt xe thành công"
       footer={<PrimaryButton onClick={backToHome}>Về trang chủ</PrimaryButton>}
     >
       <div className="flex flex-col items-center py-3xl">
-        <div className="grid size-16 place-items-center rounded-full bg-primary text-on-primary">
-          <span className="t-display-md" aria-hidden="true">
-            ✓
-          </span>
+        <div className="grid size-20 place-items-center rounded-full bg-primary text-on-primary">
+          <Icon name="check" size={40} />
         </div>
         <h2 className="t-display-md mt-lg text-center">Đặt xe thành công</h2>
+        <p className="t-body-sm mt-xxs text-center text-body">
+          Tài xế sẽ liên hệ với bạn trong ít phút
+        </p>
       </div>
 
-      <div className="rounded-xl bg-canvas p-2xl">
+      <div className="rounded-xl bg-canvas-soft p-2xl">
+        <Row label="Điểm đón" value={summary?.pickup ?? '—'} />
         <Row label="Điểm đến" value={summary?.destination ?? '—'} />
         <Row label="Loại xe" value={summary?.vehicle ?? '—'} />
         <Row label="Tổng thanh toán" value={summary?.total ?? '—'} />

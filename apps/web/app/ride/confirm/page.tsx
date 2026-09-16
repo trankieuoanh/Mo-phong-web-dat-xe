@@ -12,9 +12,10 @@
  */
 
 import { useRouter } from 'next/navigation';
-import { FIXED_PICKUP, calcRideTotals, getAddress, getPromo, getVehicle } from '@gsm/shared';
+import { DEFAULT_PICKUP, calcRideTotals, getPromo, getVehicle } from '@gsm/shared';
 import { BackButton } from '@/components/BackButton';
 import { FlowGuard } from '@/components/FlowGuard';
+import { Icon, type IconName } from '@/components/Icon';
 import { MapCanvas } from '@/components/MapCanvas';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { ScreenShell } from '@/components/ScreenShell';
@@ -22,16 +23,16 @@ import { useApp, type PaymentMethod } from '@/lib/app-context';
 import { formatVnd } from '@/lib/format';
 import { trackEvent, useScreenView } from '@/lib/track';
 
-const PAYMENTS: { id: PaymentMethod; label: string }[] = [
-  { id: 'cash', label: '💵 Tiền mặt' },
-  { id: 'qr', label: '📱 QR' },
+const PAYMENTS: { id: PaymentMethod; label: string; icon: IconName }[] = [
+  { id: 'cash', label: 'Tiền mặt', icon: 'cash' },
+  { id: 'qr', label: 'QR', icon: 'qr' },
 ];
 
 export default function RideConfirmPage() {
   const { ride } = useApp();
   return (
     <FlowGuard
-      ready={Boolean(ride.addressId && ride.vehicleId && ride.promoId !== undefined)}
+      ready={Boolean(ride.destination && ride.vehicleId && ride.promoId !== undefined)}
       fallback="/ride/address"
     >
       <RideConfirmContent />
@@ -44,7 +45,9 @@ function RideConfirmContent() {
   const router = useRouter();
   const { ride, setRide } = useApp();
 
-  const address = getAddress(ride.addressId!);
+  // FlowGuard da bao dam `destination`; `pickup` luon co nho newRideDraft().
+  const destination = ride.destination!;
+  const pickup = ride.pickup ?? DEFAULT_PICKUP;
   const vehicle = getVehicle(ride.vehicleId!);
   const promo = ride.promoId ? (getPromo(ride.promoId) ?? null) : null;
   const paymentMethod = ride.paymentMethod ?? 'cash';
@@ -57,7 +60,15 @@ function RideConfirmContent() {
       eventName: 'confirm_ride',
       screenName: 'ride_confirm',
       properties: {
-        address_id: ride.addressId,
+        address_id: destination.id,
+        // Lap lai NHAN o day du `select_address` da co: event nay phai TU MO TA
+        // du mot chuyen di, vi man /history dung bang lich su tu rieng cac
+        // document `confirm_ride`, khong join nguoc. Va voi dia chi tim duoc thi
+        // KHONG CO BANG NAO tra id ra ten (event-taxonomy.md muc `ride_confirm`).
+        address_label: destination.label,
+        address_source: destination.source,
+        pickup_id: pickup.id,
+        pickup_label: pickup.label,
         vehicle_id: ride.vehicleId,
         vehicle_type: vehicle?.type,
         promo_id: ride.promoId ?? null,
@@ -73,18 +84,18 @@ function RideConfirmContent() {
 
   return (
     <ScreenShell
+      variant="split"
+      section="Di chuyển"
+      tabs={['Đặt xe', 'Đang diễn ra']}
+      aside={<MapCanvas variant="route" fill />}
       title="Xác nhận chuyến đi"
       leading={<BackButton from="ride_confirm" to="promo_selection" href="/ride/promo" />}
       footer={<PrimaryButton onClick={confirmRide}>Đặt xe</PrimaryButton>}
     >
-      <div className="mb-lg">
-        <MapCanvas variant="route" />
-      </div>
-
-      {/* card-content — tailwind-theme.md muc 4 */}
-      <div className="rounded-xl bg-canvas p-2xl">
-        <Row label="Điểm đón" value={FIXED_PICKUP.label} />
-        <Row label="Điểm đến" value={address?.label ?? '—'} />
+      {/* card-soft-tinted — panel da la nen trang nen card dung `canvas-soft`. */}
+      <div className="rounded-xl bg-canvas-soft p-2xl">
+        <Row label="Điểm đón" value={pickup.label} />
+        <Row label="Điểm đến" value={destination.label} />
         <Row label="Loại xe" value={vehicle?.name ?? '—'} />
         <Row label="Giá chuyến" value={formatVnd(totals.basePrice)} />
 
@@ -94,7 +105,7 @@ function RideConfirmContent() {
               {promo.title} · −{formatVnd(totals.discountAmount)}
             </span>
           ) : (
-            <span className="t-body-sm-strong inline-block rounded-pill bg-canvas-soft px-lg py-sm text-body">
+            <span className="t-body-sm-strong inline-block rounded-pill bg-canvas px-lg py-sm text-body">
               Không áp dụng ưu đãi
             </span>
           )}
@@ -102,21 +113,21 @@ function RideConfirmContent() {
 
         <p className="t-caption mt-lg text-mute">Phương thức thanh toán</p>
         <div className="mt-xs flex gap-sm">
-          {PAYMENTS.map(({ id, label }) => (
+          {PAYMENTS.map(({ id, label, icon }) => (
             <button
               key={id}
               type="button"
               onClick={() => setRide({ paymentMethod: id })}
-              className={`t-body-sm-strong rounded-pill bg-canvas-soft px-lg py-sm text-ink active:bg-surface-pressed ${
+              className={`t-body-sm-strong inline-flex items-center gap-sm rounded-pill bg-canvas px-lg py-sm text-ink transition-colors hover:bg-surface-pressed ${
                 id === paymentMethod ? 'ring-2 ring-primary' : ''
               }`}
             >
-              {label}
+              <Icon name={icon} size={16} /> {label}
             </button>
           ))}
         </div>
 
-        <div className="mt-lg flex items-center justify-between border-t border-surface-pressed pt-lg">
+        <div className="mt-lg flex items-center justify-between border-t border-canvas pt-lg">
           <span className="t-body-md-strong">Tổng cộng</span>
           <span className="t-display-sm">{formatVnd(totals.finalPrice)}</span>
         </div>
