@@ -251,7 +251,7 @@ BE **không** dùng `mock-data.ts` hay `pricing.ts` — dữ liệu tĩnh và t�
 
 ## 11. Trạng thái: BE đã xong tới đâu
 
-**Không còn `TODO` nào trong `apps/api`.** Toàn repo chỉ còn **2** `TODO`, cả hai ở `analysis/metrics.py` (Tuần 5).
+**Không còn `TODO` nào trong `apps/api`** — và từ khi `analysis/metrics.py` được viết đủ 6 nhóm chỉ số, **toàn repo không còn `TODO` nào**.
 
 **BE đã chạy thật với Firestore** — không còn gì để implement.
 
