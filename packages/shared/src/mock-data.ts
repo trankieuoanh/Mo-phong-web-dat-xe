@@ -13,13 +13,16 @@ export const SHIPPING_FEE = 15_000;
 export const CURRENCY = 'đ';
 
 /**
- * Diem DON co dinh — app that tu dinh vi GPS, man `pickup_confirm` chi xac nhan.
- * KHONG ghi event cho no: hang so thi moi document deu giong nhau, khong phan
- * biet duoc session nay voi session kia. Xem mock-data.md muc 1.
+ * Diem DON MAC DINH — app that tu dinh vi GPS, man `pickup_confirm` hien san
+ * gia tri nay. KHONG con la hang so bat bien: man do gio co o tim, nguoi dung
+ * doi duoc diem don, va `confirm_pickup` ghi lai lua chon do.
  *
- * Nguoi dung chon DIEM DEN o man 1 (`ADDRESSES` ben duoi).
+ * `id` phai on dinh — no di thang vao `properties.pickup_id`, va
+ * `pickup_id != 'pickup-current'` chinh la ti le nguoi doi diem don
+ * (analysis-spec.md nhom 5). Xem mock-data.md muc 1.
  */
 export const FIXED_PICKUP = {
+  id: 'pickup-current',
   label: 'Vị trí hiện tại',
   address: '128 Xuân Thủy, Cầu Giấy, Hà Nội',
 };
@@ -29,7 +32,10 @@ export const FIXED_PICKUP = {
  * "34 phut • 15 km" o man chon xe va man xac nhan.
  * KHONG ghi vao event: hang so thi moi document deu giong nhau,
  * khong phan biet duoc session nay voi session kia.
- * Xem ride-flow-design.md muc 5.2.
+ *
+ * Van la hang so DU dia chi tim duoc da co lat/lon: tinh quang duong that can
+ * mot dich vu dinh tuyen, ma app nay khong dat xe that nen con so do khong them
+ * gi cho phan tich funnel. Xem ride-flow-design.md muc 5.2.
  */
 export const FIXED_ROUTE = { distanceKm: 15, durationMin: 34 };
 

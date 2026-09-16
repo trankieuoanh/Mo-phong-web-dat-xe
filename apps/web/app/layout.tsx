@@ -14,14 +14,15 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'GSM — Mô phỏng đặt xe',
+  title: 'Green SM — Mô phỏng đặt xe',
   description: 'Mô phỏng web đặt xe kiểu Green SM, dùng để thu thập event hành vi người dùng.',
 };
 
+// `viewportFit: 'cover'` da bo — no chi co y nghia voi notch dien thoai, con
+// day gio la web desktop (screen-map.md muc 6).
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  viewportFit: 'cover',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

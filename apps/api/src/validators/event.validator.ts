@@ -120,6 +120,8 @@ export function validateEventPayload(body: unknown): ValidationResult {
 
 export interface EventQuery {
   sessionId?: string;
+  /** Ben qua nhieu phien — nguon du lieu cho man /history. */
+  userId?: string;
   flow?: 'ride' | 'food';
   from?: Date;
   to?: Date;
@@ -138,6 +140,14 @@ export function validateEventQuery(params: URLSearchParams): QueryValidationResu
       return { ok: false, error: 'Invalid value for session_id: expected a non-empty string' };
     }
     query.sessionId = sessionId.trim();
+  }
+
+  const userId = params.get('user_id');
+  if (userId !== null) {
+    if (userId.trim() === '') {
+      return { ok: false, error: 'Invalid value for user_id: expected a non-empty string' };
+    }
+    query.userId = userId.trim();
   }
 
   const flow = params.get('flow');

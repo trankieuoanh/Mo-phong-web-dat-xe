@@ -11,6 +11,7 @@ import cors from 'cors';
 import express from 'express';
 import { eventsRouter } from './routes/events.routes.js';
 import { healthRouter } from './routes/health.routes.js';
+import { placesRouter } from './routes/places.routes.js';
 
 const PORT = Number(process.env.PORT ?? 4000);
 const WEB_ORIGIN = process.env.WEB_ORIGIN ?? 'http://localhost:3000';
@@ -22,6 +23,8 @@ app.use(express.json({ limit: '64kb' }));
 
 app.use('/api', healthRouter);
 app.use('/api', eventsRouter);
+// Tra cuu dia chi — khong cham Firestore, tra loi duoc ca khi chua co credential.
+app.use('/api', placesRouter);
 
 app.use((_req, res) => {
   res.status(404).json({ error: 'Not found' });

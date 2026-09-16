@@ -10,8 +10,18 @@
 const SESSION_KEY = 'gsm_session_id';
 const USER_KEY = 'gsm_user_id';
 
-/** Cac khoa draft bi xoa khi reset session. */
-export const DRAFT_KEYS = ['gsm_ride_draft', 'gsm_cart', 'gsm_offer'] as const;
+/**
+ * Cac khoa draft bi xoa khi reset session.
+ *
+ * `gsm_ride_draft` (khong hau to) la khoa CU, hinh dang khac han — giu lai o day
+ * de lan reset dau tien don not no khoi sessionStorage cua nguoi dung.
+ */
+export const DRAFT_KEYS = [
+  'gsm_ride_draft_v2',
+  'gsm_ride_draft',
+  'gsm_cart',
+  'gsm_offer',
+] as const;
 
 function isBrowser(): boolean {
   return typeof window !== 'undefined';

@@ -14,7 +14,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import type { CartLine } from '@gsm/shared';
+import { DEFAULT_PICKUP, type CartLine, type Place } from '@gsm/shared';
 import { getSessionId, getUserId, resetSession } from './session';
 import { resetPreviousScreen } from './track';
 
@@ -27,8 +27,14 @@ import { resetPreviousScreen } from './track';
 export type PaymentMethod = 'cash' | 'qr';
 
 export interface RideDraft {
-  /** Dia chi chon o man 1 — DIEM DEN. Diem don la hang so FIXED_PICKUP. */
-  addressId?: string;
+  /**
+   * DIEM DEN chon o man 1. Luu ca object chu khong chi `id`:
+   * dia chi tim duoc co id dang `osm-*`, KHONG tra nguoc ra ten bang
+   * `getAddress()` duoc (mock-data.md muc 1), nen nhan phai di theo state.
+   */
+  destination?: Place;
+  /** DIEM DON, mac dinh DEFAULT_PICKUP. Doi duoc o man 2. */
+  pickup?: Place;
   vehicleId?: string;
   promoId?: string | null;
   /** Ghi chu cho tai xe (man pickup_confirm). Chuoi rong = khong nhap. */
@@ -62,7 +68,14 @@ interface AppContextValue extends StoredState {
   resetAll: () => void;
 }
 
-const RIDE_KEY = 'gsm_ride_draft';
+/**
+ * `_v2` vi hinh dang RideDraft da doi (`addressId: string` -> `destination: Place`).
+ * `readJson` co try/catch nhung KHONG kiem tra hinh dang, nen mot draft cu con
+ * trong tab cua nguoi dung se tra ve {addressId: '...'} va lam man confirm no
+ * o `ride.destination.label`. Doi khoa la cach re nhat de bo draft cu di.
+ * Phai khop DRAFT_KEYS trong lib/session.ts.
+ */
+const RIDE_KEY = 'gsm_ride_draft_v2';
 const CART_KEY = 'gsm_cart';
 const OFFER_KEY = 'gsm_offer';
 
@@ -87,12 +100,21 @@ function writeJson(key: string, value: unknown): void {
   }
 }
 
+/**
+ * Draft ride luon co `pickup`. Goi o MOI cho dat lai draft (khoi tao, doc
+ * storage, clearRide, resetAll) — de khong man nao phai viet
+ * `ride.pickup ?? DEFAULT_PICKUP` va khong cho nao quen mat.
+ */
+function newRideDraft(base: RideDraft = {}): RideDraft {
+  return { pickup: DEFAULT_PICKUP, ...base };
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [sessionId, setSessionId] = useState('');
   const [userId, setUserId] = useState('');
   const [hydrated, setHydrated] = useState(false);
 
-  const [ride, setRideState] = useState<RideDraft>({});
+  const [ride, setRideState] = useState<RideDraft>(newRideDraft());
   const [cart, setCart] = useState<CartLine[]>([]);
   const [offerId, setOfferIdState] = useState<string | null | undefined>(undefined);
 
@@ -100,7 +122,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setSessionId(getSessionId());
     setUserId(getUserId());
-    setRideState(readJson<RideDraft>(RIDE_KEY, {}));
+    setRideState(newRideDraft(readJson<RideDraft>(RIDE_KEY, {})));
     setCart(readJson<CartLine[]>(CART_KEY, []));
     setOfferIdState(readJson<string | null | undefined>(OFFER_KEY, undefined));
     setHydrated(true);
@@ -123,7 +145,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setRideState((prev) => ({ ...prev, ...patch }));
   }, []);
 
-  const clearRide = useCallback(() => setRideState({}), []);
+  const clearRide = useCallback(() => setRideState(newRideDraft()), []);
 
   const addToCart = useCallback((itemId: string, quantity: number) => {
     setCart((prev) => {
@@ -159,7 +181,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const resetAll = useCallback(() => {
     setSessionId(resetSession());
     resetPreviousScreen();
-    setRideState({});
+    setRideState(newRideDraft());
     setCart([]);
     setOfferIdState(undefined);
   }, []);

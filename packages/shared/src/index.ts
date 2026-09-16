@@ -8,3 +8,4 @@ export * from './types';
 export * from './screens';
 export * from './mock-data';
 export * from './pricing';
+export * from './places';

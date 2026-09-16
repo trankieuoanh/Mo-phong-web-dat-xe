@@ -12,10 +12,12 @@ import type { ButtonHTMLAttributes } from 'react';
 
 type Variant = 'primary' | 'secondary' | 'subtle';
 
+// `enabled:hover:` chu khong phai `hover:` — day la web desktop nen co con tro
+// chuot, nhung nut dang disable khong duoc doi mau khi ro chuot qua.
 const VARIANTS: Record<Variant, string> = {
-  primary: 'bg-primary-dark text-on-primary',
-  secondary: 'bg-canvas text-ink border border-surface-pressed',
-  subtle: 'bg-canvas-soft text-ink',
+  primary: 'bg-primary-dark text-on-primary enabled:hover:bg-primary',
+  secondary: 'bg-canvas text-ink border border-surface-pressed enabled:hover:bg-canvas-soft',
+  subtle: 'bg-canvas-soft text-ink enabled:hover:bg-surface-pressed',
 };
 
 interface PrimaryButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -34,9 +36,9 @@ export function PrimaryButton({
       {...props}
       className={[
         't-button-md rounded-pill px-2xl py-md',
-        // Toi thieu 44px chieu cao — screen-map.md muc 6.
-        'min-h-[44px]',
-        'active:bg-surface-pressed disabled:cursor-not-allowed disabled:opacity-50',
+        // Toi thieu 48px chieu cao tren desktop — screen-map.md muc 6.
+        'min-h-[48px] transition-colors',
+        'disabled:cursor-not-allowed disabled:opacity-50',
         VARIANTS[variant],
         fullWidth ? 'w-full' : '',
         className,
