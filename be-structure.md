@@ -251,23 +251,43 @@ BE **không** dùng `mock-data.ts` hay `pricing.ts` — dữ liệu tĩnh và t�
 
 ## 11. Trạng thái: BE đã xong tới đâu
 
-**Không còn `TODO` nào trong `apps/api`.** Sáu `TODO` còn lại của dự án đều ở chỗ khác: bốn ở page FE (hoàn thiện giao diện, Tuần 2–3) và hai ở `analysis/metrics.py` (Tuần 5).
+**Không còn `TODO` nào trong `apps/api`.** Toàn repo chỉ còn **2** `TODO`, cả hai ở `analysis/metrics.py` (Tuần 5).
 
-Nghĩa là **BE không cần viết thêm code**. Việc còn lại là *kiểm chứng*, không phải *implement*.
+**BE đã chạy thật với Firestore** — không còn gì để implement.
 
 | Endpoint | Code | Đã kiểm chứng tới đâu |
 |---|:--:|---|
-| `GET /api/health` | xong | ✅ Đã chạy thật, trả `{"status":"ok"}` — cả gọi thẳng `:4000` lẫn qua proxy `:3000` |
-| `POST /api/events` — validate | xong | ✅ Đã chạy thật 6 ca lỗi, trả đúng câu lỗi trong `api-endpoints.md` |
-| `POST /api/events` — ghi Firestore | xong | ❌ **Chưa test** — chưa có `apps/api/.env`. Hiện trả 500 |
-| `GET /api/events` | xong | ❌ **Chưa test** — cần credential và dữ liệu thật |
-| 404 cho route lạ | xong | ❌ Chưa test |
+| `GET /api/health` | xong | ✅ Cả gọi thẳng `:4000` lẫn qua proxy `:3000` |
+| `POST /api/events` — validate | xong | ✅ 6 ca lỗi, đúng từng câu chữ trong `api-endpoints.md` |
+| `POST /api/events` — ghi Firestore | xong | ✅ 201 + `event_id` thật; `platform` và `created_at` do server gắn |
+| `GET /api/events?session_id=` | xong | ✅ Sắp theo `step_index`, `created_at` trả về dạng ISO |
+| `GET /api/events?from=` / `?to=` | xong | ✅ Chạy được, **không cần** composite index (chỉ một field) |
+| `GET /api/events?flow=` | xong | ⏳ Cần composite index `flow` + `created_at` — đang chờ build |
+| 404 cho route lạ | xong | ✅ `{"error":"Not found"}` |
 
-Ba dòng ❌ không phải thiếu sót của code mà là **thiếu điều kiện để chạy**: tất cả đều cần Firebase (`setup.md` Phase 1).
+### Composite index — hai cái, tạo bằng link trong thông báo lỗi
 
-Đối chiếu với `roadmap.md`, phần BE còn lại nằm ở:
-- **Tuần 2** — tạo Firebase project, điền `.env`, đi hết luồng ride rồi mở console xem có đủ document không.
-- **Tuần 4** — test `GET /api/events` với đủ tổ hợp param, và tạo composite index khi Firestore báo lỗi kèm link.
+| Truy vấn | Index cần | Trạng thái |
+|---|---|:--:|
+| `?session_id=` | `session_id` + `step_index` | ✅ đã build |
+| `?flow=` và `?flow=&from=&to=` | `flow` + `created_at` | ⏳ đang chờ |
+
+Không cần đoán trước index nào: Firestore từ chối kèm **link tạo sẵn** ngay trong `error.message`, và `events.routes.ts` trả nguyên văn message đó chính vì lý do này.
+
+### Đã kiểm chứng xuyên suốt FE → BE → Firestore
+
+Đi trọn một lượt luồng ride trên trình duyệt cho kết quả đúng như `event-taxonomy.md`:
+
+```
+so screen_view : 7            (home + 6 màn ride — KHÔNG bị Strict Mode nhân đôi)
+step di qua    : 0 → 1 → 2 → 3 → 4 → 5 → 6
+previous_screen: null → null → home → home → address_selection → ...
+confirm_ride   : 145000 − 29000 = 116000  ✅ khớp công thức
+```
+
+> **Một lỗi chỉ lộ ra khi click thật.** Bộ test bằng `curl` không bắt được, vì nó tự điền `previous_screen` trong payload còn app thật để `track.ts` suy ra. Dữ liệu thật cho thấy mọi event *hành động* mang `previous_screen` bằng chính màn nó đứng — trái với `event-taxonomy.md` §1. Nguyên nhân: `previousScreen` bị gán bằng màn hiện tại ngay sau khi `screen_view` bắn. Đã sửa bằng cách tách `previousScreen` / `currentScreen` và cập nhật trước khi bắn.
+>
+> Bài học cho các bước kiểm chứng sau: **`curl` chứng minh BE đúng, không chứng minh tracking đúng.** Hai việc khác nhau.
 
 ---
 

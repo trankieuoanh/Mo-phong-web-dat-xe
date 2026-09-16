@@ -28,9 +28,19 @@ import { getSessionId, getUserId } from './session';
  */
 let previousScreen: ScreenName | null = null;
 
+/**
+ * Man DANG dung. Tach rieng khoi `previousScreen` vi mot ly do cu the:
+ * neu chi co mot bien va gan no = man hien tai ngay sau khi screen_view ban,
+ * thi moi event HANH DONG bat sau do tren cung man se doc phai chinh man do
+ * thay vi man truoc. Loi nay khong co trieu chung tren UI — chi lo ra khi
+ * doc du lieu that (da tung xay ra, xem event-taxonomy.md muc 1).
+ */
+let currentScreen: ScreenName | null = null;
+
 /** Goi khi reset session — man ke tiep phai co previous_screen = null. */
 export function resetPreviousScreen(): void {
   previousScreen = null;
+  currentScreen = null;
 }
 
 export interface TrackEventInput {
@@ -102,9 +112,13 @@ export function useScreenView(screenName: ScreenName): void {
     if (hasFired.current) return;
     hasFired.current = true;
 
-    trackEvent({ eventName: 'screen_view', screenName });
+    // Cap nhat TRUOC khi ban: man vua roi khoi tro thanh `previousScreen`,
+    // man nay tro thanh `currentScreen`. Nho vay `screen_view` VA moi event
+    // hanh dong bat sau do tren cung man deu mang cung mot `previous_screen`
+    // — dung quy tac o event-taxonomy.md muc 1.
+    previousScreen = currentScreen;
+    currentScreen = screenName;
 
-    // Cap nhat SAU khi ban, de chinh event screen_view nay van mang man truoc do.
-    previousScreen = screenName;
+    trackEvent({ eventName: 'screen_view', screenName });
   }, [screenName]);
 }
