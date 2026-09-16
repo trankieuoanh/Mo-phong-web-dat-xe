@@ -65,8 +65,15 @@
   .t-button-md    { font: 500 16px/20px var(--font-text); }
 
   /* tailwind-theme.md muc 5 — mac dinh la phang, khong bong.
-     Chi ap cho thanh nut hanh dong dinh day man hinh. */
+     Chi ap cho LOP NOI tren noi dung: dropdown UserMenu, nut/tooltip tren
+     ban do. Card trong danh sach va panel giu phang. */
   .shadow-level-2 { box-shadow: rgba(0, 0, 0, 0.16) 0px 4px 16px 0px; }
+
+  /* Thanh cuon trong panel — manh va an theo token, khong dung mau he dieu hanh. */
+  .scroll-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-surface-pressed) transparent;
+  }
 }
 
 html,
