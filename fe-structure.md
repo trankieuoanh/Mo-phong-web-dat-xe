@@ -38,26 +38,37 @@ apps/web/
 │  │  ├─ promo/page.tsx       tab + ô nhập mã + chọn/bỏ qua khuyến mãi
 │  │  ├─ confirm/page.tsx     tóm tắt + phương thức thanh toán + nút đặt cuối
 │  │  └─ success/page.tsx     màn kết thúc luồng ride
-│  └─ food/
+│  ├─ food/
 │     ├─ page.tsx             menu 8 món + chip lọc
 │     ├─ item/[itemId]/page.tsx  chi tiết món + chọn số lượng
 │     ├─ cart/page.tsx        giỏ hàng: sửa số lượng, xoá dòng
 │     ├─ offer/page.tsx       chọn hoặc bỏ qua ưu đãi
 │     ├─ confirm/page.tsx     tóm tắt đơn + nút đặt cuối
 │     └─ success/page.tsx     màn kết thúc luồng food
+│  └─ history/page.tsx      NGOÀI FUNNEL — lịch sử chuyến đi, không bắn event
 │
 ├─ lib/
 │  ├─ track.ts             trackEvent · trackAddToCart · useScreenView
+│  ├─ use-place-search.ts  hook gọi GET /api/places (debounce + abort)
 │  ├─ app-context.tsx      AppProvider · useApp — state ride + cart
 │  ├─ session.ts           session_id / user_id / resetSession
 │  └─ format.ts            formatVnd — số nguyên VNĐ → "35.000đ"
 │
 └─ components/
-   ├─ ScreenShell.tsx      nav-bar + container 480px + footer sticky
+   ├─ ScreenShell.tsx      chọn bố cục split / wide rồi bọc bằng AppShell
+   ├─ Panel.tsx            card trắng: header / body cuộn / footer CTA
    ├─ PrimaryButton.tsx    3 biến thể: primary / secondary / subtle
    ├─ BackButton.tsx       bắn event `back` rồi điều hướng
    ├─ FlowGuard.tsx        chặn vào thẳng URL giữa luồng
-   └─ MapCanvas.tsx        bản đồ giả lập bằng SVG (không thư viện)
+   ├─ MapCanvas.tsx        bản đồ giả lập bằng SVG (không thư viện)
+   ├─ PlacePicker.tsx      ô tìm địa chỉ thật + danh sách kết quả
+   ├─ Icon.tsx             ~35 icon SVG viết tay, thay toàn bộ emoji
+   ├─ GsmLogo.tsx          logo cánh chim + wordmark, một tông cyan
+   └─ shell/
+      ├─ AppShell.tsx      rail trái + top bar + vùng nội dung
+      ├─ SideRail.tsx      6 mục icon dọc
+      ├─ TopBar.tsx        tên mục + tab trang trí + UserMenu
+      └─ UserMenu.tsx      chip người dùng — trang trí, hiện user_id đang dùng
 ```
 
 ---
@@ -68,7 +79,7 @@ Phụ thuộc đi **một chiều**, không có vòng:
 
 ```mermaid
 flowchart LR
-  P[app/**/page.tsx<br/>13 page] --> C[components/<br/>5 component]
+  P[app/**/page.tsx<br/>13 page funnel + 2 ngoài funnel] --> C[components/]
   P --> L[lib/<br/>4 file]
   C --> L
   L --> S[["@gsm/shared"]]
@@ -102,6 +113,18 @@ flowchart LR
 > **Event `back` không có trong bảng** vì nó không nằm trong file page nào cả — xem mục 6.
 
 > **Hai màn không bắn event khi bấm nút chính.** Ở `/ride/vehicle`, `select_vehicle` bắn khi bấm *hạng xe*, còn nút "Tiếp tục" chỉ điều hướng. Ở `/ride/promo`, bấm promo chỉ tick chọn, `select_promo` bắn khi bấm "Áp dụng mã". Hệ quả: một session có thể có **nhiều** `select_vehicle` (đo được sự phân vân) nhưng đúng **một** `select_promo`. Chi tiết ở `ride-flow-design.md` mục 7.
+
+> **`select_flow` bắn từ hai chỗ.** Ngoài hai card giữa màn `/`, `SideRail` cũng bắn `select_flow` khi bấm mục "Đặt xe"/"Đặt đồ ăn" — nhưng **chỉ khi đang ở `/`**. Cùng helper, cùng `properties.flow_chosen`, nên phân tích không phải phân biệt. Ở mọi màn khác hai mục đó là trang trí.
+
+### Route ngoài funnel
+
+| Route | Bắn event | Làm gì |
+|---|:--:|---|
+| `/history` | **không** | `fetch('/api/events?user_id=...')` qua proxy same-origin. Gấp `confirm_ride` → một chuyến xe, `place_order` → một đơn đồ ăn; hai thẻ "Tổng số chuyến" / "Tổng chi tiêu"; tab Di chuyển/Đặt đồ ăn bấm được thật. Ba trạng thái: skeleton / rỗng / lỗi (in nguyên văn thông báo Firestore vì nó chứa link tạo index) |
+
+**Không có trong `SCREENS`**, nên `screens.ts` và union `ScreenName` không phải sửa gì. Thêm `useScreenView` vào đây sẽ không compile — `ScreenName` không có giá trị tương ứng.
+
+> **Không có `/login`.** Dự án không có authentication, xem `api-endpoints.md`. `UserMenu` là trang trí hoàn toàn, chỉ hiện `user_id` — chính là khoá mà `/history` tra.
 
 ---
 
@@ -154,19 +177,26 @@ Tiền **luôn** là số nguyên trong dữ liệu, chỉ format khi hiển th�
 
 ---
 
-## 6. `components/` — năm component
+## 6. `components/`
 
 | Component | Props | Dùng ở | Ghi chú |
 |---|---|:--:|---|
-| `ScreenShell` | `title`, `leading`, `trailing`, `children`, `footer` | 12 page | Container 480px, nav-bar sticky, footer có `shadow-level-2` + `env(safe-area-inset-bottom)`. `trailing` là khối phải nav-bar (selector "Hà Nội", nút "Đặt hộ") |
-| `PrimaryButton` | `variant`, `fullWidth`, + props button | 11 page | Nền `primary-dark` chứ không `primary` — tương phản 4.2:1 thay vì 2.6:1 (`tailwind-theme.md` mục 0b) |
-| `BackButton` | `from`, `to`, `href`, `glyph` | 10 page | **Bắn event `back`** rồi mới `router.push`. `glyph` mặc định `←`; `/ride/promo` truyền `×` cho giống overlay — hình khác nhưng event y hệt |
+| `ScreenShell` | `title`, `leading`, `trailing`, `children`, `footer`, `variant`, `aside`, `section`, `tabs`, `maxWidth` | 12 page | Chọn bố cục `split`/`wide` rồi bọc bằng `AppShell` + `Panel`. Năm prop đầu giữ nguyên ý nghĩa từ bản mobile cũ, nên đổi sang desktop không phải viết lại page nào |
+| `Panel` | `title`, `leading`, `trailing`, `children`, `footer` | qua `ScreenShell` | Card trắng 3 khu; body tự cuộn (`overflow-y-auto`), footer dính đáy **panel** |
+| `AppShell` | `section`, `tabs`, `children` | 12 page + `/`, `/history` | `SideRail` + `TopBar` + slot. Rail ẩn dưới `lg` |
+| `SideRail` | — | qua `AppShell` | 6 mục, **mở rộng (nhãn chữ) / thu gọn (chỉ icon)**, nhớ ở `localStorage`. **Bấm được chỉ ở 2 chỗ**: hai mục luồng khi `pathname === '/'` (bắn `select_flow`), và mục "Hoạt động" (link `/history`). Còn lại trang trí |
+| `TopBar` / `UserMenu` | `section`, `tabs` / — | qua `AppShell` | Tab trang trí. `UserMenu` cũng trang trí hoàn toàn — chỉ hiện `user_id` đang dùng |
+| `PrimaryButton` | `variant`, `fullWidth`, + props button | 11 page | Nền `primary-dark` chứ không `primary` — tương phản 4.2:1 thay vì 2.6:1 (`tailwind-theme.md` mục 0b). `enabled:hover:` để nút disabled không đổi màu khi rê chuột |
+| `BackButton` | `from`, `to`, `href`, `icon` | 10 page | **Bắn event `back`** rồi mới `router.push`. `icon` mặc định `'back'`; `/ride/promo` truyền `'close'` cho giống overlay — hình khác nhưng event y hệt |
 | `FlowGuard` | `ready`, `fallback`, `children` | 8 page | Đợi `hydrated` trước khi redirect |
-| `MapCanvas` | `variant: 'pickup' \| 'route'` | 3 page | SVG inline, **không thư viện bản đồ** (`CLAUDE.md` quy tắc 8). Dùng ở `/ride/pickup`, `/ride/vehicle`, `/ride/confirm` |
+| `PlacePicker` | `placeholder`, `presetHeading`, `selectedId?`, `onPick`, `leading?` | 2 page | Ô tìm + kết quả. Dùng chung cho điểm đến và điểm đón nên hai chỗ không thể lệch nhau. **Không bắn event** — cha quyết định |
+| `MapCanvas` | `variant: 'pickup' \| 'route'`, `label?`, `fill?` | 3 page | SVG inline, **không thư viện bản đồ** (`CLAUDE.md` quy tắc 8). `fill` = cao bằng panel, dùng khi nằm trong cột `aside` |
+| `Icon` | `name`, `size?`, `className?` | khắp nơi | ~35 icon SVG viết tay. `stroke="currentColor"` nên **không bao giờ phải gõ hex ở chỗ gọi** |
+| `GsmLogo` | `variant`, `size?` | `SideRail` | Một tông cyan — `DESIGN.md` cấm màu accent thứ hai, nên không có vàng như logo thật |
 
 ### `MapCanvas` — vì sao toạ độ là hằng số
 
-Đường phố, tuyến đường và vị trí ghim đều hardcode trong file. Không random: bản đồ đổi hình mỗi lần re-render trông như lỗi chứ không như bản đồ. `variant="route"` vẽ polyline gãy khúc theo lưới phố và phủ tooltip `34 phút • 15 km` lấy từ `FIXED_ROUTE`.
+Đường phố, khối nhà, sông, nhãn tên phố, POI và vị trí ghim đều hardcode trong file. Không random: bản đồ đổi hình mỗi lần re-render trông như lỗi chứ không như bản đồ. `variant="route"` vẽ polyline gãy khúc theo lưới phố và phủ tooltip `34 phút • 15 km` lấy từ `FIXED_ROUTE`. Cụm zoom và nút re-center là **trang trí** — không có toạ độ thật để zoom hay re-center về.
 
 ### `BackButton` — chỗ dễ nhầm khi đọc code
 

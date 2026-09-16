@@ -28,7 +28,13 @@ app/
     offer/page.tsx              # /food/offer             food_offer_selection
     confirm/page.tsx            # /food/confirm           food_confirm
     success/page.tsx            # /food/success           food_success
+
+  history/page.tsx              # /history    NGOÀI FUNNEL — không có screen_name
 ```
+
+**`/history` không nằm trong funnel.** Nó không có trong `SCREENS`, **không gọi `useScreenView`, không gọi `trackEvent`**, nên không xuất hiện trong bất kỳ số liệu nào. Nó đọc `GET /api/events?user_id=...` và dựng lại lịch sử chuyến đi từ chính các event `confirm_ride` / `place_order`. Lọc theo `user_id` chứ không phải `session_id`, nên bảng bền qua nhiều phiên — đúng nghĩa "lịch sử người dùng", và là màn hữu ích nhất khi demo cho mentor.
+
+> **Không có `/login`.** Dự án không có authentication — đây là quyết định có chủ ý, xem `api-endpoints.md`. Một màn đăng nhập giả chỉ thêm một đường đi lạc mà không đo thêm được gì. `UserMenu` ở top bar vì vậy là trang trí hoàn toàn; nó chỉ hiện `user_id` đang dùng, để demo thấy ngay khoá mà `/history` tra.
 
 Không còn `app/api/` — API nằm ở `apps/api`, một process riêng. `apps/web/next.config.ts` proxy `/api/*` sang đó.
 
@@ -72,14 +78,25 @@ interface AppState {
   sessionId: string;
   userId: string;
   hydrated: boolean;                 // đã đọc xong sessionStorage chưa
-  ride:  { addressId?: string; vehicleId?: string; promoId?: string | null };
+  ride:  {
+    destination?: Place;             // điểm đến, chọn ở màn 1
+    pickup?: Place;                  // điểm đón, mặc định DEFAULT_PICKUP
+    vehicleId?: string;
+    promoId?: string | null;
+    driverNote?: string;
+    paymentMethod?: 'cash' | 'qr';
+  };
   cart:  CartLine[];                 // { itemId, quantity }
   offerId?: string | null;
 }
 ```
 
 - Một `AppProvider` duy nhất trong `app/layout.tsx`.
-- Ghi kèm `sessionStorage` (`gsm_ride_draft`, `gsm_cart`, `gsm_offer`) để F5 giữa luồng không mất lựa chọn.
+- Ghi kèm `sessionStorage` (`gsm_ride_draft_v2`, `gsm_cart`, `gsm_offer`) để F5 giữa luồng không mất lựa chọn.
+
+> **Vì sao lưu cả object `Place` chứ không chỉ `id`.** Địa chỉ người dùng tự tìm có `id` dạng `osm-*`, **không tra ngược ra tên bằng `getAddress()` được** — bảng tra chỉ có 5 dòng gợi ý (`mock-data.md` mục 1). Nhãn vì thế phải đi theo state.
+>
+> **Vì sao khoá là `_v2`.** Hình dạng `ride` đã đổi (`addressId: string` → `destination: Place`). `readJson` có `try/catch` nhưng **không kiểm tra hình dạng**, nên một draft cũ còn trong tab của người dùng sẽ trả về `{addressId: '…'}` và làm màn confirm nổ. Đổi khoá là cách rẻ nhất để bỏ draft cũ đi; khoá cũ vẫn nằm trong `DRAFT_KEYS` để lần reset đầu tiên dọn nốt nó.
 - Giỏ hàng lưu **`itemId` + `quantity`**, không lưu `price`/`name` — giá lấy từ `@gsm/shared` lúc render, để đổi giá trong mock không làm giỏ hàng cũ sai.
 - Clear: `ride` sau `confirm_ride`; `cart` + `offerId` sau `place_order`; tất cả sau `back_to_home`.
 - `promoId`/`offerId` phân biệt 3 trạng thái: `undefined` = chưa tới bước đó, `null` = đã bỏ qua, `"promo-10k"` = đã chọn.
@@ -146,6 +163,37 @@ Không có màn lỗi/thất bại — app mô phỏng luôn thành công.
 
 ## 6. Responsive
 
-Ưu tiên **mobile-first**: đây là mô phỏng app đặt xe, khung tham chiếu là điện thoại. Container chính `max-width: 480px`, canh giữa trên desktop. Breakpoint desktop trong `DESIGN.md` áp cho landing marketing của Green SM, không áp cho luồng đặt xe của dự án này.
+**Desktop-first.** Khung tham chiếu là **web Green SM trên máy tính**, không phải app điện thoại — xem 4 ảnh chụp trong `apps/web/sample_ui/` (`homepage.png`, `main_screen.png`, `history.png`, `login.png`). Cả bốn đều có rail icon dọc bên trái, top bar, và nội dung hai cột.
 
-Nút hành động chính của mỗi bước **dính đáy màn hình** (`sticky bottom-0`), cao tối thiểu 44px, cách mép dưới bằng `env(safe-area-inset-bottom)`.
+> Bản trước của mục này chốt mobile-first `max-width: 480px`. Đã đổi vì ảnh mẫu cho thấy sản phẩm thật là web desktop; giữ một cột 480px giữa màn 1600px làm bản mô phỏng không nhận ra là Green SM. Thay đổi này **thuần trình bày** — không route nào, không event nào, không `step_index` nào bị ảnh hưởng.
+
+### Khung chung
+
+`components/shell/AppShell.tsx` bọc mọi màn:
+
+```
+┌──────┬──────────────────────────────────────┐
+│ rail │ TopBar: section · tabs · UserMenu     │
+│ 72px ├──────────────────────────────────────┤
+│      │ main (p-2xl)                          │
+└──────┴──────────────────────────────────────┘
+```
+
+- **`SideRail`** — 6 mục. **Hai trạng thái**: mở rộng `w-[264px]` có nhãn chữ (mặc định, như `homepage.png`) và thu gọn `w-[72px]` chỉ-icon (như `main_screen.png`); nút "Thu gọn menu" ở đáy chuyển qua lại, lựa chọn nhớ ở `localStorage['gsm_rail_collapsed']` (đọc trong `useEffect`, không đọc lúc render — bẫy hydration). Chỉ bấm được ở đúng hai chỗ: hai mục luồng **khi đang ở `/`** (bắn `select_flow`, cùng helper và cùng `properties` với hai card giữa màn), và mục "Hoạt động" (link `/history`). Bốn mục còn lại và hai mục luồng ở mọi màn khác là **trang trí** (`ride-flow-design.md` §8). Dưới `lg` (1024px) rail ẩn hoàn toàn.
+- Nhãn theo **dự án này**, không copy nguyên ảnh mẫu: Green SM thật có dịch vụ "Giao hàng" (giao kiện hàng), còn luồng thứ hai ở đây là **"Đặt đồ ăn"**.
+- **`TopBar`** — `section` là tên **mục** ("Di chuyển", "Giao hàng", "Hoạt động"), `tabs` thuần trang trí.
+
+### Hai bố cục
+
+`ScreenShell` giữ nguyên năm prop cũ (`title`/`leading`/`trailing`/`children`/`footer`) và thêm `variant` / `aside` / `section` / `tabs` / `maxWidth`:
+
+| variant | Hình dạng | Dùng cho |
+|---|---|---|
+| `split` | Panel trái 480px (tự cuộn) + `aside` chiếm phần còn lại, cao bằng panel | `address_selection`, `pickup_confirm`, `vehicle_selection`, `ride_confirm` — 4 màn có bản đồ |
+| `wide` | Một cột canh giữa, bề ngang theo `maxWidth` | `home`, `promo_selection`, `ride_success`, toàn bộ luồng food, `/history` |
+
+Dưới `lg`, `split` xếp chồng thành một cột (`flex-col`), không có thanh cuộn ngang.
+
+### Nút hành động
+
+Dính **đáy panel** (footer của `components/Panel.tsx`), không dính đáy màn hình. Cao tối thiểu 48px. `env(safe-area-inset-bottom)` đã bỏ — nó chỉ có ý nghĩa với notch điện thoại.

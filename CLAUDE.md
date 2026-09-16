@@ -14,7 +14,7 @@ Không có backend thật, không đặt xe thật, không thanh toán. Mọi l�
 | Bất kỳ việc gì liên quan tới event | **`event-taxonomy.md`** ← hợp đồng dữ liệu, nguồn sự thật |
 | Dựng màn hình, routing, state, giỏ hàng | `screen-map.md` |
 | Dựng giao diện 6 màn luồng đặt xe | `ride-flow-design.md` |
-| Dựng giao diện 6 màn luồng đặt xe | `ride-flow-design.md` |
+| Giao diện phải trông như thế nào | `apps/web/sample_ui/` — 4 ảnh chụp web Green SM thật |
 | Hiểu code FE có sẵn: file nào làm gì, component nào dùng ở đâu | `fe-structure.md` |
 | Hiểu code BE có sẵn: 4 lớp, luồng một request | `be-structure.md` |
 | Cần nội dung địa chỉ / món ăn / khuyến mãi | `mock-data.md` |
@@ -54,7 +54,9 @@ Không có test tự động — `techstack.md` đã chốt là kiểm thử b�
 5. **Không đổi `id` trong `mock-data.md`** (`addr-home`, `banh-mi-01`, `veh-bike`…). Chúng đi thẳng vào `properties` của event; đổi id làm dữ liệu cũ và mới không ghép được.
 6. **Thêm event mới phải cập nhật `event-taxonomy.md` trước khi code**, kèm `packages/shared/src/types.ts` (union + mảng `EVENT_NAMES`) và `packages/shared/src/screens.ts` nếu là màn mới.
 7. **Không tự gõ `step_index` trong page.** `trackEvent` tra bảng `SCREENS` ở `packages/shared/src/screens.ts`. Chỉ hai ngoại lệ được truyền tay: `add_to_cart` (luôn = 3, dùng helper `trackAddToCart`) và `flow` của `select_flow` ở màn Home.
-8. **Không thêm thư viện** ngoài những gì `techstack.md` đã chốt: Next.js, React, Tailwind (FE); Express, cors, firebase-admin, tsx (BE); concurrently (root, devDependency). Không Redux/Zustand (dùng Context), không axios (dùng `fetch`), không thư viện UI component.
+8. **Không thêm thư viện** ngoài những gì `techstack.md` đã chốt: Next.js, React, Tailwind (FE); Express, cors, firebase-admin, tsx (BE); concurrently (root, devDependency). Không Redux/Zustand (dùng Context), không axios (dùng `fetch`), không thư viện UI component, **không thư viện icon** (dùng `apps/web/components/Icon.tsx`), **không thư viện bản đồ** (dùng `MapCanvas.tsx`).
+9. **`/history` không được gọi `useScreenView` hay `trackEvent`.** Route này cố ý nằm ngoài funnel, không có trong `SCREENS`, và chỉ ĐỌC lại event đã có. Thêm event vào đó là làm bẩn mọi tỉ lệ conversion. Kiểm tra: `grep -rn "trackEvent(\|useScreenView(" apps/web/app/history` → phải rỗng.
+10. **Không thêm màn đăng nhập.** Dự án không có authentication — quyết định có chủ ý, xem `api-endpoints.md`. `UserMenu` ở top bar là trang trí hoàn toàn.
 
 ## Cấu trúc thư mục — monorepo npm workspaces
 
@@ -70,18 +72,25 @@ apps/web/                 Next.js 15 — CHỈ FE, cổng 3000
     globals.css           @theme + class typography
     ride/{address,pickup,vehicle,promo,confirm,success}/page.tsx
     food/page.tsx  food/item/[itemId]/page.tsx  food/{cart,offer,confirm,success}/page.tsx
+    history/page.tsx      NGOÀI FUNNEL — lịch sử chuyến đi, chỉ đọc, không bắn event
   lib/
     session.ts            session_id / user_id / resetSession
     track.ts              trackEvent + trackAddToCart + useScreenView
     app-context.tsx       state ride + cart
+    use-place-search.ts   hook goi GET /api/places (debounce 400ms + abort)
     format.ts             formatVnd
-  components/             ScreenShell, PrimaryButton, BackButton, FlowGuard
+  components/             ScreenShell, Panel, PrimaryButton, BackButton, FlowGuard,
+                          MapCanvas, PlacePicker, Icon, GsmLogo
+    shell/                AppShell, SideRail, TopBar, UserMenu
+  sample_ui/              4 ảnh chụp web Green SM thật — tham chiếu khi dựng UI
 
 apps/api/                 Express + tsx — CHỈ BE, cổng 4000
   src/server.ts           express + cors + json
-  src/routes/             events.routes.ts, health.routes.ts
+  src/routes/             events.routes.ts, health.routes.ts, places.routes.ts
   src/validators/         event.validator.ts  ← whitelist 8 field
+                          place.validator.ts
   src/services/           event.service.ts    ← platform + serverTimestamp
+                          place.service.ts    ← Nominatim: User-Agent + 1 req/s + cache
   src/db/firebase-admin.ts
   .env                    credential Firebase (gitignored)
 
@@ -89,6 +98,7 @@ packages/shared/src/      @gsm/shared — dùng chung web + api, KHÔNG có bư�
   types.ts                Flow, EventName (19), ScreenName (13), EventPayload
   screens.ts              SCREENS — bảng route/step_index/flow
   mock-data.ts            dữ liệu tĩnh
+  places.ts               Place, PlaceSource, DEFAULT_PICKUP, PRESET_PLACES
   pricing.ts              calcDiscount, calcRideTotals, calcFoodTotals
 
 analysis/                 Python — KHÔNG phải npm workspace
@@ -104,7 +114,8 @@ Vì cả `apps/web` lẫn `apps/api` đều nhập `EventName` và `SCREENS` t�
 - **UI toàn bộ bằng tiếng Việt** ("Đặt xe", "Thêm vào giỏ", "Xác nhận"). Tên biến, tên hàm, tên field bằng tiếng Anh.
 - Field trong event và khoá trong `properties`: `snake_case`. Biến trong TypeScript: `camelCase`. Helper `trackEvent` chịu trách nhiệm chuyển đổi.
 - Tiền luôn là **số nguyên VNĐ** trong dữ liệu (`35000`), chỉ format khi hiển thị (`35.000đ`) bằng `Intl.NumberFormat('vi-VN')`.
-- Mobile-first, container `max-width: 480px` — đây là mô phỏng app điện thoại.
+- **Desktop-first** — khung tham chiếu là web Green SM trên máy tính (ảnh mẫu ở `apps/web/sample_ui/`). `AppShell` = rail icon trái + top bar; `ScreenShell` chọn bố cục `split` (panel 480px + bản đồ) hoặc `wide` (một cột canh giữa). Chi tiết ở `screen-map.md` mục 6.
+- Không dùng emoji trong UI — dùng `components/Icon.tsx` (SVG viết tay, ăn `currentColor`).
 
 ## Ba cái bẫy đã biết
 

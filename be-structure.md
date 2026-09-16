@@ -26,21 +26,35 @@ Trình duyệt **không gọi thẳng** vào đây — `apps/web` proxy `/api/*`
 apps/api/
 ├─ package.json          dev: tsx watch --env-file-if-exists=.env src/server.ts
 ├─ tsconfig.json
-├─ .env.example          FIREBASE_* · PORT · WEB_ORIGIN   (bản thật .env đã gitignore)
+├─ .env.example          FIREBASE_* · PORT · WEB_ORIGIN · NOMINATIM_CONTACT
+│                        (bản thật .env đã gitignore)
 └─ src/
-   ├─ server.ts                     47 dòng  express + cors + json + listen + xử lý EADDRINUSE
+   ├─ server.ts                     express + cors + json + listen + xử lý EADDRINUSE
    ├─ routes/
-   │  ├─ events.routes.ts           50 dòng  POST và GET /api/events
-   │  └─ health.routes.ts           14 dòng  GET /api/health — không chạm Firestore
+   │  ├─ events.routes.ts           POST và GET /api/events
+   │  ├─ places.routes.ts           GET /api/places — tìm địa chỉ thật
+   │  └─ health.routes.ts           GET /api/health — không chạm Firestore
    ├─ validators/
-   │  └─ event.validator.ts        162 dòng  whitelist 8 field + validate query
+   │  ├─ event.validator.ts         whitelist 8 field + validate query
+   │  └─ place.validator.ts         q (2–120 ký tự) + limit (1–8)
    ├─ services/
-   │  └─ event.service.ts           53 dòng  createEvent · listEvents
+   │  ├─ event.service.ts           createEvent · listEvents
+   │  └─ place.service.ts           Nominatim: User-Agent + hàng đợi 1 req/s + cache
    └─ db/
-      └─ firebase-admin.ts          56 dòng  getDb() — khởi tạo trễ
+      └─ firebase-admin.ts          getDb() — khởi tạo trễ
 ```
 
-Sáu file, 382 dòng. `event.validator.ts` chiếm 42% — xem mục 4 để biết vì sao.
+`event.validator.ts` là file lớn nhất — xem mục 4 để biết vì sao.
+
+### `places.*` — vì sao BE phải làm trung gian
+
+`GET /api/places` **không chạm Firestore**, nên nó trả lời được cả khi chưa có credential (giống `/api/health`). Nó tồn tại vì ba việc chỉ server làm được:
+
+1. **`User-Agent` định danh** — điều khoản Nominatim bắt buộc, mà trình duyệt **không cho JavaScript đặt header này**. Đây là lý do chặn cứng.
+2. **Hàng đợi ≥ 1100 ms** giữa hai lần gọi upstream — OSM giới hạn tuyệt đối 1 req/giây. Debounce ở client là gợi ý, không phải bảo đảm.
+3. **Cache dùng chung** (TTL 10 phút, ~200 khoá) — gõ rồi xoá lùi sẽ hỏi lại đúng những query vừa hỏi.
+
+Lỗi upstream trả **502** chứ không phải 500: lỗi nằm ở dịch vụ bên ngoài, không phải ở app này. FE hiện cảnh báo nhưng vẫn liệt kê 5 địa chỉ gợi ý.
 
 ---
 
@@ -172,20 +186,22 @@ FE **không đọc response** này (`trackEvent` là `fetch(...).catch(() => {})
 
 ## 6. Luồng `GET /api/events`
 
-Bốn param đều optional và ghép được với nhau:
+Năm param đều optional và ghép được với nhau:
 
 ```ts
 if (query.sessionId) ref = ref.where('session_id', '==', ...)
+if (query.userId)    ref = ref.where('user_id', '==', ...)
 if (query.flow)      ref = ref.where('flow', '==', ...)
 if (query.from)      ref = ref.where('created_at', '>=', Timestamp.fromDate(...))
 if (query.to)        ref = ref.where('created_at', '<=', Timestamp.fromDate(...))
-
-ref = query.sessionId ? ref.orderBy('step_index') : ref.orderBy('created_at');
 ```
 
 Cách sắp xếp đổi theo mục đích truy vấn:
 - **Có `session_id`** → `orderBy('step_index')`. Đang xem lại một phiên, muốn thấy đúng thứ tự bước để replay và kiểm chứng tracking.
-- **Không có** → `orderBy('created_at')`. Đang kéo dữ liệu nhiều phiên, thứ tự thời gian mới có nghĩa.
+- **Có `user_id`** (không kèm `session_id`) → **sắp xếp trong bộ nhớ**, không dùng `orderBy` của Firestore.
+- **Không có cả hai** → `orderBy('created_at')`. Đang kéo dữ liệu nhiều phiên, thứ tự thời gian mới có nghĩa.
+
+> **Vì sao `user_id` không dùng `orderBy`.** Một `where('==')` cộng một `orderBy` trên field **khác** sẽ bị Firestore từ chối và bắt tạo composite index — tức người chạy dự án phải bấm link, đợi index build, rồi mới demo được màn `/history`. Dữ liệu một người dùng chỉ vài trăm document nên sắp trong JS rẻ hơn nhiều so với bắt cấu hình thêm sau khi clone. `created_at` có thể `null` với document vừa ghi (`serverTimestamp()` chưa kết thúc) nên chúng bị đẩy xuống cuối thay vì xen vào giữa.
 
 ---
 

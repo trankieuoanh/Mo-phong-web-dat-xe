@@ -83,7 +83,9 @@ Chỉ số này trả lời câu hỏi UX cụ thể: **màn nào khiến ngư�
 | Chỉ số | Nguồn |
 |---|---|
 | `vehicle_split` | `prop_vehicle_type` trong `select_vehicle` — gom theo `vehicle_type` (2 nhóm) chứ không theo `vehicle_id` (6 hạng xe); lấy event **cuối cùng** của mỗi session vì người dùng có thể đổi ý nhiều lần |
-| `address_popularity` | `prop_address_id` trong `select_address` — đây là **điểm đến** phổ biến (điểm đón là hằng số, không ghi event) |
+| `address_popularity` | `prop_address_id` trong `select_address` — đây là **điểm đến** phổ biến. Chỉ gom nhóm được trong phạm vi `address_source == 'preset'` (5 giá trị `addr-*`); nhánh `'search'` có tập id mở nên xếp hạng theo `prop_address_label` thay vì id |
+| `search_usage_rate` | tỉ lệ `select_address` có `prop_address_source == 'search'` — **người dùng có thực sự cần ô tìm không**, hay 5 gợi ý đã đủ |
+| `pickup_change_rate` | tỉ lệ `confirm_pickup` có `prop_pickup_id != 'pickup-current'` — tỉ lệ người đổi khỏi điểm đón do GPS đề xuất |
 | `promo_usage` vs `skip_rate` | `select_promo` so với `skip_promo` |
 | `top_items` | `prop_item_id` trong `add_to_cart`, cộng theo `prop_quantity` |
 | `avg_cart_size` / `avg_cart_total` | `prop_cart_size` / `prop_cart_total` trong `proceed_to_offer` |

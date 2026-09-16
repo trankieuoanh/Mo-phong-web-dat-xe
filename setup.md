@@ -120,9 +120,17 @@ FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@gsm-simulation.iam.gserviceaccount
 FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIEv...\n-----END PRIVATE KEY-----\n"
 PORT=4000
 WEB_ORIGIN=http://localhost:3000
+
+# Tuỳ chọn — địa chỉ liên hệ gắn vào User-Agent khi gọi Nominatim.
+# Có giá trị mặc định nên bỏ trống vẫn chạy được.
+NOMINATIM_CONTACT=ban@example.com
 ```
 
 File `apps/api/.env.example` đã commit sẵn với giá trị trống, để người khác clone repo biết cần những biến gì.
+
+**`NOMINATIM_CONTACT`** phục vụ endpoint `GET /api/places` (tìm địa chỉ thật). [Điều khoản dùng Nominatim](https://operations.osmfoundation.org/policies/nominatim/) bắt buộc mỗi request mang `User-Agent` định danh ứng dụng kèm cách liên hệ; thiếu nó thì OSM có quyền chặn IP. Đây cũng là lý do endpoint này phải nằm ở `apps/api` chứ không gọi thẳng từ trình duyệt — **trình duyệt không cho JavaScript đặt header `User-Agent`**.
+
+Không cần API key: Nominatim miễn phí. Đổi lại nó giới hạn **1 request/giây**, nên `place.service.ts` giữ hàng đợi và cache; xem `api-endpoints.md` mục 3b.
 
 **Ba lỗi kinh điển với `FIREBASE_PRIVATE_KEY`:**
 1. Phải **có dấu nháy kép** bao quanh — key chứa ký tự xuống dòng.

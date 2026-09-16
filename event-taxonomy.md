@@ -80,20 +80,33 @@ Bảng này được mã hoá **một lần duy nhất** thành `SCREENS` trong 
 | `event_name` | Khi nào | `properties` |
 |---|---|---|
 | `screen_view` | Mount | `{}` |
-| `select_address` | Chọn 1 địa chỉ trong danh sách | `{ address_id, address_label }` |
+| `select_address` | Chọn 1 địa chỉ (gợi ý hoặc kết quả tìm) | `{ address_id, address_label, address_source }` |
 | `back` | Bấm quay lại | `{ to_screen: "home" }` |
 
-> **`address_id` / `address_label` là ĐIỂM ĐẾN.** Màn này hỏi "Bạn muốn đi đến đâu?"; điểm đón là hằng số `FIXED_PICKUP` ("Vị trí hiện tại") nên **không ghi event** cho nó. Điểm đến là địa chỉ duy nhất biến thiên trong một session, nên nó giữ tên khoá `address_id` ở cả ba event dùng khoá này (`select_address`, `confirm_pickup`, `confirm_ride`).
+> **`address_id` / `address_label` là ĐIỂM ĐẾN.** Màn này hỏi "Bạn muốn đi đến đâu?". Điểm đến giữ tên khoá `address_id` ở cả ba event dùng khoá này (`select_address`, `confirm_pickup`, `confirm_ride`). Điểm đón dùng bộ khoá riêng `pickup_*` — xem màn `pickup_confirm`.
+>
+> **`address_source`** là `"preset"` (1 trong 5 địa chỉ gợi ý ở `mock-data.md` mục 1) hoặc `"search"` (người dùng tự gõ tìm, dữ liệu từ `GET /api/places`). Hai nhóm có tập `address_id` khác hẳn nhau:
+>
+> | `address_source` | dạng `address_id` | ví dụ |
+> |---|---|---|
+> | `preset` | `addr-*`, tập đóng 5 giá trị | `addr-home` |
+> | `search` | `osm-<osm_type><osm_id>`, tập mở | `osm-N240109189` |
+>
+> Phải ghi `address_source` thành một khoá riêng chứ **không** đoán qua tiền tố id: tiền tố là chi tiết cài đặt, đổi nhà cung cấp địa chỉ là mọi script pandas cũ sai im lặng. Dùng `osm_type + osm_id` chứ **không** dùng `place_id` của Nominatim — `place_id` đổi mỗi lần họ build lại cơ sở dữ liệu, tức dữ liệu tuần này không ghép được với tuần sau (đúng điều `CLAUDE.md` quy tắc 5 muốn tránh).
 
 ### `pickup_confirm` — step 2
 | `event_name` | Khi nào | `properties` |
 |---|---|---|
 | `screen_view` | Mount | `{}` |
-| `confirm_pickup` | Xác nhận điểm đón | `{ address_id, driver_note }` |
+| `confirm_pickup` | Xác nhận điểm đón | `{ address_id, pickup_id, pickup_label, pickup_source, driver_note }` |
 | `change_address` | Bấm "Đổi điểm đến" | `{ address_id }` (điểm đến đang bị bỏ) |
-
-> `driver_note` là chuỗi người dùng tự gõ ở ô "Thêm ghi chú cho bác tài", **chuỗi rỗng** khi không nhập (không phải `null`) — để pandas đếm `(df.driver_note != '').mean()` ra ngay tỉ lệ dùng. Đây là trường duy nhất trong cả app do người dùng tự nhập.
 | `back` | Bấm quay lại | `{ to_screen: "address_selection" }` |
+
+> `driver_note` là chuỗi người dùng tự gõ ở ô "Thêm ghi chú cho bác tài", **chuỗi rỗng** khi không nhập (không phải `null`) — để pandas đếm `(df.driver_note != '').mean()` ra ngay tỉ lệ dùng.
+>
+> **Điểm đón giờ biến thiên.** Trước đây nó là hằng số `FIXED_PICKUP` nên cố ý không ghi event: hằng số thì mọi document giống nhau, không phân biệt được session này với session kia. Từ khi màn này có ô tìm điểm đón, nó thành một lựa chọn thật của người dùng và **phải đo được** — một thao tác làm được mà không ghi lại là một khoảng mù trong dữ liệu (`ride-flow-design.md` mục 8).
+>
+> `pickup_source` nhận cùng hai giá trị với `address_source`. Điểm đón mặc định có `pickup_id = "pickup-current"` và `pickup_source = "preset"`, nên **`pickup_id != "pickup-current"` chính là tỉ lệ người đổi điểm đón**.
 
 ### `vehicle_selection` — step 3
 | `event_name` | Khi nào | `properties` |
@@ -116,12 +129,14 @@ Bảng này được mã hoá **một lần duy nhất** thành `SCREENS` trong 
 | `event_name` | Khi nào | `properties` |
 |---|---|---|
 | `screen_view` | Mount | `{}` |
-| `confirm_ride` | Bấm nút xác nhận cuối | `{ address_id, vehicle_id, vehicle_type, promo_id \| null, base_price, discount_amount, final_price, payment_method }` |
+| `confirm_ride` | Bấm nút xác nhận cuối | `{ address_id, address_label, address_source, pickup_id, pickup_label, vehicle_id, vehicle_type, promo_id \| null, base_price, discount_amount, final_price, payment_method }` |
 | `back` | Bấm quay lại | `{ to_screen: "promo_selection" }` |
 
 > `confirm_ride` là **event kết thúc funnel ride**. Session có event này = hoàn thành.
 >
 > `payment_method` là `"cash"` hoặc `"qr"`, mặc định `"cash"`. Ghi lại vì đây là một lựa chọn của người dùng ở bước cuối — không ghi thì không biết ai đổi khỏi mặc định.
+>
+> **Vì sao lặp lại `address_label` / `pickup_label` ở đây** dù chúng đã có ở `select_address` và `confirm_pickup`: đây là event **tự mô tả đủ một chuyến đi**. Màn `/history` dựng bảng lịch sử từ riêng các document `confirm_ride`, không join ngược về event trước. Và với `address_source == "search"` thì **không có bảng nào để tra id ra tên** — `getAddress("osm-N240109189")` trả `undefined`. Không lặp lại nhãn ở đây thì cột điểm đi/điểm đến trống với mọi địa chỉ người dùng tự tìm.
 
 ### `ride_success` — step 6
 | `event_name` | Khi nào | `properties` |

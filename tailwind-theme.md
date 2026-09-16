@@ -136,7 +136,28 @@ Tailwind v4 không sinh sẵn class cho typography token, nên khai báo thành 
 | `request-form-input-row` | Dòng địa chỉ / loại xe / khuyến mãi trong danh sách | `bg-canvas-soft text-ink rounded-md p-lg` |
 | `category-button` | Chip lọc món (`main`/`drink`/`dessert`) | `bg-canvas-soft text-ink t-body-sm-strong rounded-pill px-lg py-sm` |
 | `icon-button-circular` | Nút Back ở góc, nút +/− số lượng | `bg-canvas-soft text-ink rounded-full` |
-| `nav-bar` | Thanh tiêu đề mỗi màn | `bg-canvas text-ink t-body-md-strong px-3xl py-lg` |
+| `nav-bar` | Header của `Panel` — tiêu đề màn | `bg-canvas text-ink t-display-sm px-2xl py-lg border-b border-surface-pressed` |
+
+### Khung desktop — bổ sung khi dựng lại UI theo `apps/web/sample_ui/`
+
+| Token component | Dùng ở đâu | Class |
+|---|---|---|
+| `app-shell` | `components/shell/AppShell.tsx` | `flex min-h-dvh bg-canvas-softer` |
+| `side-rail` | Rail icon dọc bên trái, ẩn dưới `lg` | `bg-canvas border-r border-surface-pressed py-lg` — mỗi mục `size-11 rounded-xl`, mục active `bg-canvas-soft text-primary-dark`, mục thường `text-body` |
+| `top-bar` | `components/shell/TopBar.tsx` | `bg-canvas border-b border-surface-pressed px-3xl` — tên mục `t-display-lg`, tab active `border-b-2 border-primary text-ink`, tab mờ `text-body` |
+| `panel` | `components/Panel.tsx` — card trắng chứa nội dung màn | `bg-canvas rounded-xl` + header/body/footer ngăn bằng `border-surface-pressed` |
+| `user-chip` | `components/shell/UserMenu.tsx` | `rounded-pill hover:bg-canvas-soft` — avatar `size-9 rounded-full bg-canvas-soft text-primary-dark` |
+
+**Card lồng trong `Panel` dùng `bg-canvas-soft`, không dùng `bg-canvas`.** Panel đã là nền trắng; card trắng trên nền trắng thì tàng hình. Đây là đảo ngược so với bản mobile cũ (nền màn là `canvas-softer`, card là `canvas`).
+
+**`hover:` được dùng ở đây**, khác bản mobile vốn chỉ có `active:` — desktop có con trỏ chuột. Nút có thể `disabled` thì dùng `enabled:hover:` để nút mờ không đổi màu khi rê chuột qua.
+
+### Icon và logo
+
+Không có thư viện icon (`CLAUDE.md` quy tắc 8). Hai file SVG viết tay:
+
+- `components/Icon.tsx` — `<Icon name="..." size={24} />`, lưới 24px, `stroke="currentColor"` `fill="none"` `strokeWidth={1.5}`. Vì ăn theo `currentColor`, **không bao giờ phải gõ hex ở chỗ gọi**.
+- `components/GsmLogo.tsx` — `variant="mark"` (rail) / `"full"` (có wordmark, dùng ở `/login`). **Một tông duy nhất**: logo thật có thêm màu vàng, nhưng `DESIGN.md` chốt "không có màu accent thứ hai".
 
 **Trạng thái được chọn** (địa chỉ/xe/khuyến mãi đang chọn): thêm `ring-2 ring-primary` lên card, **không** đổi nền sang cyan đặc — `DESIGN.md` giữ cyan riêng cho nút chuyển đổi, mỗi khung nhìn chỉ nên có một điểm cyan đặc.
 
@@ -151,7 +172,9 @@ Tailwind v4 không sinh sẵn class cho typography token, nên khai báo thành 
 ```css
 .shadow-level-2 { box-shadow: rgba(0,0,0,0.16) 0px 4px 16px 0px; }
 ```
-Chỉ áp cho **thanh nút hành động dính đáy màn hình** — để tách nó khỏi nội dung cuộn phía sau. Card trong danh sách giữ phẳng.
+Chỉ áp cho **lớp nổi lên trên nội dung khác**: dropdown của `UserMenu`, cụm nút zoom / re-center / tooltip trên `MapCanvas`. Card trong danh sách và `Panel` giữ phẳng — chúng đã tách khỏi nền bằng nền trắng trên `canvas-softer`.
+
+> Bản trước quy định `shadow-level-2` cho thanh nút dính đáy màn hình. Trên desktop nút nằm trong footer của `Panel` và đã có `border-t` ngăn cách, nên không cần bóng nữa.
 
 ## 6. Hình dạng
 

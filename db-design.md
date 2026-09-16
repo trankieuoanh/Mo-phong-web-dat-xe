@@ -60,6 +60,40 @@ events (collection)
 }
 ```
 
+## Ví dụ document — `confirm_ride` với địa chỉ tự tìm
+
+Event kết thúc funnel ride, và là **nguồn duy nhất** dựng nên một dòng ở màn `/history`:
+
+```json
+{
+  "session_id": "abc-125",
+  "user_id": "mock-user-2",
+  "flow": "ride",
+  "event_name": "confirm_ride",
+  "screen_name": "ride_confirm",
+  "previous_screen": "promo_selection",
+  "step_index": 5,
+  "platform": "web",
+  "properties": {
+    "address_id": "osm-R198437",
+    "address_label": "Hồ Hoàn Kiếm",
+    "address_source": "search",
+    "pickup_id": "pickup-current",
+    "pickup_label": "Vị trí hiện tại",
+    "vehicle_id": "veh-bike",
+    "vehicle_type": "bike",
+    "promo_id": null,
+    "base_price": 35000,
+    "discount_amount": 0,
+    "final_price": 35000,
+    "payment_method": "cash"
+  },
+  "created_at": "2026-09-15T10:20:11Z"
+}
+```
+
+> `address_id` ở đây **không** thuộc tập `addr-*` của `mock-data.md` — người dùng tự tìm địa chỉ qua `GET /api/places`, id là `osm-<osm_type><osm_id>`. Vì vậy `address_label` phải được ghi kèm: **không có bảng nào tra id đó ra tên**. `address_source` cho biết nên gom nhóm theo id (`preset`) hay theo nhãn (`search`).
+
 > Giá trị `screen_name`, `previous_screen`, `step_index` và cấu trúc `properties` của **mọi** event được quy định trong `event-taxonomy.md` — đó là nguồn sự thật, file này chỉ minh hoạ hình dạng document.
 
 `platform` do `apps/api` tự gắn, **không** nằm trong request body (xem `api-endpoints.md`).

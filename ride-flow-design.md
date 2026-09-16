@@ -47,21 +47,24 @@ Hai chỗ lệch so với spec, và lý do:
 
 | Tên trong spec | Event dùng thật | Ghi chú |
 |---|---|---|
-| `click_destination_option` | `select_address` | `{ address_id, address_label }` — giữ nguyên |
+| `click_destination_option` | `select_address` | **thêm khoá** `address_source` |
 | `confirm_pickup_point` | `confirm_pickup` | **thêm khoá** `driver_note` |
 | `select_vehicle_type` | `select_vehicle` | `{ vehicle_id, vehicle_type, base_price }` — giữ nguyên |
 | `click_voucher_button` | *(không cần)* | `screen_view` của `promo_selection` đã là mốc đó |
 | `apply_voucher_success` | `select_promo` | `{ promo_id, promo_code, discount_amount }` — giữ nguyên |
 | `submit_booking_click` | `confirm_ride` | **thêm khoá** `payment_method` |
 
-**Không có `EventName` mới.** Toàn bộ spec nằm gọn trong 19 event đã chốt — đây là lý do bản nâng cấp này rẻ. Chỉ hai khoá `properties` được thêm, đúng quy trình `event-taxonomy.md` §6 mục 2 (field đặc thù theo loại event → cho vào `properties`, Firestore không cần migrate, pandas dùng `.fillna()`).
+**Không có `EventName` mới.** Toàn bộ spec nằm gọn trong 19 event đã chốt — đây là lý do bản nâng cấp này rẻ. Chỉ thêm khoá vào `properties`, đúng quy trình `event-taxonomy.md` §6 mục 2 (field đặc thù theo loại event → cho vào `properties`, Firestore không cần migrate, pandas dùng `.fillna()`).
 
-Hai khoá mới, ghi vào `event-taxonomy.md` §3:
+Các khoá mới, ghi vào `event-taxonomy.md` §3:
 
 | Event | Khoá mới | Kiểu | Vì sao đáng ghi |
 |---|---|---|---|
+| `select_address` | `address_source` | `"preset" \| "search"` | Đo được ô tìm có thực sự cần không, hay 5 gợi ý đã đủ. Phải là khoá riêng chứ không đoán qua tiền tố id |
 | `confirm_pickup` | `driver_note` | `string` (rỗng nếu không nhập) | Đo được tỉ lệ người thực sự dùng ô ghi chú — một câu hỏi UX thật, và là trường duy nhất người dùng tự gõ trong cả app |
+| `confirm_pickup` | `pickup_id`, `pickup_label`, `pickup_source` | `string` | Điểm đón từ hằng số thành lựa chọn thật. `pickup_id != "pickup-current"` chính là tỉ lệ người đổi điểm đón |
 | `confirm_ride` | `payment_method` | `"cash" \| "qr"` | Là một lựa chọn của người dùng ở bước cuối; không ghi thì không biết ai đổi khỏi mặc định |
+| `confirm_ride` | `address_label`, `address_source`, `pickup_id`, `pickup_label` | `string` | Event này phải **tự mô tả đủ một chuyến đi**: màn `/history` dựng bảng từ riêng nó, và với địa chỉ tự tìm thì không có bảng nào tra id ra tên |
 
 ---
 
@@ -69,7 +72,18 @@ Hai khoá mới, ghi vào `event-taxonomy.md` §3:
 
 Class viết theo bảng ánh xạ ở `tailwind-theme.md` §4. Không giá trị nào nằm ngoài token (`CLAUDE.md` quy tắc 4).
 
-Khung chung: `ScreenShell` (container 480px, nav-bar sticky, footer sticky có `shadow-level-2`).
+Khung chung: `ScreenShell` — rail trái + top bar, rồi một trong hai bố cục desktop (`screen-map.md` §6):
+
+| Màn | `variant` | Cột phải (`aside`) |
+|---|---|---|
+| 1 `address_selection` | `split` | `<MapCanvas variant="pickup" fill />` |
+| 2 `pickup_confirm` | `split` | `<MapCanvas variant="pickup" label={pickup.label} fill />` |
+| 3 `vehicle_selection` | `split` | `<MapCanvas variant="route" fill />` |
+| 4 `promo_selection` | `wide`, `max-w-[600px]` | — (màn này vốn là overlay, không có bản đồ) |
+| 5 `ride_confirm` | `split` | `<MapCanvas variant="route" fill />` |
+| 6 `ride_success` | `wide`, `max-w-[600px]` | — |
+
+Nút hành động chính nằm ở footer của `Panel`, dính đáy panel chứ không dính đáy màn hình.
 
 ---
 
@@ -77,21 +91,25 @@ Khung chung: `ScreenShell` (container 480px, nav-bar sticky, footer sticky có `
 
 **Mục tiêu:** chọn **điểm đến** — *"Bạn muốn đi đến đâu?"*, đúng như spec.
 
-> **Điểm đón là hằng số, điểm đến là lựa chọn.** Bản trước của tài liệu này làm ngược lại, vì `mock-data.md` §1 lúc đó ghi dự án "không có màn chọn điểm đến". Quy tắc đó đã được thay: giờ `ADDRESSES` là danh sách điểm đến gợi ý, còn điểm đón là hằng số `FIXED_PICKUP` (`"Vị trí hiện tại"`) — giống app thật, nơi điểm đón do GPS tự xác định và người dùng chỉ xác nhận lại ở Màn 2.
+> **Điểm đến là lựa chọn chính; điểm đón có giá trị mặc định nhưng đổi được ở Màn 2.** `ADDRESSES` là danh sách điểm đến **gợi ý**, hiện khi ô tìm còn trống. Điểm đón khởi tạo bằng `DEFAULT_PICKUP` (`"Vị trí hiện tại"`) — giống app thật, nơi GPS tự xác định rồi người dùng xác nhận lại.
 >
-> Phép đảo này **không tốn một `step_index` nào**: trước và sau, vẫn chỉ có đúng **một** địa chỉ biến thiên trong mỗi session. Vì vậy khoá `address_id` giữ nguyên tên ở cả ba event dùng nó (`select_address`, `confirm_pickup`, `confirm_ride`) — chỉ đổi ý nghĩa, từ điểm đón sang điểm đến.
+> Hai địa chỉ dùng **hai bộ khoá riêng** trong event: `address_*` cho điểm đến, `pickup_*` cho điểm đón. Không cái nào tốn thêm `step_index` — ô tìm điểm đón nằm ngay trong Màn 2 chứ không phải một màn mới.
 
 | Khối | Thành phần | Class | Event |
 |---|---|---|---|
 | Nav-bar | `BackButton` + selector `Hà Nội 🇻🇳` | `nav-bar` | `back` → `home` |
 | Hành động nhanh | "Sử dụng vị trí hiện tại" | `category-button` | — *(trang trí)* |
-| Ô tìm kiếm | input + icon kính lúp | `text-input`: `bg-canvas-soft rounded-md p-lg t-body-md` | — *(chỉ lọc)* |
-| Danh sách | 5 điểm đến gợi ý từ `ADDRESSES` | `request-form-input-row` | `select_address` |
+| Ô tìm kiếm | `<PlacePicker>` — input + icon kính lúp | `text-input`: `bg-canvas-soft rounded-md p-lg t-body-md` | — *(chỉ tra cứu)* |
+| Danh sách | Kết quả `GET /api/places`, hoặc 5 gợi ý từ `ADDRESSES` khi ô trống | `request-form-input-row` | `select_address` |
 | Footer | "Địa chỉ đã lưu" · "Tìm trên bản đồ" · toggle sáp nhập tỉnh | `category-button` | — *(trang trí)* |
 
-**Một dòng địa chỉ** gồm: icon tròn (`icon-button-circular`, ký tự theo `address.icon`) · `label` (`.t-body-md-strong`) · khoảng cách (`.t-caption text-mute`) · `address` đầy đủ (`.t-body-sm text-body`) · icon tim và nút `...` bên phải *(trang trí)*. Dòng đang chọn có `ring-2 ring-primary`.
+**Một dòng địa chỉ** gồm: icon tròn (`icon-button-circular`) · `label` (`.t-body-md-strong`) · khoảng cách (`.t-caption text-mute`, **chỉ có với địa chỉ gợi ý**) · `address` đầy đủ (`.t-body-sm text-body`). Dòng đang chọn có `ring-2 ring-primary`.
 
-**Ô tìm kiếm** lọc `ADDRESSES` theo `label` và `address`, không phân biệt hoa thường, **không bắn event**. Lý do: kết quả cuối cùng đã nằm trong `select_address`; ghi thêm event cho mỗi ký tự gõ vào chỉ làm nhiễu. Không tìm thấy thì hiện dòng "Không tìm thấy điểm đến phù hợp".
+**Ô tìm kiếm gọi `GET /api/places`** (Nominatim/OpenStreetMap qua proxy `apps/api`), debounce 400 ms, chỉ gọi từ 3 ký tự trở lên, huỷ request cũ bằng `AbortController`. **Không bắn event**: kết quả cuối cùng đã nằm trong `select_address`; ghi thêm event cho mỗi ký tự gõ vào chỉ làm nhiễu.
+
+`select_address` mang thêm **`address_source`** (`'preset' | 'search'`) để phân tích tách được "chọn gợi ý" với "tự tìm" — xem `event-taxonomy.md`.
+
+**Suy biến êm khi mất mạng:** Nominatim rớt hoặc trả 429 → hiện một dòng cảnh báo **nhưng vẫn liệt kê 5 địa chỉ gợi ý**, luồng đi tiếp được bình thường. Cùng tinh thần với `trackEvent().catch(() => {})`: hạ tầng lỗi không được kẹt người dùng.
 
 **Không có `FlowGuard`** — đây là bước đầu luồng.
 
@@ -99,14 +117,17 @@ Khung chung: `ScreenShell` (container 480px, nav-bar sticky, footer sticky có `
 
 ### Màn 2 — `/ride/pickup` · `pickup_confirm` · step 2
 
-**Mục tiêu:** xác nhận điểm đón (hằng số) trên bản đồ, xem lại điểm đến, nhập ghi chú cho tài xế.
+**Mục tiêu:** xác nhận **hoặc đổi** điểm đón, xem lại điểm đến, nhập ghi chú cho tài xế.
+
+> **Ô tìm điểm đón nằm trong chính màn này, không phải một route riêng.** Thêm một màn là đánh số lại toàn bộ `step_index` và làm dữ liệu cũ không ghép được với dữ liệu mới (§9). Bấm "Đổi điểm đón" chỉ đổi nội dung panel, `screen_name` và `step_index` giữ nguyên.
 
 | Khối | Thành phần | Class | Event |
 |---|---|---|---|
 | Nav-bar | `BackButton` | `nav-bar` | `back` → `address_selection` |
-| Bản đồ | `<MapCanvas variant="pickup" />` + nút re-center | — | — |
-| Sheet · điểm đón | `FIXED_PICKUP.label` + "bán kính 10 m" | `.t-display-sm` + `.t-caption text-mute` | — |
-| Sheet · điểm đón | `FIXED_PICKUP.address` | `.t-body-sm text-body` | — |
+| Bản đồ | `<MapCanvas variant="pickup" label={pickup.label} fill />` | — | — |
+| Sheet · điểm đón | `pickup.label` + "bán kính 10 m" *(chỉ khi chưa đổi)* | `.t-display-sm` + `.t-caption text-mute` | — |
+| Sheet · điểm đón | `pickup.address` | `.t-body-sm text-body` | — |
+| Sheet · điểm đón | "Đổi điểm đón" → mở `<PlacePicker>` ngay trong panel | `category-button` | — *(chỉ đổi state)* |
 | Sheet · điểm đến | `label` + `address` của địa chỉ vừa chọn | `.t-body-md-strong` + `.t-body-sm text-body` | — |
 | Sheet · ghi chú | input "Thêm ghi chú cho bác tài (ví dụ: gần cổng)" | `text-input` | — *(ghi vào state)* |
 | Sheet · phụ | "Đổi điểm đến" | `button-secondary` | `change_address` |
@@ -324,6 +345,8 @@ Những khối dưới đây **render tĩnh hoặc `disabled`, không bắn even
 | 2 | Nút re-center GPS · dòng "bán kính 10 m" |
 | 3 | Nút "Đặt hộ" · banner "Boost" · thanh thanh toán · "Hẹn giờ" · "GreenNow" |
 | 4 | Tab "VPoint" · banner gói hội viên |
+| mọi màn | **`SideRail`** — bốn mục "Tài khoản phụ" / "Trung tâm hỗ trợ" / "Điều khoản" / "Thu gọn menu", cùng hai mục luồng khi KHÔNG ở `/`. Tab trong `TopBar`. Chip người dùng trong `UserMenu` (trừ "Đăng xuất") |
+| mọi màn có bản đồ | Cụm nút `+`/`−`, nút re-center, tooltip địa chỉ trong `MapCanvas` |
 
 Lý do — và đây là điều quan trọng nhất trong tài liệu này:
 
@@ -339,7 +362,7 @@ Ngoại lệ duy nhất: **ô tìm kiếm ở Màn 1** có lọc được danh s
 - **Không thêm `EventName` mới.** Toàn bộ spec đã nằm gọn trong 19 event.
 - **Không dùng bản đồ thật (Leaflet / Google Maps).** Phá `CLAUDE.md` quy tắc 8, cần API key, và không thêm được gì cho phân tích funnel.
 - **Không thêm màn thất bại.** App mô phỏng luôn thành công (`screen-map.md` §5).
-- **Không đổi `max-width` xuống 430px.** Spec ghi 430, `screen-map.md` §6 đang chốt 480. Giữ 480; nếu đổi ý thì là một dòng trong `ScreenShell.tsx`.
+- ~~**Không đổi `max-width` xuống 430px.**~~ Không còn áp dụng: `screen-map.md` §6 đã chuyển sang desktop-first theo `apps/web/sample_ui/`. Panel trái của bố cục `split` rộng 480px; bố cục `wide` đặt bề ngang qua prop `maxWidth`.
 
 ## 10. Cần mentor chốt
 

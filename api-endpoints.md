@@ -84,11 +84,53 @@ File: `apps/api/src/routes/events.routes.ts`, handler `GET`.
 
 `created_at` được đổi sang **chuỗi ISO** ngay tại service. Timestamp của Firestore serialize ra JSON thành `{_seconds, _nanoseconds}` mà cả `jq` lẫn pandas đều không đọc được.
 
-### 3. Lấy event theo flow / khoảng thời gian
+### 3. Lấy event theo user / flow / khoảng thời gian
 ```
+GET /api/events?user_id=mock-user-1a2b3c4d
 GET /api/events?flow=ride&from=2026-09-01&to=2026-09-15
 ```
 Cùng file, cùng handler `GET`, chỉ khác điều kiện `where` khi query Firestore. Mọi param đều optional, kết hợp được.
+
+| Param | Kiểu | Ghi chú |
+|---|---|---|
+| `session_id` | string | 1 lượt đi qua funnel. Kết quả sắp theo `step_index` |
+| `user_id` | string | **Bền qua nhiều phiên.** Nguồn dữ liệu cho màn `/history` |
+| `flow` | `ride` \| `food` | |
+| `from` / `to` | ISO date | |
+
+> **`user_id` cố ý không dùng `orderBy` của Firestore.** Một `where('user_id','==')` cộng một `orderBy('created_at')` trên field khác sẽ bị Firestore từ chối và bắt tạo composite index — tức người chạy dự án phải bấm link, đợi index build, rồi mới demo được. Dữ liệu một người dùng chỉ vài trăm document, nên service lấy về rồi **sắp xếp trong bộ nhớ**. Đổi lại là không phải cấu hình gì thêm sau khi clone.
+
+### 3b. Tìm địa chỉ thật
+```
+GET /api/places?q=Hồ Gươm&limit=6
+```
+File: `apps/api/src/routes/places.routes.ts` → `validators/place.validator.ts` → `services/place.service.ts`.
+
+**Response (200):** mảng `Place` (kiểu ở `packages/shared/src/places.ts`)
+```json
+[{ "id": "osm-N240109189", "label": "Hồ Hoàn Kiếm",
+   "address": "Hàng Trống, Hoàn Kiếm, Hà Nội", "source": "search",
+   "lat": 21.0287, "lon": 105.8524 }]
+```
+
+| Param | Kiểu | Bắt buộc |
+|---|---|---|
+| `q` | string, 2–120 ký tự | ✅ |
+| `limit` | số nguyên 1–8, mặc định 6 | ❌ |
+
+**Vì sao phải proxy qua `apps/api` chứ không gọi Nominatim thẳng từ trình duyệt** — ba lý do, lý do đầu là chặn cứng:
+
+1. Điều khoản OSM bắt buộc mỗi request mang `User-Agent` định danh, mà **trình duyệt không cho JavaScript đặt header đó**.
+2. OSM giới hạn tuyệt đối **1 request/giây**. Chỉ ở server mới đặt được hàng đợi thật; debounce phía client là gợi ý, không phải bảo đảm.
+3. Cache dùng chung. Gõ "Cầu Giấy" rồi xoá lùi sẽ hỏi lại đúng những query vừa hỏi.
+
+**Lỗi (502)** khi Nominatim rớt / trả 429 / hết thời gian chờ:
+```json
+{ "error": "Không tìm được địa chỉ lúc này (upstream 429)" }
+```
+FE phải **suy biến êm**: hiện cảnh báo nhưng vẫn liệt kê 5 địa chỉ gợi ý để luồng đi tiếp được. Cùng tinh thần với `trackEvent().catch(() => {})` — hạ tầng lỗi không được kẹt người dùng.
+
+Endpoint này **không chạm Firestore** và **không ghi event nào**: gõ phím không phải một bước funnel.
 
 ### 4. Health check
 ```

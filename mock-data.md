@@ -37,20 +37,31 @@ Sắp xếp theo `distanceKm` tăng dần — giống app thật.
 | `addr-school` | Trường | VinUniversity, Ocean Park, Gia Lâm, Hà Nội | `school` | 15.2 |
 | `addr-airport` | Sân bay | Sân bay Quốc tế Nội Bài, Sóc Sơn, Hà Nội | `plane` | 27.5 |
 
-Bảng trên là danh sách **điểm đến** gợi ý ở màn `address_selection` ("Bạn muốn đi đến đâu?").
+Bảng trên là danh sách **điểm đến gợi ý** ở màn `address_selection` ("Bạn muốn đi đến đâu?") — hiện khi ô tìm còn trống, dưới tiêu đề "Địa chỉ đã lưu".
 
-**Điểm đón là hằng số** — app thật tự định vị GPS, màn `pickup_confirm` chỉ xác nhận lại. **Không** ghi event cho nó:
+### Địa chỉ tìm được KHÔNG nằm trong file này
+
+Từ khi ô tìm nối vào `GET /api/places` (Nominatim/OpenStreetMap), người dùng chọn được bất kỳ địa điểm nào ở Việt Nam. Những địa chỉ đó là **dữ liệu động**, không hardcode, `id` dạng `osm-<osm_type><osm_id>`.
+
+Hệ quả cần nhớ: `getAddress(id)` chỉ tra được 5 dòng ở trên. Với địa chỉ tìm được nó trả `undefined` — nên nhãn hiển thị phải đi theo state (`ride.destination.label`) và phải được ghi vào chính event (`address_label`), chứ không tra ngược từ id. Xem `event-taxonomy.md` mục `ride_confirm`.
+
+### Điểm đón — mặc định, không còn là hằng số
 
 ```ts
 export const FIXED_PICKUP = {
+  id: 'pickup-current',                            // id ổn định, đi vào properties
   label: 'Vị trí hiện tại',
   address: '128 Xuân Thủy, Cầu Giấy, Hà Nội',
 };
 ```
 
-Vì vậy địa chỉ **duy nhất biến thiên** trong một session là điểm đến, và nó giữ tên khoá `address_id` trong `select_address` / `confirm_pickup` / `confirm_ride`.
+Trước đây điểm đón là hằng số bất biến nên cố ý **không ghi event**: hằng số thì mọi document giống nhau, không phân biệt được session này với session kia. Giờ màn `pickup_confirm` có ô tìm điểm đón, nên đây là **giá trị khởi tạo** chứ không phải giá trị duy nhất, và `confirm_pickup` ghi lại `pickup_id` / `pickup_label` / `pickup_source`.
 
-Quãng đường của chuyến cũng là hằng số, dùng để hiển thị "34 phút • 15 km" ở màn chọn xe và màn xác nhận, **không** vào event:
+Tên biến giữ nguyên `FIXED_PICKUP` để không phải sửa mọi chỗ import; "fixed" giờ đọc là "mặc định".
+
+Điểm đến giữ tên khoá `address_id` trong `select_address` / `confirm_pickup` / `confirm_ride`; điểm đón dùng bộ khoá riêng `pickup_*`.
+
+Quãng đường của chuyến **vẫn là hằng số**, dùng để hiển thị "34 phút • 15 km" ở màn chọn xe và màn xác nhận, **không** vào event. Nó không đổi theo địa chỉ dù giờ đã có toạ độ thật: tính quãng đường thật cần dịch vụ định tuyến, mà app này không đặt xe thật nên con số đó không thêm gì cho phân tích funnel:
 
 ```ts
 export const FIXED_ROUTE = { distanceKm: 15, durationMin: 34 };
