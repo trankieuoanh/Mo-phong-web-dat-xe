@@ -24,10 +24,17 @@ import { resetPreviousScreen } from './track';
  *   null          = da bo qua
  *   "promo-10k"   = da chon
  */
+export type PaymentMethod = 'cash' | 'qr';
+
 export interface RideDraft {
+  /** Dia chi chon o man 1 — DIEM DEN. Diem don la hang so FIXED_PICKUP. */
   addressId?: string;
   vehicleId?: string;
   promoId?: string | null;
+  /** Ghi chu cho tai xe (man pickup_confirm). Chuoi rong = khong nhap. */
+  driverNote?: string;
+  /** Man ride_confirm. Mac dinh 'cash'. Chi 2 lua chon de khong chia nho mau. */
+  paymentMethod?: PaymentMethod;
 }
 
 interface StoredState {

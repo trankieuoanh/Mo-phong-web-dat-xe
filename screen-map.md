@@ -134,7 +134,7 @@ Bắn `screen_view` một lần khi mount. Dùng `useRef` chặn lần chạy th
 
 Cả hai luồng có màn success riêng (route thật, không phải toast/modal) để funnel có mốc kết thúc rõ ràng.
 
-**`/ride/success`** — icon tích cyan, "Đặt xe thành công", tóm tắt điểm đón + loại xe + giá cuối, nút `Về trang chủ`.
+**`/ride/success`** — icon tích cyan, "Đặt xe thành công", tóm tắt điểm đến + loại xe + giá cuối, nút `Về trang chủ`.
 
 **`/food/success`** — tương tự, tóm tắt số món + tổng tiền cuối, nút `Về trang chủ`.
 

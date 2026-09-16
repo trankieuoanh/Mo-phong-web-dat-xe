@@ -30,7 +30,7 @@ export default function FoodOfferPage() {
 function FoodOfferContent() {
   useScreenView('food_offer_selection');
   const router = useRouter();
-  const { cart, setOfferId } = useApp();
+  const { cart, offerId, setOfferId } = useApp();
 
   const { cartTotal } = calcFoodTotals(cart, null, getFoodItem);
 
@@ -71,7 +71,9 @@ function FoodOfferContent() {
                 type="button"
                 disabled={!available}
                 onClick={() => selectOffer(offer.id, offer.code, discount)}
-                className="w-full rounded-md bg-canvas-soft p-lg text-left text-ink active:bg-surface-pressed disabled:cursor-not-allowed disabled:opacity-50"
+                className={`w-full rounded-md bg-canvas-soft p-lg text-left text-ink active:bg-surface-pressed disabled:cursor-not-allowed disabled:opacity-50 ${
+                  offer.id === offerId ? 'ring-2 ring-primary' : ''
+                }`}
               >
                 <span className="t-body-md-strong block">{offer.title}</span>
                 <span className="t-body-sm mt-xxs block text-body">{offer.description}</span>

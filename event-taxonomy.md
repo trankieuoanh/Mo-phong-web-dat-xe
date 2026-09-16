@@ -83,12 +83,16 @@ Bảng này được mã hoá **một lần duy nhất** thành `SCREENS` trong 
 | `select_address` | Chọn 1 địa chỉ trong danh sách | `{ address_id, address_label }` |
 | `back` | Bấm quay lại | `{ to_screen: "home" }` |
 
+> **`address_id` / `address_label` là ĐIỂM ĐẾN.** Màn này hỏi "Bạn muốn đi đến đâu?"; điểm đón là hằng số `FIXED_PICKUP` ("Vị trí hiện tại") nên **không ghi event** cho nó. Điểm đến là địa chỉ duy nhất biến thiên trong một session, nên nó giữ tên khoá `address_id` ở cả ba event dùng khoá này (`select_address`, `confirm_pickup`, `confirm_ride`).
+
 ### `pickup_confirm` — step 2
 | `event_name` | Khi nào | `properties` |
 |---|---|---|
 | `screen_view` | Mount | `{}` |
-| `confirm_pickup` | Xác nhận điểm đón | `{ address_id }` |
-| `change_address` | Bấm "Đổi địa chỉ" | `{ address_id }` (địa chỉ đang bị bỏ) |
+| `confirm_pickup` | Xác nhận điểm đón | `{ address_id, driver_note }` |
+| `change_address` | Bấm "Đổi điểm đến" | `{ address_id }` (điểm đến đang bị bỏ) |
+
+> `driver_note` là chuỗi người dùng tự gõ ở ô "Thêm ghi chú cho bác tài", **chuỗi rỗng** khi không nhập (không phải `null`) — để pandas đếm `(df.driver_note != '').mean()` ra ngay tỉ lệ dùng. Đây là trường duy nhất trong cả app do người dùng tự nhập.
 | `back` | Bấm quay lại | `{ to_screen: "address_selection" }` |
 
 ### `vehicle_selection` — step 3
@@ -112,10 +116,12 @@ Bảng này được mã hoá **một lần duy nhất** thành `SCREENS` trong 
 | `event_name` | Khi nào | `properties` |
 |---|---|---|
 | `screen_view` | Mount | `{}` |
-| `confirm_ride` | Bấm nút xác nhận cuối | `{ address_id, vehicle_id, vehicle_type, promo_id \| null, base_price, discount_amount, final_price }` |
+| `confirm_ride` | Bấm nút xác nhận cuối | `{ address_id, vehicle_id, vehicle_type, promo_id \| null, base_price, discount_amount, final_price, payment_method }` |
 | `back` | Bấm quay lại | `{ to_screen: "promo_selection" }` |
 
 > `confirm_ride` là **event kết thúc funnel ride**. Session có event này = hoàn thành.
+>
+> `payment_method` là `"cash"` hoặc `"qr"`, mặc định `"cash"`. Ghi lại vì đây là một lựa chọn của người dùng ở bước cuối — không ghi thì không biết ai đổi khỏi mặc định.
 
 ### `ride_success` — step 6
 | `event_name` | Khi nào | `properties` |

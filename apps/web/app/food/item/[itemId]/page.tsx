@@ -51,10 +51,10 @@ function FoodItemContent({ itemId }: { itemId: string }) {
   }
 
   function handleAddToCart() {
-    const nextCart = [...cart];
-    const line = nextCart.find((l) => l.itemId === itemId);
-    if (line) line.quantity += quantity;
-    else nextCart.push({ itemId, quantity });
+    // Copy ca dong — xem ghi chu cung loi o app/food/page.tsx.
+    const nextCart = cart.some((l) => l.itemId === itemId)
+      ? cart.map((l) => (l.itemId === itemId ? { ...l, quantity: l.quantity + quantity } : l))
+      : [...cart, { itemId, quantity }];
     const after = calcFoodTotals(nextCart, null, getFoodItem);
 
     trackAddToCart('food_item_detail', {
@@ -121,7 +121,7 @@ function QtyButton({
       type="button"
       aria-label={label}
       onClick={onClick}
-      className="grid size-9 place-items-center rounded-full bg-canvas-soft text-ink active:bg-surface-pressed"
+      className="grid size-11 place-items-center rounded-full bg-canvas-soft text-ink active:bg-surface-pressed"
     >
       <span aria-hidden="true">{children}</span>
     </button>

@@ -82,8 +82,8 @@ Chỉ số này trả lời câu hỏi UX cụ thể: **màn nào khiến ngư�
 
 | Chỉ số | Nguồn |
 |---|---|
-| `vehicle_split` | `prop_vehicle_type` trong `select_vehicle` |
-| `address_popularity` | `prop_address_id` trong `select_address` |
+| `vehicle_split` | `prop_vehicle_type` trong `select_vehicle` — gom theo `vehicle_type` (2 nhóm) chứ không theo `vehicle_id` (6 hạng xe); lấy event **cuối cùng** của mỗi session vì người dùng có thể đổi ý nhiều lần |
+| `address_popularity` | `prop_address_id` trong `select_address` — đây là **điểm đến** phổ biến (điểm đón là hằng số, không ghi event) |
 | `promo_usage` vs `skip_rate` | `select_promo` so với `skip_promo` |
 | `top_items` | `prop_item_id` trong `add_to_cart`, cộng theo `prop_quantity` |
 | `avg_cart_size` / `avg_cart_total` | `prop_cart_size` / `prop_cart_total` trong `proceed_to_offer` |

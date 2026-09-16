@@ -4,11 +4,14 @@
  * screen_name: `promo_selection` — step 4
  * Event: screen_view, select_promo, skip_promo, back.
  *
- * `discount_amount` la SO TIEN GIAM THUC TE (VND), khong phai phan tram —
- * de pandas cong truc tiep (event-taxonomy.md muc 3).
+ * Giao dien theo ride-flow-design.md muc 3 "Man 4".
+ *
+ * THAY DOI HANH VI (muc 7 cua tai lieu do): bam mot promo chi TICK CHON,
+ * nut footer moi ban event. Nho vay moi session co dung MOT `select_promo`.
  */
 
 import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { PROMOS, calcDiscount, getVehicle, isRuleAvailable } from '@gsm/shared';
 import { BackButton } from '@/components/BackButton';
 import { FlowGuard } from '@/components/FlowGuard';
@@ -37,13 +40,41 @@ function PromoContent() {
 
   const basePrice = getVehicle(ride.vehicleId!)?.basePrice ?? 0;
 
-  function selectPromo(id: string, code: string, discountAmount: number) {
+  const [picked, setPicked] = useState<string | null>(ride.promoId ?? null);
+  const [code, setCode] = useState('');
+  const [codeError, setCodeError] = useState('');
+
+  /** Go dung `code` thi tick promo tuong ung — CHUA ban event. */
+  function applyCode() {
+    const typed = code.trim().toUpperCase();
+    const found = PROMOS.find((p) => p.code.toUpperCase() === typed);
+
+    if (!found) {
+      setCodeError('Mã không hợp lệ');
+      return;
+    }
+    if (!isRuleAvailable(found, basePrice)) {
+      setCodeError(`Cần đơn tối thiểu ${formatVnd(found.minOrder)}`);
+      return;
+    }
+    setCodeError('');
+    setPicked(found.id);
+  }
+
+  function confirmSelection() {
+    const promo = PROMOS.find((p) => p.id === picked);
+    if (!promo) return;
+
     trackEvent({
       eventName: 'select_promo',
       screenName: 'promo_selection',
-      properties: { promo_id: id, promo_code: code, discount_amount: discountAmount },
+      properties: {
+        promo_id: promo.id,
+        promo_code: promo.code,
+        discount_amount: calcDiscount(promo, basePrice),
+      },
     });
-    setRide({ promoId: id });
+    setRide({ promoId: promo.id });
     router.push('/ride/confirm');
   }
 
@@ -56,15 +87,58 @@ function PromoContent() {
 
   return (
     <ScreenShell
-      title="Chọn khuyến mãi"
-      leading={<BackButton from="promo_selection" to="vehicle_selection" href="/ride/vehicle" />}
+      title="Ưu đãi"
+      leading={
+        <BackButton
+          from="promo_selection"
+          to="vehicle_selection"
+          href="/ride/vehicle"
+          glyph="×"
+        />
+      }
       footer={
-        <PrimaryButton variant="subtle" onClick={skipPromo}>
-          Bỏ qua
-        </PrimaryButton>
+        picked ? (
+          <PrimaryButton onClick={confirmSelection}>Áp dụng mã</PrimaryButton>
+        ) : (
+          <PrimaryButton variant="subtle" onClick={skipPromo}>
+            Bỏ qua ưu đãi và tiếp tục
+          </PrimaryButton>
+        )
       }
     >
-      <ul className="flex flex-col gap-md">
+      <div aria-hidden="true" className="mb-lg flex gap-sm">
+        <span className="t-body-sm-strong rounded-pill bg-canvas-soft px-lg py-sm text-ink ring-2 ring-primary">
+          Mã ưu đãi
+        </span>
+        <span className="t-body-sm-strong rounded-pill bg-canvas-soft px-lg py-sm text-mute">
+          VPoint
+        </span>
+      </div>
+
+      <div className="flex items-center gap-md">
+        <input
+          type="text"
+          value={code}
+          onChange={(e) => {
+            setCode(e.target.value);
+            setCodeError('');
+          }}
+          placeholder="Bạn có mã ưu đãi? Nhập tại đây."
+          aria-label="Mã ưu đãi"
+          className="t-body-md min-w-0 flex-1 rounded-md bg-canvas-soft p-lg text-ink outline-none placeholder:text-mute"
+        />
+        <PrimaryButton variant="subtle" fullWidth={false} onClick={applyCode}>
+          Áp dụng
+        </PrimaryButton>
+      </div>
+      {codeError ? <p className="t-caption mt-xs text-mute">{codeError}</p> : null}
+
+      <div aria-hidden="true" className="mt-lg rounded-xl bg-canvas-soft p-2xl">
+        <p className="t-body-md-strong">👑 Gói hội viên GSM</p>
+        <p className="t-body-sm mt-xxs text-body">Ưu đãi mỗi chuyến, huỷ bất cứ lúc nào</p>
+      </div>
+
+      <ul className="mt-lg flex flex-col gap-md">
         {PROMOS.map((promo) => {
           const available = isRuleAvailable(promo, basePrice);
           const discount = calcDiscount(promo, basePrice);
@@ -74,22 +148,38 @@ function PromoContent() {
               <button
                 type="button"
                 disabled={!available}
-                onClick={() => selectPromo(promo.id, promo.code, discount)}
-                className="w-full rounded-md bg-canvas-soft p-lg text-left text-ink active:bg-surface-pressed disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={() => {
+                  setPicked((prev) => (prev === promo.id ? null : promo.id));
+                  setCodeError('');
+                }}
+                className={`flex w-full items-center gap-lg rounded-md bg-canvas-soft p-lg text-left text-ink active:bg-surface-pressed disabled:cursor-not-allowed disabled:opacity-50 ${
+                  promo.id === picked ? 'ring-2 ring-primary' : ''
+                }`}
               >
-                <span className="t-body-md-strong block">{promo.title}</span>
-                <span className="t-body-sm mt-xxs block text-body">{promo.description}</span>
-                {available ? (
-                  <span className="t-caption mt-xxs block text-mute">
-                    Giảm {formatVnd(discount)}
-                  </span>
-                ) : (
-                  // Hien thi nhung disable, KEM DONG GIAI THICH — nguoi dung thay duoc
-                  // ly do, va ta khong ghi event cho lua chon bi disable.
-                  <span className="t-caption mt-xxs block text-mute">
-                    Cần đơn tối thiểu {formatVnd(promo.minOrder)}
-                  </span>
-                )}
+                <span className="flex-1">
+                  <span className="t-body-md-strong block">{promo.title}</span>
+                  <span className="t-body-sm mt-xxs block text-body">{promo.description}</span>
+                  {available ? (
+                    <span className="t-caption mt-xxs block text-mute">
+                      Giảm {formatVnd(discount)}
+                    </span>
+                  ) : (
+                    // Hien thi nhung disable, KEM DONG GIAI THICH — nguoi dung thay duoc
+                    // ly do, va ta khong ghi event cho lua chon bi disable.
+                    <span className="t-caption mt-xxs block text-mute">
+                      Cần đơn tối thiểu {formatVnd(promo.minOrder)}
+                    </span>
+                  )}
+                </span>
+
+                <span
+                  aria-hidden="true"
+                  className={`grid size-6 shrink-0 place-items-center rounded-full ${
+                    promo.id === picked ? 'bg-primary-dark text-on-primary' : 'bg-canvas'
+                  }`}
+                >
+                  {promo.id === picked ? '✓' : ''}
+                </span>
               </button>
             </li>
           );

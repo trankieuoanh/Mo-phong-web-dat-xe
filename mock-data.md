@@ -23,18 +23,38 @@ export interface Address {
   label: string;      // tên ngắn hiển thị đậm
   address: string;    // địa chỉ đầy đủ hiển thị mờ bên dưới
   icon: 'home' | 'work' | 'school' | 'plane' | 'shop';
+  distanceKm: number;   // chỉ để hiển thị, KHÔNG vào event
 }
 ```
 
-| `id` | `label` | `address` | `icon` |
-|---|---|---|---|
-| `addr-home` | Nhà | Số 12, ngõ 34 Trần Duy Hưng, Cầu Giấy, Hà Nội | `home` |
-| `addr-office` | Công ty | Keangnam Landmark 72, Phạm Hùng, Nam Từ Liêm, Hà Nội | `work` |
-| `addr-school` | Trường | VinUniversity, Ocean Park, Gia Lâm, Hà Nội | `school` |
-| `addr-airport` | Sân bay | Sân bay Quốc tế Nội Bài, Sóc Sơn, Hà Nội | `plane` |
-| `addr-mall` | Trung tâm thương mại | Vincom Mega Mall Royal City, Thanh Xuân, Hà Nội | `shop` |
+Sắp xếp theo `distanceKm` tăng dần — giống app thật.
 
-Điểm đến: **không có màn chọn điểm đến** trong phạm vi dự án — chỉ chọn điểm đón. Nếu UI cần hiển thị điểm đến cho đủ nghĩa, dùng chuỗi cố định `"Hồ Gươm, Hoàn Kiếm, Hà Nội"` và **không** ghi event cho nó.
+| `id` | `label` | `address` | `icon` | `distanceKm` |
+|---|---|---|---|---:|
+| `addr-home` | Nhà | Số 12, ngõ 34 Trần Duy Hưng, Cầu Giấy, Hà Nội | `home` | 1.3 |
+| `addr-office` | Công ty | Keangnam Landmark 72, Phạm Hùng, Nam Từ Liêm, Hà Nội | `work` | 3.8 |
+| `addr-mall` | Trung tâm thương mại | Vincom Mega Mall Royal City, Thanh Xuân, Hà Nội | `shop` | 4.6 |
+| `addr-school` | Trường | VinUniversity, Ocean Park, Gia Lâm, Hà Nội | `school` | 15.2 |
+| `addr-airport` | Sân bay | Sân bay Quốc tế Nội Bài, Sóc Sơn, Hà Nội | `plane` | 27.5 |
+
+Bảng trên là danh sách **điểm đến** gợi ý ở màn `address_selection` ("Bạn muốn đi đến đâu?").
+
+**Điểm đón là hằng số** — app thật tự định vị GPS, màn `pickup_confirm` chỉ xác nhận lại. **Không** ghi event cho nó:
+
+```ts
+export const FIXED_PICKUP = {
+  label: 'Vị trí hiện tại',
+  address: '128 Xuân Thủy, Cầu Giấy, Hà Nội',
+};
+```
+
+Vì vậy địa chỉ **duy nhất biến thiên** trong một session là điểm đến, và nó giữ tên khoá `address_id` trong `select_address` / `confirm_pickup` / `confirm_ride`.
+
+Quãng đường của chuyến cũng là hằng số, dùng để hiển thị "34 phút • 15 km" ở màn chọn xe và màn xác nhận, **không** vào event:
+
+```ts
+export const FIXED_ROUTE = { distanceKm: 15, durationMin: 34 };
+```
 
 ---
 
@@ -54,10 +74,18 @@ export interface Vehicle {
 
 | `id` | `type` | `name` | `description` | `basePrice` | `etaMinutes` | `seats` |
 |---|---|---|---|---|---|---|
-| `veh-bike` | `bike` | Xe máy | Nhanh, tiết kiệm cho quãng ngắn | 25000 | 3 | 1 |
-| `veh-car` | `car` | Ô tô | Xe điện 4 chỗ, êm và mát | 75000 | 6 | 4 |
+| `veh-bike` | `bike` | Green Bike | Xe máy điện, nhanh và tiết kiệm | 58000 | 2 | 1 |
+| `veh-bike-plus` | `bike` | Green Bike Plus | Xe máy điện đời mới, tài xế kinh nghiệm | 72000 | 3 | 1 |
+| `veh-mini` | `car` | Green Mini | Xe điện 3 chỗ, giá tốt nhất | 145000 | 3 | 3 |
+| `veh-car` | `car` | Green Car | Xe điện 4 chỗ, êm và mát | 149000 | 3 | 4 |
+| `veh-premium` | `car` | Green Premium | Xe điện hạng sang 4 chỗ | 161000 | 3 | 4 |
+| `veh-limo` | `car` | Green Limo | Xe điện 6 chỗ, rộng rãi cho nhóm | 194000 | 4 | 6 |
 
-> `DESIGN.md` chốt đúng 2 lựa chọn (Xe máy / Ô tô). Không thêm hạng xe khác — mỗi lựa chọn thêm sẽ làm loãng mẫu funnel khi chỉ có vài chục session.
+> **Sửa đổi so với bản trước** (`ride-flow-design.md` mục 5.1). Bản cũ chỉ có 2 lựa chọn (Xe máy / Ô tô) kèm ghi chú "không thêm hạng xe khác — làm loãng mẫu funnel". Ghi chú đó bị ghi đè có chủ ý để bám sát app GSM thật.
+>
+> - `veh-bike` và `veh-car` **giữ nguyên `id`** (quy tắc 5), nhưng đổi `name` và `basePrice` để cùng thang giá với 4 hạng còn lại (đều cho cùng một chuyến 15 km). Hệ quả: `base_price` của phiên cũ và phiên mới **không so sánh trực tiếp được**.
+> - Đổi lại cách phân tích: gom theo **`vehicle_type`** (2 nhóm bike/car) thay vì theo từng `vehicle_id` (6 nhóm). Vài chục session mà chia 6 thì mỗi nhóm không còn nói được gì. `vehicle_id` vẫn nằm trong event để sau này nhiều dữ liệu hơn thì bóc tách được.
+> - **58.000 và 72.000 là hai con số duy nhất không lấy từ bản hướng dẫn thiết kế** — ảnh chụp chỉ có 4 hạng ô tô. Cần mentor xác nhận.
 
 ---
 

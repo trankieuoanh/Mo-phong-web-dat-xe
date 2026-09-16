@@ -29,6 +29,9 @@ Mũi tên đứt nét từ `packages/shared` là điểm đáng chú ý: cả FE
 
 ## Từng khối làm gì
 
+> File này dừng ở **mức khối**. Xuống tới từng file, từng component, từng lớp:
+> **`fe-structure.md`** (frontend) và **`be-structure.md`** (backend).
+
 ### 1. `apps/web` — Next.js, chỉ frontend
 - Hiển thị UI, điều hướng giữa các màn hình của 2 luồng (Đặt xe, Food — chi tiết ở `DESIGN.md`, route và state ở `screen-map.md`).
 - Dữ liệu tĩnh (địa chỉ, loại xe, khuyến mãi, menu, ưu đãi) lấy từ `packages/shared` — nội dung cụ thể ở `mock-data.md`, không gọi API cho phần này.

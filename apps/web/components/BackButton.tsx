@@ -19,9 +19,15 @@ interface BackButtonProps {
   to: ScreenName;
   /** Route cua man dich. */
   href: string;
+  /**
+   * Ky tu hien thi. Mac dinh mui ten. Man `promo_selection` dung `×` cho giong
+   * overlay trong spec — hinh khac nhung HANH VI va EVENT y het nut Back,
+   * de `to_screen` van khop event-taxonomy.md.
+   */
+  glyph?: string;
 }
 
-export function BackButton({ from, to, href }: BackButtonProps) {
+export function BackButton({ from, to, href, glyph = '←' }: BackButtonProps) {
   const router = useRouter();
 
   return (
@@ -35,7 +41,7 @@ export function BackButton({ from, to, href }: BackButtonProps) {
         router.push(href);
       }}
     >
-      <span aria-hidden="true">←</span>
+      <span aria-hidden="true">{glyph}</span>
     </button>
   );
 }

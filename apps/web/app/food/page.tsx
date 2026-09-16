@@ -43,10 +43,12 @@ export default function FoodMenuPage() {
   }
 
   function quickAdd(id: string, name: string, price: number) {
-    const nextCart = [...cart];
-    const line = nextCart.find((l) => l.itemId === id);
-    if (line) line.quantity += 1;
-    else nextCart.push({ itemId: id, quantity: 1 });
+    // Phai copy CA DONG, khong chi copy mang: [...cart] van giu nguyen tham chieu
+    // toi object CartLine dang nam trong state, mutate no se lam addToCart ben duoi
+    // cong them mot lan nua (so luong tang 2 thay vi 1).
+    const nextCart = cart.some((l) => l.itemId === id)
+      ? cart.map((l) => (l.itemId === id ? { ...l, quantity: l.quantity + 1 } : l))
+      : [...cart, { itemId: id, quantity: 1 }];
     const after = calcFoodTotals(nextCart, null, getFoodItem);
 
     trackAddToCart('food_menu', {
@@ -111,7 +113,7 @@ export default function FoodMenuPage() {
               type="button"
               aria-label={`Thêm ${item.name} vào giỏ`}
               onClick={() => quickAdd(item.id, item.name, item.price)}
-              className="grid size-9 shrink-0 place-items-center rounded-full bg-canvas text-ink active:bg-surface-pressed"
+              className="grid size-11 shrink-0 place-items-center rounded-full bg-canvas text-ink active:bg-surface-pressed"
             >
               <span aria-hidden="true">+</span>
             </button>

@@ -54,7 +54,7 @@ export default function FoodSuccessPage() {
         <h2 className="t-display-md mt-lg text-center">Đặt đơn thành công</h2>
       </div>
 
-      <div className="rounded-xl bg-canvas-soft p-2xl">
+      <div className="rounded-xl bg-canvas p-2xl">
         <Row label="Số món" value={summary ? `${summary.itemCount} món` : '—'} />
         <Row label="Tổng thanh toán" value={summary?.total ?? '—'} />
       </div>

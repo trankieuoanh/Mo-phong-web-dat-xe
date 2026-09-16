@@ -13,6 +13,10 @@ Không có backend thật, không đặt xe thật, không thanh toán. Mọi l�
 |---|---|
 | Bất kỳ việc gì liên quan tới event | **`event-taxonomy.md`** ← hợp đồng dữ liệu, nguồn sự thật |
 | Dựng màn hình, routing, state, giỏ hàng | `screen-map.md` |
+| Dựng giao diện 6 màn luồng đặt xe | `ride-flow-design.md` |
+| Dựng giao diện 6 màn luồng đặt xe | `ride-flow-design.md` |
+| Hiểu code FE có sẵn: file nào làm gì, component nào dùng ở đâu | `fe-structure.md` |
+| Hiểu code BE có sẵn: 4 lớp, luồng một request | `be-structure.md` |
 | Cần nội dung địa chỉ / món ăn / khuyến mãi | `mock-data.md` |
 | Viết CSS, chọn màu/cỡ chữ/bo góc | `tailwind-theme.md` (giá trị gốc ở `DESIGN.md`) |
 | Viết API route | `api-endpoints.md` |

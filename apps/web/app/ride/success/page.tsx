@@ -24,9 +24,11 @@ export default function RideSuccessPage() {
 
   // Chup lai tom tat TRUOC khi xoa draft — neu doc truc tiep tu `ride` thi
   // man hinh se trong rong ngay sau khi clearRide() chay.
-  const [summary, setSummary] = useState<{ pickup: string; vehicle: string; total: string } | null>(
-    null,
-  );
+  const [summary, setSummary] = useState<{
+    destination: string;
+    vehicle: string;
+    total: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!hydrated || summary) return;
@@ -36,7 +38,7 @@ export default function RideSuccessPage() {
     const totals = calcRideTotals(vehicle?.basePrice ?? 0, promo);
 
     setSummary({
-      pickup: getAddress(ride.addressId ?? '')?.label ?? '—',
+      destination: getAddress(ride.addressId ?? '')?.label ?? '—',
       vehicle: vehicle?.name ?? '—',
       total: formatVnd(totals.finalPrice),
     });
@@ -68,8 +70,8 @@ export default function RideSuccessPage() {
         <h2 className="t-display-md mt-lg text-center">Đặt xe thành công</h2>
       </div>
 
-      <div className="rounded-xl bg-canvas-soft p-2xl">
-        <Row label="Điểm đón" value={summary?.pickup ?? '—'} />
+      <div className="rounded-xl bg-canvas p-2xl">
+        <Row label="Điểm đến" value={summary?.destination ?? '—'} />
         <Row label="Loại xe" value={summary?.vehicle ?? '—'} />
         <Row label="Tổng thanh toán" value={summary?.total ?? '—'} />
       </div>

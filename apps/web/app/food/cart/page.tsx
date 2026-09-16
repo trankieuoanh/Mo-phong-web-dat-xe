@@ -156,7 +156,7 @@ function QtyButton({
       type="button"
       aria-label={label}
       onClick={onClick}
-      className="grid size-8 place-items-center rounded-full bg-canvas text-ink active:bg-surface-pressed"
+      className="grid size-11 place-items-center rounded-full bg-canvas text-ink active:bg-surface-pressed"
     >
       <span aria-hidden="true">{children}</span>
     </button>
