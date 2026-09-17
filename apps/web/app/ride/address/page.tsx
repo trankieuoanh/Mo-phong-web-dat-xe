@@ -44,7 +44,12 @@ export default function AddressPage() {
         address_source: place.source,
       },
     });
-    setRide({ destination: place });
+    // Xoa `route` cu CUNG LUC voi viec dat diem den moi. Tuyen duong da cat
+    // trong draft thuoc ve diem den TRUOC do; giu lai thi sau `change_address`
+    // nguoi dung co the bam Back cua trinh duyet ve /ride/vehicle va thay gia
+    // tinh theo quang duong cu — `confirm_ride` se ghi `distance_km` khong khop
+    // `address_label` trong cung mot document. Man /ride/pickup se lay tuyen moi.
+    setRide({ destination: place, route: undefined });
     router.push('/ride/pickup');
   }
 

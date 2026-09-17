@@ -36,7 +36,7 @@ funnel = (df[df.flow == 'ride']
 |---|---|
 | `reach` | số session chạm tới bước n |
 | `step_conversion` | `reach(n) / reach(n-1)` — tỉ lệ đi tiếp từ bước ngay trước |
-| `overall_conversion` | `reach(n) / reach(0)` — tỉ lệ so với tổng số vào Home |
+| `overall_conversion` | `reach(n) / reach(0)` — tỉ lệ so với số session **chọn luồng này** (bước 0 = `select_flow`) |
 | `drop_off` | `1 - step_conversion` |
 
 Kết quả cần đọc được thành câu kiểu: *"68% người chọn xong địa chỉ tiếp tục xác nhận điểm đón; tụt mạnh nhất ở bước chọn khuyến mãi (chỉ 41% đi tiếp)."*
@@ -50,6 +50,10 @@ Kết quả cần đọc được thành câu kiểu: *"68% người chọn xong
 | `completion_rate` | session có `confirm_ride` (ride) / `place_order` (food), chia cho số session vào luồng đó |
 | `abandon_step` | với session chưa hoàn thành: `max(step_index)` — bước cuối cùng chạm tới |
 | `abandon_distribution` | phân bố `abandon_step` → biết người dùng bỏ nhiều nhất ở màn nào |
+
+> **Bước 0 là event `select_flow`, không phải màn `home`.** Nó luôn mang `step_index: 0` kể cả khi bắn ở `address_selection` hay `food_menu` (người dùng bấm tab đổi luồng ở sidebar) — xem `event-taxonomy.md` mục 1.
+>
+> **Hệ quả cho `completion_rate`:** đổi luồng giờ chỉ tốn một click, nên một phiên ride ghé tab "Đặt đồ ăn" một cái vẫn nằm trong mẫu số của food và bị tính là bỏ dở. Muốn loại chúng ra, lọc session có `select_flow` với `screen_name != 'home'` — đó chính là dấu hiệu nhảy luồng.
 
 ## Nhóm 3 — Thời gian
 
@@ -106,7 +110,7 @@ Với một `session_id` bất kỳ, in ra dòng thời gian đầy đủ để 
 
 ```
 00.0s  home                 screen_view
-02.3s  home                 select_flow          {flow_chosen: ride}
+02.3s  home                 select_flow          {flow_chosen: ride}     # step 0
 02.4s  address_selection    screen_view
 07.8s  address_selection    select_address       {address_id: addr-home}
 ...

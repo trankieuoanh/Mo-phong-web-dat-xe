@@ -34,7 +34,7 @@ export default function RideConfirmPage() {
   return (
     <FlowGuard
       ready={Boolean(ride.destination && ride.vehicleId && ride.promoId !== undefined)}
-      fallback="/ride/address"
+      fallback="/"
     >
       <RideConfirmContent />
     </FlowGuard>
@@ -78,7 +78,12 @@ function RideConfirmContent() {
         // mot chuyen 8 km duong chim bay trong giong het nhau trong du lieu.
         route_source: route.source,
         vehicle_id: ride.vehicleId,
-        vehicle_type: vehicle?.type,
+        // `?? null` chu KHONG de undefined: JSON.stringify xoa han khoa co gia
+        // tri undefined, nen document se thieu mot field ma event-taxonomy.md
+        // ghi la bat buoc — va `column()` trong metrics.py tra Series rong ma
+        // khong bao gi. FlowGuard chi bao dam `vehicleId` khac rong, khong bao
+        // dam no tra cuu duoc (id cu trong sessionStorage sau khi doi mock-data).
+        vehicle_type: vehicle?.type ?? null,
         promo_id: ride.promoId ?? null,
         base_price: totals.basePrice,
         discount_amount: totals.discountAmount,

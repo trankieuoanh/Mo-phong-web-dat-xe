@@ -18,7 +18,17 @@ import { useApp } from '@/lib/app-context';
 interface FlowGuardProps {
   /** true = du dieu kien o lai man nay. */
   ready: boolean;
-  /** Buoc dau cua luong: '/ride/address' hoac '/food'. */
+  /**
+   * LOI VAO cua luong: '/' cho ride, '/food' cho food.
+   *
+   * Ride tra ve '/' chu KHONG phai '/ride/address': tu khi `/` thanh man dat xe,
+   * `select_flow` (buoc 0 cua funnel ride) chi sinh ra o do. Da nguoi dung thang
+   * vao '/ride/address' se tao mot session co buoc 1 ma KHONG CO buoc 0, lam
+   * `reach[1] > reach[0]` va `step_conversion` cua buoc 1 vot len tren 1 —
+   * dung thu "session rac" ma guard nay sinh ra de tranh. Ve '/' thi session do
+   * chi co mot `screen_view home` (flow 'none') va bi `drop_junk_sessions()`
+   * trong analysis/metrics.py loai bo sach se.
+   */
   fallback: string;
   children: ReactNode;
 }

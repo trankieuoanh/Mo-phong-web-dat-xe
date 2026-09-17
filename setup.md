@@ -19,7 +19,7 @@ npm install     # ở thư mục GỐC của repo
 npm run dev
 ```
 
-Mở **http://localhost:3000** → thấy màn Home với 2 nút lớn.
+Mở **http://localhost:3000** → thấy màn Home: panel đặt xe bên trái, bản đồ bên phải, tab "Đặt xe" sáng ở sidebar.
 
 > **Chưa cần Firebase để chạy.** App lên được, click hết cả hai luồng (Đặt xe / Food) được, chỉ là event không lưu xuống đâu cả — `POST /api/events` sẽ trả 500. Muốn lưu event mới cần làm Phase 1.
 >
@@ -81,7 +81,7 @@ Route `/api/health` **không chạm Firestore** (xem `api-endpoints.md`), nên n
 
 **Bước 2 hỏng mà bước 1 chạy** → sai `rewrites` trong `apps/web/next.config.ts`, không phải sai Express. Hai lỗi này trông giống hệt nhau từ phía trình duyệt nên phải tách bằng hai lệnh curl.
 
-Mở `http://localhost:3000` → thấy màn Home với 2 nút lớn.
+Mở `http://localhost:3000` → thấy màn Home: panel đặt xe bên trái, bản đồ bên phải, tab "Đặt xe" sáng ở sidebar.
 
 ---
 

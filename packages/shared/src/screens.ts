@@ -43,6 +43,17 @@ export const SCREENS: Record<ScreenName, ScreenSpec> = {
  */
 export const ADD_TO_CART_STEP_INDEX = 3;
 
+/**
+ * step_index cua `select_flow` — luon la 0, du ban o `home` (step 0),
+ * `address_selection` (step 1) hay `food_menu` (step 1).
+ *
+ * `select_flow` la moc "bat dau luong nay", tuc buoc 0 cua funnel luong DUOC
+ * CHON. Neu de no mang step cua man dang dung, funnel luong do khong co buoc 0
+ * va `funnel()` trong analysis/metrics.py se lay buoc 1 lam mau so — moi ti le
+ * sai im lang. Xem event-taxonomy.md muc 1.
+ */
+export const SELECT_FLOW_STEP_INDEX = 0;
+
 export const SCREEN_NAMES = Object.keys(SCREENS) as ScreenName[];
 
 export function isScreenName(value: unknown): value is ScreenName {

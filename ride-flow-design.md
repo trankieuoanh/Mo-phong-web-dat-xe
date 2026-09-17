@@ -361,7 +361,7 @@ Những khối dưới đây **render tĩnh hoặc `disabled`, không bắn even
 | 2 | Nút re-center GPS · dòng "bán kính 10 m" |
 | 3 | Nút "Đặt hộ" · banner "Boost" · thanh thanh toán · "Hẹn giờ" · "GreenNow" |
 | 4 | Tab "VPoint" · banner gói hội viên |
-| mọi màn | **`SideRail`** — bốn mục "Tài khoản phụ" / "Trung tâm hỗ trợ" / "Điều khoản" / "Thu gọn menu", cùng hai mục luồng khi KHÔNG ở `/`. Tab trong `TopBar`. Chip người dùng trong `UserMenu` (trừ "Đăng xuất") |
+| mọi màn | **`SideRail`** — bốn mục "Tài khoản phụ" / "Trung tâm hỗ trợ" / "Điều khoản" / "Thu gọn menu", cùng hai mục luồng khi KHÔNG ở màn đầu luồng (`/`, `/ride/address`, `/food`). Tab trong `TopBar`. Chip người dùng trong `UserMenu` (trừ "Đăng xuất") |
 | mọi màn có bản đồ | Cụm nút `+`/`−`, nút re-center, tooltip địa chỉ trong `MapCanvas` |
 
 Lý do — và đây là điều quan trọng nhất trong tài liệu này:

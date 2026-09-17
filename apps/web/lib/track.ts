@@ -12,6 +12,7 @@ import { useEffect, useRef } from 'react';
 import {
   ADD_TO_CART_STEP_INDEX,
   SCREENS,
+  SELECT_FLOW_STEP_INDEX,
   type EventName,
   type EventPayload,
   type Flow,
@@ -46,9 +47,9 @@ export function resetPreviousScreen(): void {
 export interface TrackEventInput {
   eventName: EventName;
   screenName: ScreenName;
-  /** Mac dinh: SCREENS[screenName].flow. Chi truyen tay cho `select_flow` o man home. */
+  /** Mac dinh: SCREENS[screenName].flow. Chi truyen tay qua `trackSelectFlow`. */
   flow?: Flow;
-  /** Mac dinh: SCREENS[screenName].stepIndex. Chi truyen tay cho `add_to_cart` (= 3). */
+  /** Mac dinh: SCREENS[screenName].stepIndex. Chi truyen tay qua hai helper duoi. */
   stepIndex?: number;
   properties?: Record<string, unknown>;
 }
@@ -95,6 +96,32 @@ export function trackAddToCart(
     screenName,
     stepIndex: ADD_TO_CART_STEP_INDEX,
     properties,
+  });
+}
+
+/**
+ * Man dau cua moi luong — ba cho duy nhat `select_flow` duoc phep ban.
+ *
+ * Kieu hep de compiler chan luon viec goi tu man thu tu: nhay luong tu giua
+ * luong tao session lai khong phan tich duoc (SideRail.tsx).
+ */
+export type FlowEntryScreen = Extract<ScreenName, 'home' | 'address_selection' | 'food_menu'>;
+
+/**
+ * `select_flow` luon mang step_index = 0 va flow = luong VUA CHON, du ban o man
+ * nao — xem SELECT_FLOW_STEP_INDEX trong @gsm/shared.
+ *
+ * Phai ban DONG BO ngay truoc `router.push`, khong duoc doi sang ban trong
+ * useEffect cua man dich: lam vay `previous_screen` lech mot nac va loi do
+ * khong co trieu chung tren UI.
+ */
+export function trackSelectFlow(screenName: FlowEntryScreen, flow: Flow): void {
+  trackEvent({
+    eventName: 'select_flow',
+    screenName,
+    flow,
+    stepIndex: SELECT_FLOW_STEP_INDEX,
+    properties: { flow_chosen: flow },
   });
 }
 

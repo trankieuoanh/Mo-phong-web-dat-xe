@@ -7,8 +7,8 @@
  * hai bo cuc:
  *
  *  - `split` — panel trai 480px + cot `aside` (ban do) chiem phan con lai.
- *    Dung cho 4 man ride co ban do: address, pickup, vehicle, confirm.
- *  - `wide`  — mot cot canh giua. Dung cho home, promo, success va ca luong food.
+ *    Dung cho 5 man co ban do: home, address, pickup, vehicle, confirm.
+ *  - `wide`  — mot cot canh giua. Dung cho promo, success va ca luong food.
  *
  * Nam prop cu (title / leading / trailing / children / footer) GIU NGUYEN Y NGHIA
  * nen 12 page khong phai viet lai — chung chi them variant/section/aside.
@@ -23,8 +23,14 @@ import { Panel } from '@/components/Panel';
 import { AppShell } from '@/components/shell/AppShell';
 
 interface ScreenShellProps {
-  /** Tieu de PANEL (khong phai tieu de muc o top bar). */
-  title: string;
+  /**
+   * Tieu de PANEL (khong phai tieu de muc o top bar).
+   *
+   * Bo qua duoc: hai man success dat tieu de trong THAN panel (canh icon tich)
+   * nen khong can header — truyen ca hai thi cau do hien hai lan lien nhau.
+   * `Panel` chi dung header khi co title/leading/trailing.
+   */
+  title?: string;
   /** Nut Back o dau header panel. */
   leading?: ReactNode;
   /** Khoi phu cuoi header panel. */

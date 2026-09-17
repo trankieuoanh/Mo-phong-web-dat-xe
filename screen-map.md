@@ -41,7 +41,7 @@ Không còn `app/api/` — API nằm ở `apps/api`, một process riêng. `apps
 Mọi page của 2 luồng đều là **client component** (`'use client'`) vì cần đọc state giỏ hàng / lựa chọn và bắn event. `apps/web` không có server-side logic nào.
 
 ### Bảo vệ luồng (guard)
-Vào thẳng một URL giữa luồng mà state rỗng (ví dụ mở `/ride/confirm` khi chưa chọn xe) → `redirect` về bước đầu của luồng (`/ride/address` hoặc `/food`) và **không bắn event nào**. Tránh sinh session rác trong dữ liệu phân tích.
+Vào thẳng một URL giữa luồng mà state rỗng (ví dụ mở `/ride/confirm` khi chưa chọn xe) → `redirect` về **lối vào** của luồng (`/` cho ride, `/food` cho food) và **không bắn event nào**. Tránh sinh session rác trong dữ liệu phân tích — ride trả về `/` vì đó mới là nơi sinh `select_flow`, tức bước 0 của funnel.
 
 Implement: component `<FlowGuard ready={...} fallback="...">` bọc nội dung màn. Nó phải **đợi `hydrated`** trước khi redirect — trước khi đọc xong `sessionStorage` thì state luôn rỗng, và guard sẽ đá người dùng ra khỏi luồng ngay sau mỗi lần F5. Vì guard chạy trước khi nội dung mount, `useScreenView` bên trong không kịp chạy — đó là chủ ý, không phải tác dụng phụ.
 
@@ -81,6 +81,7 @@ interface AppState {
   ride:  {
     destination?: Place;             // điểm đến, chọn ở màn 1
     pickup?: Place;                  // điểm đón, mặc định DEFAULT_PICKUP
+    route?: RouteResult;             // tuyến đường — CHỈ màn 2 ghi, các màn sau đọc
     vehicleId?: string;
     promoId?: string | null;
     driverNote?: string;
@@ -99,6 +100,7 @@ interface AppState {
 > **Vì sao khoá là `_v2`.** Hình dạng `ride` đã đổi (`addressId: string` → `destination: Place`). `readJson` có `try/catch` nhưng **không kiểm tra hình dạng**, nên một draft cũ còn trong tab của người dùng sẽ trả về `{addressId: '…'}` và làm màn confirm nổ. Đổi khoá là cách rẻ nhất để bỏ draft cũ đi; khoá cũ vẫn nằm trong `DRAFT_KEYS` để lần reset đầu tiên dọn nốt nó.
 - Giỏ hàng lưu **`itemId` + `quantity`**, không lưu `price`/`name` — giá lấy từ `@gsm/shared` lúc render, để đổi giá trong mock không làm giỏ hàng cũ sai.
 - Clear: `ride` sau `confirm_ride`; `cart` + `offerId` sau `place_order`; tất cả sau `back_to_home`.
+- **`route` phải bị xoá cùng lúc với việc đổi `destination`** (`/ride/address`). Tuyến đường đã cắt trong draft thuộc về điểm đến trước đó; giữ lại thì sau `change_address`, bấm Back của trình duyệt về `/ride/vehicle` sẽ thấy giá tính theo quãng đường cũ, và `confirm_ride` ghi `distance_km` không khớp `address_label` trong cùng một document.
 - `promoId`/`offerId` phân biệt 3 trạng thái: `undefined` = chưa tới bước đó, `null` = đã bỏ qua, `"promo-10k"` = đã chọn.
 
 ---
@@ -130,12 +132,12 @@ export function trackEvent(input: {
 
 Hai tham số này **mặc định lấy từ bảng `SCREENS`** trong `@gsm/shared` (mã hoá bảng ở `event-taxonomy.md` mục 2). Gõ tay `step_index` ở 13 page là nguồn sai số liệu số một, và sai kiểu đó *không có triệu chứng* — app vẫn chạy đẹp, chỉ có funnel sai, và chỉ phát hiện ra ở Tuần 5.
 
-Đúng **hai ngoại lệ** được truyền tay:
+Đúng **hai ngoại lệ** được truyền tay, và cả hai đều đi qua một helper riêng để không page nào phải tự gõ:
 
 | Ngoại lệ | Truyền gì | Vì sao |
 |---|---|---|
-| `add_to_cart` | `stepIndex: 3` | Là hành động, không phải màn hình — bắn ở `food_menu` hay `food_item_detail` đều mang step 3. Dùng helper `trackAddToCart(screenName, properties)` |
-| `select_flow` ở `home` | `flow: 'ride' \| 'food'` | Màn `home` có `flow: 'none'`, nhưng event này phải ghi đúng luồng được chọn để đếm được tỉ lệ giữa 2 luồng |
+| `add_to_cart` | `stepIndex: 3` — helper `trackAddToCart(screenName, properties)` | Là hành động, không phải màn hình — bắn ở `food_menu` hay `food_item_detail` đều mang step 3 |
+| `select_flow` | `flow` = luồng được chọn **và** `stepIndex: 0` — helper `trackSelectFlow(screenName, flow)` | Là mốc "bắt đầu luồng này", tức bước 0 của funnel luồng được chọn, dù bấm ở `home` (step 0), `address_selection` (step 1) hay `food_menu` (step 1). Màn `home` lại có `flow: 'none'` nên `flow` cũng phải truyền tay |
 
 ### Hook `useScreenView`
 ```ts
@@ -179,7 +181,11 @@ Không có màn lỗi/thất bại — app mô phỏng luôn thành công.
 └──────┴──────────────────────────────────────┘
 ```
 
-- **`SideRail`** — 6 mục. **Hai trạng thái**: mở rộng `w-[264px]` có nhãn chữ (mặc định, như `homepage.png`) và thu gọn `w-[72px]` chỉ-icon (như `main_screen.png`); nút "Thu gọn menu" ở đáy chuyển qua lại, lựa chọn nhớ ở `localStorage['gsm_rail_collapsed']` (đọc trong `useEffect`, không đọc lúc render — bẫy hydration). Chỉ bấm được ở đúng hai chỗ: hai mục luồng **khi đang ở `/`** (bắn `select_flow`, cùng helper và cùng `properties` với hai card giữa màn), và mục "Hoạt động" (link `/history`). Bốn mục còn lại và hai mục luồng ở mọi màn khác là **trang trí** (`ride-flow-design.md` §8). Dưới `lg` (1024px) rail ẩn hoàn toàn.
+- **`SideRail`** — 6 mục. **Hai trạng thái**: mở rộng `w-[264px]` có nhãn chữ (mặc định, như `homepage.png`) và thu gọn `w-[72px]` chỉ-icon (như `main_screen.png`); nút "Thu gọn menu" ở đáy chuyển qua lại, lựa chọn nhớ ở `localStorage['gsm_rail_collapsed']` (đọc trong `useEffect`, không đọc lúc render — bẫy hydration). Dưới `lg` (1024px) rail ẩn hoàn toàn.
+- **Hai mục luồng là TAB** — đây là nơi **duy nhất** đổi luồng được (màn `/` không còn hai card). Một quy tắc: *tab của luồng đang đứng = active (`border-primary` + `bg-canvas-soft`, `aria-current="page"`), **không** bấm được; tab luồng kia = bấm được, bắn `select_flow`* — nhưng chỉ ở **ba màn đầu luồng** `/`, `/ride/address`, `/food` (bảng `FLOW_ENTRY` trong `SideRail.tsx`). Vào sâu hơn thì cả hai trở lại **trang trí**: nhảy luồng từ giữa luồng tạo session lai không phân tích được. Mục "Hoạt động" bấm được ở mọi nơi (link `/history`); ba mục còn lại luôn trang trí (`ride-flow-design.md` §8).
+- `/` được tính là luồng **ride** — đó chính là "mặc định là đặt xe". Lối vào luồng ride ở `/` không nằm ở rail mà là ô tìm kiếm giữa panel, nên tab "Đặt xe" ở `/` chỉ phải làm đúng một việc: báo rằng đây là luồng mặc định.
+
+> **Ghi đè `DESIGN.md`.** `DESIGN.md` §"Màn 1" mô tả Home là "2 nút tính năng chính". Từ thay đổi này, Home **không còn** hai nút đó — chúng thành hai tab ở `SideRail`, còn Home là màn đặt xe (bố cục `split`). `DESIGN.md` giữ nguyên vì nó là brief gốc kiêm nguồn token; mục này là bản ghi đè, cùng cách `ride-flow-design.md` §5.1 ghi đè bảng xe của `mock-data.md`.
 - Nhãn theo **dự án này**, không copy nguyên ảnh mẫu: Green SM thật có dịch vụ "Giao hàng" (giao kiện hàng), còn luồng thứ hai ở đây là **"Đặt đồ ăn"**.
 - **`TopBar`** — `section` là tên **mục** ("Di chuyển", "Giao hàng", "Hoạt động"), `tabs` thuần trang trí.
 
@@ -189,8 +195,10 @@ Không có màn lỗi/thất bại — app mô phỏng luôn thành công.
 
 | variant | Hình dạng | Dùng cho |
 |---|---|---|
-| `split` | Panel trái 480px (tự cuộn) + `aside` chiếm phần còn lại, cao bằng panel | `address_selection`, `pickup_confirm`, `vehicle_selection`, `ride_confirm` — 4 màn có bản đồ |
-| `wide` | Một cột canh giữa, bề ngang theo `maxWidth` | `home`, `promo_selection`, `ride_success`, toàn bộ luồng food, `/history` |
+| `split` | Panel trái 480px (tự cuộn) + `aside` chiếm phần còn lại, cao bằng panel | `home`, `address_selection`, `pickup_confirm`, `vehicle_selection`, `ride_confirm` — 5 màn có bản đồ |
+| `wide` | Một cột canh giữa, bề ngang theo `maxWidth` | `promo_selection`, `ride_success`, toàn bộ luồng food, `/history` |
+
+`home` dùng `split` vì nó **là** màn đặt xe. Nó dùng chung `section`, `tabs` và bản đồ với `address_selection`, nên **tiêu đề panel phải khác hẳn nhau** ("Xin chào, hôm nay bạn đi đâu?" vs "Bạn muốn đi đến đâu?") — nếu không, `BackButton` từ `/ride/address` sẽ đưa người dùng về một màn nhìn y hệt.
 
 Dưới `lg`, `split` xếp chồng thành một cột (`flex-col`), không có thanh cuộn ngang.
 

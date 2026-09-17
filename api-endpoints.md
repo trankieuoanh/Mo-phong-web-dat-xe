@@ -60,7 +60,7 @@ File: `apps/api/src/routes/events.routes.ts` → `validators/event.validator.ts`
 
 > Validator **không** tự gõ lại danh sách `event_name`/`screen_name` — nó import từ `@gsm/shared`, cùng nguồn mà `apps/web` dùng để gọi. Hai bên vì thế không thể lệch nhau, và thêm một event mới chỉ phải sửa một chỗ.
 >
-> `flow: "none"` dành cho `screen_view` và `back_to_home` ở màn `home` — lúc đó người dùng chưa chọn luồng nào. Xem `event-taxonomy.md` mục 2.
+> `flow: "none"` chỉ dành cho `screen_view` ở màn `home` — lúc đó người dùng chưa chọn luồng nào. Xem `event-taxonomy.md` mục 1.
 
 Field do **server tự gắn**, client gửi lên cũng bị bỏ qua:
 - `platform: "web"` — vì vậy request body không chứa field này, dù document trong Firestore có (xem `db-design.md`).
@@ -81,6 +81,11 @@ GET /api/events?session_id=abc-123
 File: `apps/api/src/routes/events.routes.ts`, handler `GET`.
 
 **Response (200):** mảng document, sắp xếp theo `step_index` tăng dần — dùng cho phân tích & replay.
+
+> **Thứ tự `step_index` KHÔNG còn xấp xỉ thứ tự thời gian.** `select_flow` luôn mang `step_index: 0` (`event-taxonomy.md` mục 1), kể cả khi người dùng bấm tab đổi luồng ở giữa phiên — event đó vì thế nhảy lên đầu mảng. Muốn đọc đúng dòng thời gian thì sắp lại theo `created_at`:
+> ```bash
+> curl -s "localhost:3000/api/events?session_id=$SID" | jq 'sort_by(.created_at)'
+> ```
 
 `created_at` được đổi sang **chuỗi ISO** ngay tại service. Timestamp của Firestore serialize ra JSON thành `{_seconds, _nanoseconds}` mà cả `jq` lẫn pandas đều không đọc được.
 

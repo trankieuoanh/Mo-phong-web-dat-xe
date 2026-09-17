@@ -28,7 +28,7 @@ import { trackEvent, useScreenView } from '@/lib/track';
 export default function PickupPage() {
   const { ride } = useApp();
   return (
-    <FlowGuard ready={Boolean(ride.destination)} fallback="/ride/address">
+    <FlowGuard ready={Boolean(ride.destination)} fallback="/">
       <PickupContent />
     </FlowGuard>
   );

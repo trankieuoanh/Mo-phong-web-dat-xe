@@ -31,7 +31,7 @@ const ICONS: Record<Vehicle['type'], IconName> = { bike: 'bike', car: 'car' };
 export default function VehiclePage() {
   const { ride } = useApp();
   return (
-    <FlowGuard ready={Boolean(ride.destination)} fallback="/ride/address">
+    <FlowGuard ready={Boolean(ride.destination)} fallback="/">
       <VehicleContent />
     </FlowGuard>
   );
@@ -147,7 +147,16 @@ function VehicleContent() {
       </div>
 
       <div className="mt-lg">
-        <PrimaryButton variant="subtle" onClick={goToPromo} className="inline-flex items-center justify-center gap-sm">
+        {/* PHAI disable y het nut "Tiep tuc": ca hai cung goi goToPromo, ma
+            FlowGuard cua /ride/promo doi `vehicleId`. Thieu disabled o day thi
+            bam luc chua chon xe se bi da nguoc ve step 1 — mot cu nhay
+            3 -> 1 trong du lieu, khong co screen_view cua promo_selection. */}
+        <PrimaryButton
+          variant="subtle"
+          onClick={goToPromo}
+          disabled={!ride.vehicleId}
+          className="inline-flex items-center justify-center gap-sm"
+        >
           <Icon name="ticket" size={20} /> Ưu đãi
         </PrimaryButton>
       </div>

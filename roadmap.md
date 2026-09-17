@@ -4,7 +4,7 @@ Kế hoạch 6 tuần. Mỗi tuần có **Definition of Done kiểm chứng đư
 
 | Tuần | Trọng tâm | Definition of Done |
 |---|---|---|
-| **1** | Phase 0 + nền UI | `npm run dev` lên cả 2 process; `curl localhost:4000/api/health` **và** `curl localhost:3000/api/health` đều trả `{"status":"ok"}`; màn Home render 2 nút đúng token |
+| **1** | Phase 0 + nền UI | `npm run dev` lên cả 2 process; `curl localhost:4000/api/health` **và** `curl localhost:3000/api/health` đều trả `{"status":"ok"}`; màn Home render panel đặt xe + bản đồ đúng token |
 | **2** | Firestore + luồng Ride | Click hết 5 bước ride → mở Firebase console thấy đủ document, `step_index` 0→6 đúng `event-taxonomy.md` |
 | **3** | Luồng Food + giỏ hàng | Thêm/xoá/sửa số lượng, đặt đơn xong → `place_order` có `final_total` khớp với số hiển thị trên màn |
 | **4** | `GET /api/events` + hoàn thiện UI | `curl "localhost:3000/api/events?session_id=..."` trả đúng thứ tự bước; app dùng tốt ở khổ 390px |

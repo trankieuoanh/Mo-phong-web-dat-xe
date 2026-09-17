@@ -53,7 +53,7 @@ Không có test tự động — `techstack.md` đã chốt là kiểm thử b�
 4. **Không tự sinh giá trị màu/spacing/radius mới.** Mọi giá trị phải truy được về token trong `DESIGN.md` qua bảng ở `tailwind-theme.md`.
 5. **Không đổi `id` trong `mock-data.md`** (`addr-home`, `banh-mi-01`, `veh-bike`…). Chúng đi thẳng vào `properties` của event; đổi id làm dữ liệu cũ và mới không ghép được.
 6. **Thêm event mới phải cập nhật `event-taxonomy.md` trước khi code**, kèm `packages/shared/src/types.ts` (union + mảng `EVENT_NAMES`) và `packages/shared/src/screens.ts` nếu là màn mới.
-7. **Không tự gõ `step_index` trong page.** `trackEvent` tra bảng `SCREENS` ở `packages/shared/src/screens.ts`. Chỉ hai ngoại lệ được truyền tay: `add_to_cart` (luôn = 3, dùng helper `trackAddToCart`) và `flow` của `select_flow` ở màn Home.
+7. **Không tự gõ `step_index` trong page.** `trackEvent` tra bảng `SCREENS` ở `packages/shared/src/screens.ts`. Chỉ hai ngoại lệ được truyền tay, và cả hai đã gói sẵn thành helper trong `apps/web/lib/track.ts`: `trackAddToCart` (`step_index` luôn = 3) và `trackSelectFlow` (`step_index` luôn = 0, `flow` = luồng vừa chọn — dùng ở cả `home`, `address_selection` và `food_menu`).
 8. **Không thêm thư viện** ngoài những gì `techstack.md` đã chốt: Next.js, React, Tailwind (FE); Express, cors, firebase-admin, tsx (BE); concurrently (root, devDependency). Không Redux/Zustand (dùng Context), không axios (dùng `fetch`), không thư viện UI component, **không thư viện icon** (dùng `apps/web/components/Icon.tsx`), **không thư viện bản đồ** — `MapCanvas.tsx` render tile OpenStreetMap bằng thẻ `<img>` và gọi OSRM bằng `fetch`, nên không cần Leaflet.
 9. **`/history` không được gọi `useScreenView` hay `trackEvent`.** Route này cố ý nằm ngoài funnel, không có trong `SCREENS`, và chỉ ĐỌC lại event đã có. Thêm event vào đó là làm bẩn mọi tỉ lệ conversion. Kiểm tra: `grep -rn "trackEvent(\|useScreenView(" apps/web/app/history` → phải rỗng.
 10. **Bản đồ phải giữ dòng ghi công `© OpenStreetMap`.** Điều khoản dùng tile yêu cầu, không phải chi tiết thẩm mỹ. Kiểm tra: `grep -n "OpenStreetMap" apps/web/components/MapCanvas.tsx`.
@@ -69,21 +69,21 @@ apps/web/                 Next.js 15 — CHỈ FE, cổng 3000
   next.config.ts          transpilePackages + rewrites /api/* → :4000
   app/
     layout.tsx            AppProvider + font Inter (subset vietnamese)
-    page.tsx              Home
+    page.tsx              Home — man dat xe mac dinh (screen_name `home`)
     globals.css           @theme + class typography
     ride/{address,pickup,vehicle,promo,confirm,success}/page.tsx
     food/page.tsx  food/item/[itemId]/page.tsx  food/{cart,offer,confirm,success}/page.tsx
     history/page.tsx      NGOÀI FUNNEL — lịch sử chuyến đi, chỉ đọc, không bắn event
   lib/
     session.ts            session_id / user_id / resetSession
-    track.ts              trackEvent + trackAddToCart + useScreenView
+    track.ts              trackEvent + trackAddToCart + trackSelectFlow + useScreenView
     app-context.tsx       state ride + cart
     use-place-search.ts   hook goi GET /api/places (debounce 400ms + abort)
     use-route.ts          hook goi GET /api/route + duong lui straightRoute
     format.ts             formatVnd
   components/             ScreenShell, Panel, PrimaryButton, BackButton, FlowGuard,
                           MapCanvas, PlacePicker, Icon, GsmLogo
-    shell/                AppShell, SideRail, TopBar, UserMenu
+    shell/                AppShell, SideRail (2 muc dau la TAB chuyen luong), TopBar, UserMenu
   sample_ui/              4 ảnh chụp web Green SM thật — tham chiếu khi dựng UI
 
 apps/api/                 Express + tsx — CHỈ BE, cổng 4000

@@ -37,7 +37,9 @@ COMPLETION_EVENT = {"ride": "confirm_ride", "food": "place_order"}
 # Sua bang do thi phai sua ca day — day la ban sao duy nhat ngoai TypeScript.
 STEP_LABELS: dict[str, dict[int, str]] = {
     "ride": {
-        0: "home",
+        # Buoc 0 la EVENT `select_flow`, khong phai mot man hinh: no ban o
+        # `home`, `address_selection` hay `food_menu` deu mang step 0.
+        0: "select_flow",
         1: "address_selection",
         2: "pickup_confirm",
         3: "vehicle_selection",
@@ -46,7 +48,7 @@ STEP_LABELS: dict[str, dict[int, str]] = {
         6: "ride_success",
     },
     "food": {
-        0: "home",
+        0: "select_flow",
         1: "food_menu",
         2: "food_item_detail",
         3: "add_to_cart",  # hanh dong, khong phai man hinh
@@ -133,6 +135,12 @@ def funnel(df: pd.DataFrame, flow: str) -> pd.DataFrame:
 
     Luu y ve buoc 0: man `home` mang flow 'none', nen o day buoc 0 chinh la
     event `select_flow` — tuc "so nguoi CHON luong nay", dung lam mau so.
+    `select_flow` luon mang step 0 du ban o man nao (event-taxonomy.md muc 1),
+    ke ca khi nguoi dung nhay luong bang tab o sidebar giua chung.
+
+    `base` lay iloc[0] — HANG DAU TIEN TON TAI, khong phai step 0. Neu mot ngay
+    nao do `select_flow` khong con mang step 0 nua thi funnel se lang le lay
+    buoc 1 lam mau so va moi ti le deu sai ma khong bao loi.
     """
     reach = (
         df[df["flow"] == flow]
@@ -177,6 +185,13 @@ def completed_sessions(df: pd.DataFrame, flow: str) -> set[str]:
 
 
 def completion_rate(df: pd.DataFrame, flow: str) -> tuple[int, int, float]:
+    """Mau so = moi session CO CHAM toi luong nay, ke ca cham mot cai roi ra.
+
+    Tu khi sidebar thanh tab, doi luong chi ton mot click, nen mot phien ride
+    ghe tab "Dat do an" mot cai van nam trong mau so cua food va tinh la bo do.
+    Muon loai chung ra thi loc session co `select_flow` voi `screen_name` khac
+    'home' — do chinh la dau hieu nhay luong (analysis-spec.md Nhom 2).
+    """
     flow_df = df[df["flow"] == flow]
     total = flow_df["session_id"].nunique()
     done = len(completed_sessions(df, flow))

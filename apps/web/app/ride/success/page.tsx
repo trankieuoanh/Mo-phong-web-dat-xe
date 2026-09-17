@@ -10,11 +10,12 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { calcFare, calcRideTotals, getPromo, getVehicle } from '@gsm/shared';
+import { DEFAULT_PICKUP, calcFare, calcRideTotals, getPromo, getVehicle } from '@gsm/shared';
 import { Icon } from '@/components/Icon';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { ScreenShell } from '@/components/ScreenShell';
 import { useApp } from '@/lib/app-context';
+import { routeOrFallback } from '@/lib/use-route';
 import { formatVnd } from '@/lib/format';
 import { trackEvent, useScreenView } from '@/lib/track';
 
@@ -38,15 +39,26 @@ export default function RideSuccessPage() {
 
     const vehicle = getVehicle(ride.vehicleId ?? '');
     const promo = ride.promoId ? (getPromo(ride.promoId) ?? null) : null;
-    const distanceKm = ride.route?.distanceKm ?? 0;
-    const totals = calcRideTotals(vehicle ? calcFare(vehicle, distanceKm) : 0, promo);
+
+    // CUNG `routeOrFallback` voi vehicle/promo/confirm. Truoc day man nay suy
+    // bien ve 0 km khi thieu `route`, trong khi ba man kia suy bien ve duong
+    // thang — tong tien o day thanh ra THAP HON so vua ghi vao `confirm_ride`
+    // (calcFare voi 0 km van tra dung gia mo cua, nen con so sai trong rat
+    // hop ly). pricing.ts muc dau: hai cho BAT BUOC ra cung mot con so.
+    //
+    // Man nay khong co FlowGuard nen `destination` co the vang — khi do khong
+    // co gi de tinh va moi dong hien '—'.
+    const route = ride.destination
+      ? routeOrFallback(ride.pickup ?? DEFAULT_PICKUP, ride.destination, ride.route)
+      : null;
+    const totals = calcRideTotals(vehicle && route ? calcFare(vehicle, route.distanceKm) : 0, promo);
 
     setSummary({
       pickup: ride.pickup?.label ?? '—',
       destination: ride.destination?.label ?? '—',
       vehicle: vehicle?.name ?? '—',
-      distance: ride.route ? `${ride.route.distanceKm} km · ${ride.route.durationMin} phút` : '—',
-      total: formatVnd(totals.finalPrice),
+      distance: route ? `${route.distanceKm} km · ${route.durationMin} phút` : '—',
+      total: route ? formatVnd(totals.finalPrice) : '—',
     });
 
     // Clear `ride` sau confirm_ride — screen-map.md muc 3.
@@ -68,14 +80,16 @@ export default function RideSuccessPage() {
       section="Di chuyển"
       tabs={['Đặt xe', 'Đang diễn ra']}
       maxWidth="max-w-[600px]"
-      title="Đặt xe thành công"
+      // KHONG truyen `title`: tieu de that nam trong than panel, canh icon tich.
+      // Truyen ca hai thi cau "Dat xe thanh cong" hien HAI LAN lien nhau —
+      // Panel chi dung header khi co title/leading/trailing (Panel.tsx).
       footer={<PrimaryButton onClick={backToHome}>Về trang chủ</PrimaryButton>}
     >
       <div className="flex flex-col items-center py-3xl">
         <div className="grid size-20 place-items-center rounded-full bg-primary text-on-primary">
           <Icon name="check" size={40} />
         </div>
-        <h2 className="t-display-md mt-lg text-center">Đặt xe thành công</h2>
+        <h1 className="t-display-md mt-lg text-center">Đặt xe thành công</h1>
         <p className="t-body-sm mt-xxs text-center text-body">
           Tài xế sẽ liên hệ với bạn trong ít phút
         </p>

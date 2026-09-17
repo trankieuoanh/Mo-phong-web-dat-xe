@@ -114,7 +114,7 @@ Tailwind v4 không sinh sẵn class cho typography token, nên khai báo thành 
 | Vai trò trong app | Class |
 |---|---|
 | Tiêu đề màn hình ("Bạn muốn đón ở đâu?") | `.t-display-md` (24px) |
-| Nhãn 2 nút lớn ở Home | `.t-display-sm` (20px) |
+| Tiêu đề panel ở Home | `.t-display-sm` (20px) |
 | Tên địa chỉ / tên món / tên khuyến mãi | `.t-body-md-strong` |
 | Địa chỉ đầy đủ, mô tả món, điều kiện khuyến mãi | `.t-body-sm` + màu `body` |
 | Giá tiền trong dòng | `.t-body-md-strong` |

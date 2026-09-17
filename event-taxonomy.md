@@ -7,7 +7,9 @@
 ### `step_index` — vị trí bước trong luồng
 - Là **số cố định gán cho từng bước**, không phải bộ đếm event tăng dần.
 - `home` luôn là `0` cho cả hai luồng.
-- Mọi event bắn trên cùng một màn dùng **chung** `step_index` của màn đó.
+- Mọi event bắn trên cùng một màn dùng **chung** `step_index` của màn đó, trừ hai ngoại lệ dưới đây.
+- **Ngoại lệ 1 — `add_to_cart` luôn là `3`**, dù bắn ở `food_menu` (step 1) hay `food_item_detail` (step 2). Nó là *hành động*, không phải màn hình.
+- **Ngoại lệ 2 — `select_flow` luôn là `0`**, dù bắn ở `home` (step 0), `address_selection` (step 1) hay `food_menu` (step 1). Nó là mốc "bắt đầu luồng này", tức bước 0 của funnel luồng được chọn. Nếu để nó mang step của màn đang đứng, funnel của luồng được chọn sẽ **không có bước 0** và mọi tỉ lệ tính từ mẫu số đó đều sai.
 - Bấm Back không làm `step_index` lùi — event `back` mang `step_index` của màn đang đứng khi bấm.
 - Mục đích: script pandas chỉ cần `groupby('step_index').session_id.nunique()` là ra funnel.
 
@@ -15,16 +17,19 @@
 - `screen_name` của màn ngay trước trong session.
 - `null` ở màn đầu tiên của session (`home`).
 - Ở lại một màn và bắn nhiều event → `previous_screen` **không đổi**, giữ nguyên giá trị của màn trước.
+- Hệ quả phản trực giác: muốn biết người dùng **nhảy luồng từ đâu**, đọc `screen_name` của `select_flow`, **không phải** `previous_screen`. Một `select_flow` bắn ở `/ride/address` mang `screen_name: "address_selection"` nhưng `previous_screen: "home"` — vì `previous_screen` chỉ đổi khi có `screen_view` mới.
 
 ### `flow` — luồng đang đi, kể cả khi chưa chọn
 Ba giá trị: `"ride"`, `"food"`, `"none"`.
 
-`"none"` chỉ dùng cho hai event ở màn `home` (`screen_view` và `back_to_home`) — lúc đó người dùng **chưa chọn luồng nào**, nên không giá trị nào khác là đúng. Ghi bừa `"ride"` sẽ thổi phồng mọi tỉ lệ "vào Home → chọn ride".
+`"none"` chỉ dùng cho **`screen_view` ở màn `home`** — lúc đó người dùng **chưa chọn luồng nào**, nên không giá trị nào khác là đúng. (`back_to_home` **không** mang `"none"`: nó bắn ở `ride_success` / `food_success`, tức lúc luồng đã xong, nên mang `"ride"` / `"food"` — xem bảng mục 3 và 4.) Ghi bừa `"ride"` sẽ thổi phồng mọi tỉ lệ "vào Home → chọn ride".
 
 Hệ quả cho script pandas:
 - Đếm funnel từng luồng: lọc `flow != 'none'`.
 - Mẫu số "số người vào Home": đếm `session_id` duy nhất có `flow == 'none'`.
 - `select_flow` **luôn** mang `flow` = giá trị được chọn, không phải `'none'`.
+
+> **Từ khi sidebar thành tab, `home` mặc định là màn Đặt xe.** Tỉ lệ ride/food ở bước 0 vì thế **không còn** đo "người dùng tự chọn gì" mà đo "ride là mặc định". Dữ liệu bước 0 sinh trước và sau thay đổi này **không ghép được với nhau** — nếu đã có dữ liệu demo cũ thì phải sinh lại. Các bước từ 1 trở đi không bị ảnh hưởng.
 
 ### `screen_view`
 - Bắn **một lần** khi mỗi màn mount lần đầu trong một lượt điều hướng.
@@ -72,15 +77,18 @@ Bảng này được mã hoá **một lần duy nhất** thành `SCREENS` trong 
 | `event_name` | Khi nào | `properties` |
 |---|---|---|
 | `screen_view` | Mount màn Home | `{}` |
-| `select_flow` | Bấm 1 trong 2 nút lớn | `{ flow_chosen: "ride" \| "food" }` |
+| `select_flow` | Bấm ô "Bạn muốn đi đâu?" (→ ride) hoặc tab "Đặt đồ ăn" ở sidebar (→ food) | `{ flow_chosen: "ride" \| "food" }` |
 
-> `select_flow` luôn ghi `flow` = giá trị được chọn (không phải `null`), để đếm được tỉ lệ chọn giữa 2 luồng.
+> `select_flow` luôn ghi `flow` = giá trị được chọn (không phải `null`), và luôn `step_index: 0` (mục 1).
+>
+> **Không có `properties` phân biệt lối vào** vì cặp (`screen_name`, `flow_chosen`) đã đủ: `home`+`ride` = ô tìm kiếm giữa panel, `home`+`food` = tab sidebar, còn `screen_name` khác `home` = nhảy luồng từ sidebar.
 
 ### `address_selection` — step 1
 | `event_name` | Khi nào | `properties` |
 |---|---|---|
 | `screen_view` | Mount | `{}` |
 | `select_address` | Chọn 1 địa chỉ (gợi ý hoặc kết quả tìm) | `{ address_id, address_label, address_source }` |
+| `select_flow` | Bấm tab "Đặt đồ ăn" ở sidebar — **`step_index: 0`**, `flow: "food"` | `{ flow_chosen: "food" }` |
 | `back` | Bấm quay lại | `{ to_screen: "home" }` |
 
 > **`address_id` / `address_label` là ĐIỂM ĐẾN.** Màn này hỏi "Bạn muốn đi đến đâu?". Điểm đến giữ tên khoá `address_id` ở cả ba event dùng khoá này (`select_address`, `confirm_pickup`, `confirm_ride`). Điểm đón dùng bộ khoá riêng `pickup_*` — xem màn `pickup_confirm`.
@@ -164,6 +172,7 @@ Bảng này được mã hoá **một lần duy nhất** thành `SCREENS` trong 
 | `screen_view` | Mount | `{}` |
 | `select_item` | Bấm vào 1 món để mở chi tiết | `{ item_id, item_name, price }` |
 | `add_to_cart` | Thêm nhanh từ màn menu (không mở chi tiết) | xem mục `add_to_cart` bên dưới |
+| `select_flow` | Bấm tab "Đặt xe" ở sidebar — **`step_index: 0`**, `flow: "ride"` | `{ flow_chosen: "ride" }` |
 | `back` | Bấm quay lại | `{ to_screen: "home" }` |
 
 ### `food_item_detail` — step 2

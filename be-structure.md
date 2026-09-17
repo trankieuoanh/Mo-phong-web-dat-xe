@@ -313,6 +313,16 @@ previous_screen: null → null → home → home → address_selection → ...
 confirm_ride   : 145000 − 29000 = 116000  ✅ khớp công thức
 ```
 
+Phiên có **nhảy luồng** (bấm tab "Đặt đồ ăn" ở sidebar khi đang ở `/ride/address`) đọc như sau — `select_flow` mang `step_index: 0` nhưng `screen_name` là màn thật lúc bấm, còn `previous_screen` vẫn là `home` vì nó chỉ đổi khi có `screen_view` mới:
+
+```
+screen_view  home               step 0  flow none  prev null
+select_flow  home               step 0  flow ride  prev null
+screen_view  address_selection  step 1  flow ride  prev home
+select_flow  address_selection  step 0  flow food  prev home     ← nhảy luồng
+screen_view  food_menu          step 1  flow food  prev address_selection
+```
+
 > **Một lỗi chỉ lộ ra khi click thật.** Bộ test bằng `curl` không bắt được, vì nó tự điền `previous_screen` trong payload còn app thật để `track.ts` suy ra. Dữ liệu thật cho thấy mọi event *hành động* mang `previous_screen` bằng chính màn nó đứng — trái với `event-taxonomy.md` §1. Nguyên nhân: `previousScreen` bị gán bằng màn hiện tại ngay sau khi `screen_view` bắn. Đã sửa bằng cách tách `previousScreen` / `currentScreen` và cập nhật trước khi bắn.
 >
 > Bài học cho các bước kiểm chứng sau: **`curl` chứng minh BE đúng, không chứng minh tracking đúng.** Hai việc khác nhau.

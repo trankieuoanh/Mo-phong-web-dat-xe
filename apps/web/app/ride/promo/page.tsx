@@ -28,7 +28,7 @@ export default function PromoPage() {
   return (
     <FlowGuard
       ready={Boolean(ride.destination && ride.vehicleId)}
-      fallback="/ride/address"
+      fallback="/"
     >
       <PromoContent />
     </FlowGuard>

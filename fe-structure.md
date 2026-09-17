@@ -30,7 +30,7 @@ apps/web/
 ├─ app/
 │  ├─ layout.tsx           font Inter (subset vietnamese) + <AppProvider>
 │  ├─ globals.css          @theme token + 13 class .t-* + .shadow-level-2
-│  ├─ page.tsx             Home
+│  ├─ page.tsx             Home — màn đặt xe mặc định (screen_name `home`)
 │  ├─ ride/
 │  │  ├─ address/page.tsx     tìm + chọn điểm đến
 │  │  ├─ pickup/page.tsx      xác nhận điểm đón (hằng số) + ghi chú tài xế
@@ -48,7 +48,7 @@ apps/web/
 │  └─ history/page.tsx      NGOÀI FUNNEL — lịch sử chuyến đi, không bắn event
 │
 ├─ lib/
-│  ├─ track.ts             trackEvent · trackAddToCart · useScreenView
+│  ├─ track.ts             trackEvent · trackAddToCart · trackSelectFlow · useScreenView
 │  ├─ use-place-search.ts  hook gọi GET /api/places (debounce + abort)
 │  ├─ use-route.ts         hook gọi GET /api/route + routeOrFallback()
 │  ├─ app-context.tsx      AppProvider · useApp — state ride + cart
@@ -67,7 +67,7 @@ apps/web/
    ├─ GsmLogo.tsx          logo cánh chim + wordmark, một tông cyan
    └─ shell/
       ├─ AppShell.tsx      rail trái + top bar + vùng nội dung
-      ├─ SideRail.tsx      6 mục icon dọc
+      ├─ SideRail.tsx      6 mục icon dọc — 2 mục đầu là tab chuyển luồng
       ├─ TopBar.tsx        tên mục + tab trang trí + UserMenu
       └─ UserMenu.tsx      chip người dùng — trang trí, hiện user_id đang dùng
 ```
@@ -95,7 +95,7 @@ flowchart LR
 
 | Route | `screen_name` | step | Guard | Event bắn ra (ngoài `screen_view`) | Dòng |
 |---|---|:--:|:--:|---|--:|
-| `/` | `home` | 0 | — | `select_flow` | 72 |
+| `/` | `home` | 0 | — | `select_flow` | 101 |
 | `/ride/address` | `address_selection` | 1 | — | `select_address` | 147 |
 | `/ride/pickup` | `pickup_confirm` | 2 | ✓ | `confirm_pickup`, `change_address` | 115 |
 | `/ride/vehicle` | `vehicle_selection` | 3 | ✓ | `select_vehicle` | 131 |
@@ -115,7 +115,7 @@ flowchart LR
 
 > **Hai màn không bắn event khi bấm nút chính.** Ở `/ride/vehicle`, `select_vehicle` bắn khi bấm *hạng xe*, còn nút "Tiếp tục" chỉ điều hướng. Ở `/ride/promo`, bấm promo chỉ tick chọn, `select_promo` bắn khi bấm "Áp dụng mã". Hệ quả: một session có thể có **nhiều** `select_vehicle` (đo được sự phân vân) nhưng đúng **một** `select_promo`. Chi tiết ở `ride-flow-design.md` mục 7.
 
-> **`select_flow` bắn từ hai chỗ.** Ngoài hai card giữa màn `/`, `SideRail` cũng bắn `select_flow` khi bấm mục "Đặt xe"/"Đặt đồ ăn" — nhưng **chỉ khi đang ở `/`**. Cùng helper, cùng `properties.flow_chosen`, nên phân tích không phải phân biệt. Ở mọi màn khác hai mục đó là trang trí.
+> **`select_flow` bắn từ hai chỗ, và không phải lúc nào cũng ở `/`.** Màn `/` không còn hai card: nó **là** màn đặt xe, và ô tìm kiếm giữa panel bắn `select_flow(ride)`. Lối vào luồng food — và mọi lần đổi luồng — nằm ở hai tab của `SideRail`, bấm được ở **ba màn đầu luồng** `/`, `/ride/address`, `/food`. Cả hai chỗ dùng chung helper `trackSelectFlow`, nên event luôn mang `step_index: 0` và `flow` = luồng được chọn. Muốn biết người dùng nhảy luồng từ đâu thì đọc `screen_name` của event, **không phải** `previous_screen`.
 
 ### Route ngoài funnel
 
@@ -131,10 +131,11 @@ flowchart LR
 
 ## 5. `lib/` — bốn file
 
-### `track.ts` (110 dòng) — quan trọng nhất
+### `track.ts` (151 dòng) — quan trọng nhất
 ```ts
 trackEvent(input): void          // KHÔNG async, không ai await được
 trackAddToCart(screenName, properties): void
+trackSelectFlow(screenName, flow): void
 useScreenView(screenName): void
 resetPreviousScreen(): void
 ```
@@ -142,7 +143,7 @@ resetPreviousScreen(): void
 Ba thứ file này giữ mà không chỗ nào khác giữ:
 
 1. **`previousScreen`** — biến module-level, cập nhật sau mỗi `screen_view`. Không suy ra từ route vì Back của trình duyệt sẽ làm mọi suy luận từ route sai.
-2. **Tra bảng `SCREENS`** để điền `flow` và `step_index`. Hai tham số đó *có thể* truyền tay nhưng chỉ dùng cho đúng hai ngoại lệ: `add_to_cart` (luôn step 3) và `select_flow` ở Home (flow là giá trị vừa chọn).
+2. **Tra bảng `SCREENS`** để điền `flow` và `step_index`. Hai tham số đó *có thể* truyền tay nhưng chỉ dùng cho đúng hai ngoại lệ, và cả hai đã được gói vào helper riêng: `trackAddToCart` (luôn step 3) và `trackSelectFlow` (luôn step 0, `flow` = luồng vừa chọn).
 3. **`useRef` chặn React Strict Mode** trong `useScreenView`. Thiếu nó thì mọi `screen_view` nhân đôi và funnel sai gấp đôi.
 
 `trackEvent` trả `void` có chủ ý — không ai `await` được nên không thể vô tình chặn điều hướng. Kèm `keepalive: true` và `.catch(() => {})`.
@@ -185,7 +186,7 @@ Tiền **luôn** là số nguyên trong dữ liệu, chỉ format khi hiển th�
 | `ScreenShell` | `title`, `leading`, `trailing`, `children`, `footer`, `variant`, `aside`, `section`, `tabs`, `maxWidth` | 12 page | Chọn bố cục `split`/`wide` rồi bọc bằng `AppShell` + `Panel`. Năm prop đầu giữ nguyên ý nghĩa từ bản mobile cũ, nên đổi sang desktop không phải viết lại page nào |
 | `Panel` | `title`, `leading`, `trailing`, `children`, `footer` | qua `ScreenShell` | Card trắng 3 khu; body tự cuộn (`overflow-y-auto`), footer dính đáy **panel** |
 | `AppShell` | `section`, `tabs`, `children` | 12 page + `/`, `/history` | `SideRail` + `TopBar` + slot. Rail ẩn dưới `lg` |
-| `SideRail` | — | qua `AppShell` | 6 mục, **mở rộng (nhãn chữ) / thu gọn (chỉ icon)**, nhớ ở `localStorage`. **Bấm được chỉ ở 2 chỗ**: hai mục luồng khi `pathname === '/'` (bắn `select_flow`), và mục "Hoạt động" (link `/history`). Còn lại trang trí |
+| `SideRail` | — | qua `AppShell` | 6 mục, **mở rộng (nhãn chữ) / thu gọn (chỉ icon)**, nhớ ở `localStorage`. Hai mục luồng là **tab**: tab của luồng đang đứng thì active và không bấm được, tab luồng kia bấm được (bắn `select_flow`) — chỉ ở 3 màn đầu luồng trong bảng `FLOW_ENTRY`. Mục "Hoạt động" là link `/history` ở mọi màn. Còn lại trang trí |
 | `TopBar` / `UserMenu` | `section`, `tabs` / — | qua `AppShell` | Tab trang trí. `UserMenu` cũng trang trí hoàn toàn — chỉ hiện `user_id` đang dùng |
 | `PrimaryButton` | `variant`, `fullWidth`, + props button | 11 page | Nền `primary-dark` chứ không `primary` — tương phản 4.2:1 thay vì 2.6:1 (`tailwind-theme.md` mục 0b). `enabled:hover:` để nút disabled không đổi màu khi rê chuột |
 | `BackButton` | `from`, `to`, `href`, `icon` | 10 page | **Bắn event `back`** rồi mới `router.push`. `icon` mặc định `'back'`; `/ride/promo` truyền `'close'` cho giống overlay — hình khác nhưng event y hệt |
@@ -228,10 +229,10 @@ Hai màn success không có `BackButton` — chúng dùng `router.replace` để
 
 | Page | `ready` | `fallback` |
 |---|---|---|
-| `/ride/pickup` | `Boolean(ride.addressId)` | `/ride/address` |
-| `/ride/vehicle` | `Boolean(ride.addressId)` | `/ride/address` |
-| `/ride/promo` | `addressId && vehicleId` | `/ride/address` |
-| `/ride/confirm` | `addressId && vehicleId && promoId !== undefined` | `/ride/address` |
+| `/ride/pickup` | `Boolean(ride.destination)` | `/` |
+| `/ride/vehicle` | `Boolean(ride.destination)` | `/` |
+| `/ride/promo` | `destination && vehicleId` | `/` |
+| `/ride/confirm` | `destination && vehicleId && promoId !== undefined` | `/` |
 | `/food/item/[itemId]` | `Boolean(item)` — id có thật | `/food` |
 | `/food/cart` | `cart.length > 0` | `/food` |
 | `/food/offer` | `cart.length > 0` | `/food` |
@@ -240,6 +241,8 @@ Hai màn success không có `BackButton` — chúng dùng `router.replace` để
 Năm page **không** có guard: `home`, `/ride/address`, `/food` (đầu luồng, không có gì để bảo vệ) và hai màn success (vào được là do vừa hoàn thành luồng).
 
 Guard chạy **trước** khi nội dung mount, nên `useScreenView` bên trong không kịp chạy — bị chặn thì không sinh event nào. Đó là chủ ý: tránh session rác trong dữ liệu phân tích.
+
+> **Vì sao ride trả về `/` chứ không phải `/ride/address`.** Từ khi `/` thành màn đặt xe, `select_flow` — **bước 0** của funnel ride — chỉ sinh ra ở đó. Đá người dùng thẳng vào `/ride/address` tạo một session có bước 1 mà **không có bước 0**, làm `reach[1] > reach[0]` và `step_conversion` của bước 1 vọt lên trên 1. Trả về `/` thì session đó chỉ có một `screen_view home` (`flow: 'none'`) và bị `drop_junk_sessions()` loại sạch. Food vẫn trả về `/food` vì đó là màn đầu luồng của nó — nhưng **`/food` có đúng vấn đề tương tự** và là việc cần rà khi audit luồng food.
 
 ---
 
