@@ -8,7 +8,7 @@
  *
  * Moi gia tri deu la SO NGUYEN VND. Math.floor khi tinh phan tram de khong sinh so le.
  */
-import { SHIPPING_FEE, type DiscountRule, type FoodItem } from './mock-data';
+import { SHIPPING_FEE, type DiscountRule, type FoodItem, type Vehicle } from './mock-data';
 
 /**
  * So tien giam thuc te (VND). Dung chung cho ca Promo (Ride) va Offer (Food).
@@ -30,6 +30,27 @@ export function isRuleAvailable(rule: DiscountRule, subtotal: number): boolean {
 // ─────────────────────────────────────────────────────────────
 // Ride — mock-data.md muc 6
 // ─────────────────────────────────────────────────────────────
+
+/** Gia mo cua da bao gom hai km dau. */
+export const INCLUDED_KM = 2;
+
+/**
+ * Gia chuyen xe theo QUANG DUONG THAT.
+ *
+ * Truoc day gia la hang so `Vehicle.basePrice`; gio no la ham cua
+ * (hang xe, quang duong). Hai cho BAT BUOC goi ham nay chu khong tu tinh:
+ * man `vehicle_selection` (hien gia) va event `confirm_ride` (ghi gia) —
+ * neu moi cho tu tinh thi bao cao phan tich se khong khop anh chup man hinh.
+ *
+ * Lam tron toi 1.000d: tien le toi hang don vi trong nhu loi chu khong nhu gia.
+ *
+ * He so trong VEHICLES duoc chon de mot chuyen 15 km ra dung con so `basePrice`
+ * cu — xem ghi chu o mock-data.ts.
+ */
+export function calcFare(vehicle: Vehicle, distanceKm: number): number {
+  const extra = Math.max(0, distanceKm - INCLUDED_KM);
+  return Math.round((vehicle.openingFare + extra * vehicle.pricePerKm) / 1000) * 1000;
+}
 
 export interface RideTotals {
   basePrice: number;
