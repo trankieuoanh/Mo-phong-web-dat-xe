@@ -112,8 +112,12 @@ Bảng này được mã hoá **một lần duy nhất** thành `SCREENS` trong 
 | `event_name` | Khi nào | `properties` |
 |---|---|---|
 | `screen_view` | Mount | `{}` |
-| `select_vehicle` | Chọn loại xe | `{ vehicle_id, vehicle_type: "bike" \| "car", base_price }` |
+| `select_vehicle` | Chọn loại xe | `{ vehicle_id, vehicle_type: "bike" \| "car", base_price, distance_km }` |
 | `back` | Bấm quay lại | `{ to_screen: "pickup_confirm" }` |
+
+> **`base_price` đã đổi nghĩa.** Trước đây nó là giá cố định của hạng xe (`Vehicle.basePrice`); giờ giá tính theo quãng đường thật: `giá mở cửa + đơn giá/km × số km vượt quá 2 km đầu` (`mock-data.md` mục 2).
+>
+> Vì vậy `base_price` **chỉ đọc được khi có `distance_km` đi kèm** — hai chuyến cùng hạng xe mà khác quãng đường thì khác giá, và so `base_price` giữa hai session không nói lên điều gì nếu không chuẩn hoá theo km. Đó là lý do `distance_km` phải nằm ngay trong chính event này chứ không chỉ ở `confirm_ride`: người bỏ dở ở bước chọn xe không bao giờ sinh ra `confirm_ride`.
 
 ### `promo_selection` — step 4
 | `event_name` | Khi nào | `properties` |
@@ -129,13 +133,19 @@ Bảng này được mã hoá **một lần duy nhất** thành `SCREENS` trong 
 | `event_name` | Khi nào | `properties` |
 |---|---|---|
 | `screen_view` | Mount | `{}` |
-| `confirm_ride` | Bấm nút xác nhận cuối | `{ address_id, address_label, address_source, pickup_id, pickup_label, vehicle_id, vehicle_type, promo_id \| null, base_price, discount_amount, final_price, payment_method }` |
+| `confirm_ride` | Bấm nút xác nhận cuối | `{ address_id, address_label, address_source, pickup_id, pickup_label, distance_km, duration_min, route_source, vehicle_id, vehicle_type, promo_id \| null, base_price, discount_amount, final_price, payment_method }` |
 | `back` | Bấm quay lại | `{ to_screen: "promo_selection" }` |
 
 > `confirm_ride` là **event kết thúc funnel ride**. Session có event này = hoàn thành.
 >
 > `payment_method` là `"cash"` hoặc `"qr"`, mặc định `"cash"`. Ghi lại vì đây là một lựa chọn của người dùng ở bước cuối — không ghi thì không biết ai đổi khỏi mặc định.
 >
+> **`route_source`** là `"osrm"` (tuyến đường thật, lấy từ `GET /api/route`) hoặc `"straight"` (dịch vụ định tuyến không trả lời nên đã suy biến về đường nối thẳng, quãng đường tính theo đường chim bay).
+>
+> **Bắt buộc phải có khoá này.** Thiếu nó thì một chuyến 8 km đường thật và một chuyến 8 km đường chim bay trông giống hệt nhau trong dữ liệu, mà đường chim bay luôn ngắn hơn đường thật đáng kể. Mọi phân tích theo quãng đường sẽ trộn lẫn hai loại và không có cách nào tách ra về sau. Khi phân tích, lọc `route_source == 'osrm'` trước khi so sánh quãng đường hay giá.
+>
+> `distance_km` là số thực (làm tròn 1 chữ số thập phân), `duration_min` là số nguyên phút.
+
 > **Vì sao lặp lại `address_label` / `pickup_label` ở đây** dù chúng đã có ở `select_address` và `confirm_pickup`: đây là event **tự mô tả đủ một chuyến đi**. Màn `/history` dựng bảng lịch sử từ riêng các document `confirm_ride`, không join ngược về event trước. Và với `address_source == "search"` thì **không có bảng nào để tra id ra tên** — `getAddress("osm-N240109189")` trả `undefined`. Không lặp lại nhãn ở đây thì cột điểm đi/điểm đến trống với mọi địa chỉ người dùng tự tìm.
 
 ### `ride_success` — step 6

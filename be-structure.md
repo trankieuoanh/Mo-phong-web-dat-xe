@@ -33,20 +33,30 @@ apps/api/
    ├─ routes/
    │  ├─ events.routes.ts           POST và GET /api/events
    │  ├─ places.routes.ts           GET /api/places — tìm địa chỉ thật
+   │  ├─ route.routes.ts            GET /api/route  — tìm tuyến đường thật
    │  └─ health.routes.ts           GET /api/health — không chạm Firestore
    ├─ validators/
    │  ├─ event.validator.ts         whitelist 8 field + validate query
-   │  └─ place.validator.ts         q (2–120 ký tự) + limit (1–8)
+   │  ├─ place.validator.ts         q (2–120 ký tự) + limit (1–8)
+   │  └─ route.validator.ts         from/to dạng "lat,lon" 
    ├─ services/
    │  ├─ event.service.ts           createEvent · listEvents
-   │  └─ place.service.ts           Nominatim: User-Agent + hàng đợi 1 req/s + cache
+   │  ├─ place.service.ts           Nominatim: User-Agent + chuẩn hoá kết quả
+   │  ├─ route.service.ts           OSRM: gọi + chuẩn hoá geometry sang [lat,lon]
+   │  └─ upstream.ts                hàng đợi + cache, DÙNG CHUNG cho hai cái trên
    └─ db/
       └─ firebase-admin.ts          getDb() — khởi tạo trễ
 ```
 
 `event.validator.ts` là file lớn nhất — xem mục 4 để biết vì sao.
 
-### `places.*` — vì sao BE phải làm trung gian
+### `upstream.ts` — vì sao hàng đợi và cache nằm một chỗ
+
+Nominatim và OSRM đều là hạ tầng cộng đồng miễn phí với cùng một ràng buộc: đừng gọi dồn dập, và đừng hỏi lại thứ vừa hỏi. Chép logic đó hai lần nghĩa là sửa một bên quên bên kia — mà triệu chứng của nó là **bị chặn IP giữa lúc demo**, không phải một test đỏ.
+
+`createUpstreamGate({ minGapMs, ttlMs, maxEntries })` trả về `run(key, work)`: đọc cache trước, xếp hàng, chờ đủ khoảng cách, gọi, ghi cache. `place.service.ts` dùng `minGapMs: 1100` (OSM giới hạn tuyệt đối 1 req/giây), `route.service.ts` dùng `600`.
+
+### `places.*` và `route.*` — vì sao BE phải làm trung gian
 
 `GET /api/places` **không chạm Firestore**, nên nó trả lời được cả khi chưa có credential (giống `/api/health`). Nó tồn tại vì ba việc chỉ server làm được:
 
@@ -54,7 +64,9 @@ apps/api/
 2. **Hàng đợi ≥ 1100 ms** giữa hai lần gọi upstream — OSM giới hạn tuyệt đối 1 req/giây. Debounce ở client là gợi ý, không phải bảo đảm.
 3. **Cache dùng chung** (TTL 10 phút, ~200 khoá) — gõ rồi xoá lùi sẽ hỏi lại đúng những query vừa hỏi.
 
-Lỗi upstream trả **502** chứ không phải 500: lỗi nằm ở dịch vụ bên ngoài, không phải ở app này. FE hiện cảnh báo nhưng vẫn liệt kê 5 địa chỉ gợi ý.
+Lỗi upstream trả **502** chứ không phải 500: lỗi nằm ở dịch vụ bên ngoài, không phải ở app này. FE suy biến êm — `/api/places` lỗi thì vẫn liệt kê 5 địa chỉ gợi ý; `/api/route` lỗi thì dùng `straightRoute()` và ghi `route_source: 'straight'`.
+
+> **`route.service.ts` cố ý KHÔNG tự suy biến về đường thẳng.** Nếu nó lặng lẽ trả về đường chim bay thì `route_source` sẽ ghi `'osrm'` cho một con số không phải đường bộ, và dữ liệu nói dối. Suy biến là việc của FE, nơi biết mình đang dùng đường lui.
 
 ---
 

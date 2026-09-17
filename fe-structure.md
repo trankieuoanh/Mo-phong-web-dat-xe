@@ -50,6 +50,7 @@ apps/web/
 ├─ lib/
 │  ├─ track.ts             trackEvent · trackAddToCart · useScreenView
 │  ├─ use-place-search.ts  hook gọi GET /api/places (debounce + abort)
+│  ├─ use-route.ts         hook gọi GET /api/route + routeOrFallback()
 │  ├─ app-context.tsx      AppProvider · useApp — state ride + cart
 │  ├─ session.ts           session_id / user_id / resetSession
 │  └─ format.ts            formatVnd — số nguyên VNĐ → "35.000đ"
@@ -60,7 +61,7 @@ apps/web/
    ├─ PrimaryButton.tsx    3 biến thể: primary / secondary / subtle
    ├─ BackButton.tsx       bắn event `back` rồi điều hướng
    ├─ FlowGuard.tsx        chặn vào thẳng URL giữa luồng
-   ├─ MapCanvas.tsx        bản đồ giả lập bằng SVG (không thư viện)
+   ├─ MapCanvas.tsx        tile OSM thật + tuyến thật, không thư viện
    ├─ PlacePicker.tsx      ô tìm địa chỉ thật + danh sách kết quả
    ├─ Icon.tsx             ~35 icon SVG viết tay, thay toàn bộ emoji
    ├─ GsmLogo.tsx          logo cánh chim + wordmark, một tông cyan
@@ -190,13 +191,17 @@ Tiền **luôn** là số nguyên trong dữ liệu, chỉ format khi hiển th�
 | `BackButton` | `from`, `to`, `href`, `icon` | 10 page | **Bắn event `back`** rồi mới `router.push`. `icon` mặc định `'back'`; `/ride/promo` truyền `'close'` cho giống overlay — hình khác nhưng event y hệt |
 | `FlowGuard` | `ready`, `fallback`, `children` | 8 page | Đợi `hydrated` trước khi redirect |
 | `PlacePicker` | `placeholder`, `presetHeading`, `selectedId?`, `onPick`, `leading?` | 2 page | Ô tìm + kết quả. Dùng chung cho điểm đến và điểm đón nên hai chỗ không thể lệch nhau. **Không bắn event** — cha quyết định |
-| `MapCanvas` | `variant: 'pickup' \| 'route'`, `label?`, `fill?` | 3 page | SVG inline, **không thư viện bản đồ** (`CLAUDE.md` quy tắc 8). `fill` = cao bằng panel, dùng khi nằm trong cột `aside` |
+| `MapCanvas` | `pickup`, `destination?`, `route?`, `label?`, `fill?` | 4 page | Tile OpenStreetMap thật (`<img>`) + tuyến OSRM vẽ bằng SVG phủ lên. **Không thư viện bản đồ** (`CLAUDE.md` quy tắc 8). Bắt buộc có dòng ghi công `© OpenStreetMap` |
 | `Icon` | `name`, `size?`, `className?` | khắp nơi | ~35 icon SVG viết tay. `stroke="currentColor"` nên **không bao giờ phải gõ hex ở chỗ gọi** |
 | `GsmLogo` | `variant`, `size?` | `SideRail` | Một tông cyan — `DESIGN.md` cấm màu accent thứ hai, nên không có vàng như logo thật |
 
-### `MapCanvas` — vì sao toạ độ là hằng số
+### `MapCanvas` — bản đồ thật, không thư viện
 
-Đường phố, khối nhà, sông, nhãn tên phố, POI và vị trí ghim đều hardcode trong file. Không random: bản đồ đổi hình mỗi lần re-render trông như lỗi chứ không như bản đồ. `variant="route"` vẽ polyline gãy khúc theo lưới phố và phủ tooltip `34 phút • 15 km` lấy từ `FIXED_ROUTE`. Cụm zoom và nút re-center là **trang trí** — không có toạ độ thật để zoom hay re-center về.
+Bản trước vẽ lưới phố **bịa** với tuyến hằng số, nên hai chuyến khác hẳn nhau vẫn ra cùng một hình. Giờ: `ResizeObserver` đo khung → chọn zoom vừa khít tuyến → chiếu Web Mercator → xếp lưới `<img>` tile OSM → phủ `<svg>` vẽ polyline và hai ghim.
+
+Cụm `+`/`−` và nút re-center **giờ làm thật** (đổi zoom, đưa khung về vừa khít). Chúng không bắn event vì không đổi lựa chọn nào của người dùng.
+
+Dòng **`© OpenStreetMap` là bắt buộc** theo điều khoản dùng tile.
 
 ### `BackButton` — chỗ dễ nhầm khi đọc code
 
@@ -266,7 +271,9 @@ Phần còn lại của hành trình (từ `:4000` trở đi) → `be-structure.
 
 FE dùng shared cho hai việc, không hơn:
 
-**Dữ liệu tĩnh để render** — `ADDRESSES`, `VEHICLES`, `PROMOS`, `OFFERS`, `FOOD_ITEMS`, `SHIPPING_FEE`, `FIXED_PICKUP`, `FIXED_ROUTE`, và các hàm `getAddress` / `getVehicle` / `getPromo` / `getOffer` / `getFoodItem`.
+**Dữ liệu tĩnh để render** — `ADDRESSES`, `VEHICLES`, `PROMOS`, `OFFERS`, `FOOD_ITEMS`, `SHIPPING_FEE`, `FIXED_PICKUP` / `DEFAULT_PICKUP`, `PRESET_PLACES`, và các hàm `getAddress` / `getVehicle` / `getPromo` / `getOffer` / `getFoodItem`.
+
+**Tính toán dùng chung** — `calcFare` (giá theo km), `calcRideTotals`, `calcFoodTotals`, `calcDiscount`, `haversineKm`, `straightRoute`, `roundKm`.
 
 **Tính tiền** — `calcDiscount`, `isRuleAvailable`, `calcRideTotals`, `calcFoodTotals`. Màn confirm hiển thị số tiền và event `confirm_ride` / `place_order` ghi số tiền, **cùng một hàm** — nên hai chỗ không thể lệch nhau.
 
@@ -284,9 +291,9 @@ FE dùng shared cho hai việc, không hơn:
 | `/food/offer` | `OFFERS`, `calcDiscount`, `calcFoodTotals`, `getFoodItem`, `isRuleAvailable` |
 | `/food/confirm` · `/food/success` | `calcFoodTotals`, `getFoodItem`, `getOffer` |
 
-Ngoài page: `lib/track.ts` nhập `SCREENS` và `ADD_TO_CART_STEP_INDEX`; `components/MapCanvas.tsx` nhập `FIXED_ROUTE`. Nội dung thật của các hằng số này ở `mock-data.md` và `event-taxonomy.md`.
+Ngoài page: `lib/track.ts` nhập `SCREENS` và `ADD_TO_CART_STEP_INDEX`; `lib/use-route.ts` nhập `straightRoute`. Nội dung thật của các hằng số này ở `mock-data.md` và `event-taxonomy.md`.
 
-`FIXED_PICKUP` và `FIXED_ROUTE` chỉ để hiển thị — **không** đi vào event, vì hằng số thì mọi document đều giống nhau (`ride-flow-design.md` mục 5.2).
+`FIXED_ROUTE` **đã bị xoá**: quãng đường giờ lấy từ `GET /api/route` nên biến thiên và đi vào event (`distance_km`, `duration_min`, `route_source`). `FIXED_PICKUP` cũng không còn là hằng số — nó là điểm đón **mặc định**, đổi được ở Màn 2 (`ride-flow-design.md` mục 5.2).
 
 ---
 

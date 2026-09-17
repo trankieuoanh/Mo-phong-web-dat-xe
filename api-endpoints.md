@@ -132,6 +132,34 @@ FE phải **suy biến êm**: hiện cảnh báo nhưng vẫn liệt kê 5 đị
 
 Endpoint này **không chạm Firestore** và **không ghi event nào**: gõ phím không phải một bước funnel.
 
+### 3c. Tìm tuyến đường thật
+```
+GET /api/route?from=21.0369,105.7856&to=21.2189,105.8045
+```
+File: `apps/api/src/routes/route.routes.ts` → `validators/route.validator.ts` → `services/route.service.ts`.
+
+**Response (200):** một `RouteResult` (kiểu ở `packages/shared/src/route.ts`)
+```json
+{ "distanceKm": 28.4, "durationMin": 38, "source": "osrm",
+  "geometry": [[21.0369,105.7856], [21.0371,105.7859], "…vài trăm điểm…"] }
+```
+
+| Param | Kiểu | Bắt buộc |
+|---|---|---|
+| `from` | `"lat,lon"` — lat ∈ [-90,90], lon ∈ [-180,180] | ✅ |
+| `to` | như trên | ✅ |
+
+Nguồn: [OSRM](https://project-osrm.org/) `router.project-osrm.org`, hồ sơ `driving`. Miễn phí, không API key. Proxy qua `apps/api` vì cùng ba lý do với `/api/places`: đặt được `User-Agent`, giữ được hàng đợi, và cache dùng chung — `service` dùng lại **đúng cơ chế** đã viết trong `place.service.ts`.
+
+**Lỗi (502)** khi OSRM rớt / quá thời gian chờ:
+```json
+{ "error": "Không tính được tuyến đường lúc này (upstream 429)" }
+```
+
+> **`router.project-osrm.org` là máy chủ demo công cộng, không cam kết uptime.** Vì vậy FE **bắt buộc có đường lui**: gặp 502 thì gọi `straightRoute()` trong `@gsm/shared` — nối thẳng hai điểm, quãng đường theo công thức haversine — rồi ghi `route_source: "straight"` vào event. Luồng đặt xe **không bao giờ bị chặn** vì một dịch vụ bên ngoài, và dữ liệu vẫn nói thật về việc con số đến từ đâu.
+
+Endpoint này **không chạm Firestore** và **không ghi event nào**.
+
 ### 4. Health check
 ```
 GET /api/health

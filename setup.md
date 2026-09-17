@@ -130,7 +130,19 @@ File `apps/api/.env.example` đã commit sẵn với giá trị trống, để n
 
 **`NOMINATIM_CONTACT`** phục vụ endpoint `GET /api/places` (tìm địa chỉ thật). [Điều khoản dùng Nominatim](https://operations.osmfoundation.org/policies/nominatim/) bắt buộc mỗi request mang `User-Agent` định danh ứng dụng kèm cách liên hệ; thiếu nó thì OSM có quyền chặn IP. Đây cũng là lý do endpoint này phải nằm ở `apps/api` chứ không gọi thẳng từ trình duyệt — **trình duyệt không cho JavaScript đặt header `User-Agent`**.
 
-Không cần API key: Nominatim miễn phí. Đổi lại nó giới hạn **1 request/giây**, nên `place.service.ts` giữ hàng đợi và cache; xem `api-endpoints.md` mục 3b.
+Không cần API key: Nominatim miễn phí. Đổi lại nó giới hạn **1 request/giây**, nên hàng đợi và cache nằm ở `apps/api/src/services/upstream.ts`; xem `api-endpoints.md` mục 3b.
+
+### Ba dịch vụ ngoài mà app gọi
+
+| Dịch vụ | Dùng cho | API key | Khi nó chết |
+|---|---|---|---|
+| **Nominatim** (`nominatim.openstreetmap.org`) | `GET /api/places` — tìm địa chỉ | không | Panel hiện cảnh báo, vẫn liệt kê 5 địa chỉ gợi ý |
+| **OSRM** (`router.project-osrm.org`) | `GET /api/route` — tuyến đường | không | Dùng đường nối thẳng, ghi `route_source: "straight"` |
+| **Tile OSM** (`tile.openstreetmap.org`) | Nền bản đồ trong `MapCanvas` | không | Bản đồ trắng, tuyến và ghim vẫn vẽ |
+
+Cả ba là **hạ tầng cộng đồng miễn phí**, chỉ hợp cho demo cục bộ. `api-endpoints.md` đã chốt không deploy công khai trước khi sinh xong dữ liệu — điều đó giờ còn thêm một lý do nữa.
+
+Không có mạng thì app **vẫn chạy hết luồng**: chỉ mất bản đồ nền và độ chính xác của quãng đường.
 
 **Ba lỗi kinh điển với `FIREBASE_PRIVATE_KEY`:**
 1. Phải **có dấu nháy kép** bao quanh — key chứa ký tự xuống dòng.

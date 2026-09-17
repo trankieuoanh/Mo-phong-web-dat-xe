@@ -54,9 +54,10 @@ Không có test tự động — `techstack.md` đã chốt là kiểm thử b�
 5. **Không đổi `id` trong `mock-data.md`** (`addr-home`, `banh-mi-01`, `veh-bike`…). Chúng đi thẳng vào `properties` của event; đổi id làm dữ liệu cũ và mới không ghép được.
 6. **Thêm event mới phải cập nhật `event-taxonomy.md` trước khi code**, kèm `packages/shared/src/types.ts` (union + mảng `EVENT_NAMES`) và `packages/shared/src/screens.ts` nếu là màn mới.
 7. **Không tự gõ `step_index` trong page.** `trackEvent` tra bảng `SCREENS` ở `packages/shared/src/screens.ts`. Chỉ hai ngoại lệ được truyền tay: `add_to_cart` (luôn = 3, dùng helper `trackAddToCart`) và `flow` của `select_flow` ở màn Home.
-8. **Không thêm thư viện** ngoài những gì `techstack.md` đã chốt: Next.js, React, Tailwind (FE); Express, cors, firebase-admin, tsx (BE); concurrently (root, devDependency). Không Redux/Zustand (dùng Context), không axios (dùng `fetch`), không thư viện UI component, **không thư viện icon** (dùng `apps/web/components/Icon.tsx`), **không thư viện bản đồ** (dùng `MapCanvas.tsx`).
+8. **Không thêm thư viện** ngoài những gì `techstack.md` đã chốt: Next.js, React, Tailwind (FE); Express, cors, firebase-admin, tsx (BE); concurrently (root, devDependency). Không Redux/Zustand (dùng Context), không axios (dùng `fetch`), không thư viện UI component, **không thư viện icon** (dùng `apps/web/components/Icon.tsx`), **không thư viện bản đồ** — `MapCanvas.tsx` render tile OpenStreetMap bằng thẻ `<img>` và gọi OSRM bằng `fetch`, nên không cần Leaflet.
 9. **`/history` không được gọi `useScreenView` hay `trackEvent`.** Route này cố ý nằm ngoài funnel, không có trong `SCREENS`, và chỉ ĐỌC lại event đã có. Thêm event vào đó là làm bẩn mọi tỉ lệ conversion. Kiểm tra: `grep -rn "trackEvent(\|useScreenView(" apps/web/app/history` → phải rỗng.
-10. **Không thêm màn đăng nhập.** Dự án không có authentication — quyết định có chủ ý, xem `api-endpoints.md`. `UserMenu` ở top bar là trang trí hoàn toàn.
+10. **Bản đồ phải giữ dòng ghi công `© OpenStreetMap`.** Điều khoản dùng tile yêu cầu, không phải chi tiết thẩm mỹ. Kiểm tra: `grep -n "OpenStreetMap" apps/web/components/MapCanvas.tsx`.
+11. **Không thêm màn đăng nhập.** Dự án không có authentication — quyết định có chủ ý, xem `api-endpoints.md`. `UserMenu` ở top bar là trang trí hoàn toàn.
 
 ## Cấu trúc thư mục — monorepo npm workspaces
 
@@ -78,6 +79,7 @@ apps/web/                 Next.js 15 — CHỈ FE, cổng 3000
     track.ts              trackEvent + trackAddToCart + useScreenView
     app-context.tsx       state ride + cart
     use-place-search.ts   hook goi GET /api/places (debounce 400ms + abort)
+    use-route.ts          hook goi GET /api/route + duong lui straightRoute
     format.ts             formatVnd
   components/             ScreenShell, Panel, PrimaryButton, BackButton, FlowGuard,
                           MapCanvas, PlacePicker, Icon, GsmLogo
@@ -86,11 +88,14 @@ apps/web/                 Next.js 15 — CHỈ FE, cổng 3000
 
 apps/api/                 Express + tsx — CHỈ BE, cổng 4000
   src/server.ts           express + cors + json
-  src/routes/             events.routes.ts, health.routes.ts, places.routes.ts
+  src/routes/             events.routes.ts, health.routes.ts,
+                          places.routes.ts, route.routes.ts
   src/validators/         event.validator.ts  ← whitelist 8 field
-                          place.validator.ts
+                          place.validator.ts, route.validator.ts
   src/services/           event.service.ts    ← platform + serverTimestamp
-                          place.service.ts    ← Nominatim: User-Agent + 1 req/s + cache
+                          place.service.ts    ← Nominatim (địa chỉ)
+                          route.service.ts    ← OSRM (tuyến đường)
+                          upstream.ts         ← hàng đợi + cache dùng chung
   src/db/firebase-admin.ts
   .env                    credential Firebase (gitignored)
 
@@ -99,7 +104,9 @@ packages/shared/src/      @gsm/shared — dùng chung web + api, KHÔNG có bư�
   screens.ts              SCREENS — bảng route/step_index/flow
   mock-data.ts            dữ liệu tĩnh
   places.ts               Place, PlaceSource, DEFAULT_PICKUP, PRESET_PLACES
-  pricing.ts              calcDiscount, calcRideTotals, calcFoodTotals
+  route.ts                RouteResult, haversineKm, straightRoute
+  pricing.ts              calcFare (giá theo km), calcDiscount, calcRideTotals,
+                          calcFoodTotals
 
 analysis/                 Python — KHÔNG phải npm workspace
 ```

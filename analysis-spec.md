@@ -86,11 +86,19 @@ Chỉ số này trả lời câu hỏi UX cụ thể: **màn nào khiến ngư�
 | `address_popularity` | `prop_address_id` trong `select_address` — đây là **điểm đến** phổ biến. Chỉ gom nhóm được trong phạm vi `address_source == 'preset'` (5 giá trị `addr-*`); nhánh `'search'` có tập id mở nên xếp hạng theo `prop_address_label` thay vì id |
 | `search_usage_rate` | tỉ lệ `select_address` có `prop_address_source == 'search'` — **người dùng có thực sự cần ô tìm không**, hay 5 gợi ý đã đủ |
 | `pickup_change_rate` | tỉ lệ `confirm_pickup` có `prop_pickup_id != 'pickup-current'` — tỉ lệ người đổi khỏi điểm đón do GPS đề xuất |
+| `avg_distance_km` | trung bình `prop_distance_km` trong `confirm_ride`. **Lọc `prop_route_source == 'osrm'` trước** — xem cảnh báo bên dưới |
+| `abandon_rate_by_distance` | chia `prop_distance_km` của `select_vehicle` thành khoảng (0–5, 5–15, >15 km) rồi tính tỉ lệ session **không** có `confirm_ride` trong từng khoảng. Trả lời: *chuyến càng xa (càng đắt) thì càng dễ bỏ dở?* |
+| `route_fallback_rate` | tỉ lệ `confirm_ride` có `prop_route_source == 'straight'` — **chỉ số sức khoẻ hạ tầng, không phải hành vi người dùng**. Cao nghĩa là OSRM hay chết trong đợt thu thập, và mọi số liệu quãng đường của đợt đó kém tin cậy |
 | `promo_usage` vs `skip_rate` | `select_promo` so với `skip_promo` |
 | `top_items` | `prop_item_id` trong `add_to_cart`, cộng theo `prop_quantity` |
 | `avg_cart_size` / `avg_cart_total` | `prop_cart_size` / `prop_cart_total` trong `proceed_to_offer` |
 | `offer_usage` vs `skip_rate` | `select_offer` so với `skip_offer` |
 | `avg_discount` | trung bình `prop_discount_amount` của các đơn hoàn thành |
+
+> **Hai cảnh báo khi dùng `prop_base_price` và `prop_distance_km`:**
+>
+> 1. **`base_price` không còn so sánh trực tiếp được giữa các session.** Nó từng là giá cố định của hạng xe; giờ nó là hàm của (hạng xe, quãng đường). Muốn so giá thì phải chuẩn hoá — ví dụ `base_price / distance_km` — hoặc chỉ so trong cùng một khoảng quãng đường.
+> 2. **`distance_km` trộn hai loại nếu không lọc `route_source`.** `'osrm'` là quãng đường đường bộ thật; `'straight'` là đường chim bay, luôn ngắn hơn đáng kể. Gộp chung sẽ kéo trung bình xuống một cách vô hình.
 
 ## Nhóm 6 — Replay một phiên
 

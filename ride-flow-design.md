@@ -156,7 +156,7 @@ Nút re-center GPS và dòng "bán kính 10 m" là trang trí — không có to�
 | Sheet · điều hướng | "Hẹn giờ" · "GreenNow" | `category-button` | — *(trang trí)* |
 | Footer | "Tiếp tục" | `button-primary` | — *(chỉ điều hướng)* |
 
-**Một dòng xe** gồm: icon (🛵 cho `bike`, 🚗 cho `car`) · `name` (`.t-body-md-strong`) · `description` (`.t-body-sm text-body`) · "Đón trong N phút · M chỗ" (`.t-caption text-mute`) · `basePrice` (`.t-body-md-strong`, format `formatVnd`). Dòng đang chọn: `ring-2 ring-primary`.
+**Một dòng xe** gồm: icon (`bike`/`car` từ `components/Icon.tsx`) · `name` (`.t-body-md-strong`) · `description` (`.t-body-sm text-body`) · "Đón trong N phút · M chỗ" (`.t-caption text-mute`) · **giá của chuyến này** = `calcFare(vehicle, route.distanceKm)` (`.t-body-md-strong`, format `formatVnd`). Dòng đang chọn: `ring-2 ring-primary`.
 
 Nút "Ưu đãi" và nút "Tiếp tục" **đều điều hướng sang `/ride/promo`** — spec có nút Ưu đãi riêng, giữ cả hai cho giống, nhưng không bắn event cho việc điều hướng (`screen_view` của màn sau đã ghi nhận).
 
@@ -208,7 +208,7 @@ Dùng **lại đúng khung của Màn 3** (bản đồ + bottom sheet) để ng�
 | Sheet · tổng | "Tổng cộng" + `finalPrice` | `.t-display-sm` | — |
 | Footer | "Đặt xe" | `button-primary` | `confirm_ride` |
 
-Số tiền lấy từ `calcRideTotals(vehicle.basePrice, promo)` — **cùng một hàm** với lúc ghi event, nên số trên màn và số trong dữ liệu không thể lệch nhau.
+Số tiền lấy từ `calcRideTotals(calcFare(vehicle, route.distanceKm), promo)` — **cùng một hàm** với lúc ghi event, nên số trên màn và số trong dữ liệu không thể lệch nhau. Tuyến đường được lấy **một lần** ở Màn 2 rồi cất vào `RideDraft.route`; hai lần fetch có thể ra hai quãng đường hơi khác nhau và làm hỏng chính điều đó.
 
 `confirm_ride` mang `{ address_id, vehicle_id, vehicle_type, promo_id|null, base_price, discount_amount, final_price, payment_method }`.
 
@@ -226,77 +226,93 @@ Vẫn phải **chụp tóm tắt vào `useState` trước khi gọi `clearRide()
 
 ---
 
-## 4. `MapCanvas` — bản đồ giả lập
+## 4. `MapCanvas` — bản đồ thật
 
-`apps/web/components/MapCanvas.tsx`. SVG inline, **không ảnh, không thư viện** (`CLAUDE.md` quy tắc 8). Màu lấy từ `var(--color-*)` đã khai trong `globals.css`.
+Bản trước vẽ một lưới phố **bịa** với tuyến đường hằng số, nên hai chuyến đi khác hẳn nhau vẫn ra cùng một hình. Giờ cả nền lẫn tuyến đều theo toạ độ thật.
 
+```ts
+interface MapCanvasProps {
+  pickup: Place;
+  destination?: Place;      // không có = chỉ ghim điểm đón
+  route?: RouteResult | null;
+  label?: string;
+  fill?: boolean;           // cao bằng panel khi nằm ở cột `aside`
+}
 ```
-Props: { variant: 'pickup' | 'route' }
-```
 
-Khung ngoài: `aspect-[4/3] w-full rounded-xl bg-canvas-soft overflow-hidden`, `<svg viewBox="0 0 320 240">`.
+**Vẫn không dùng thư viện bản đồ** (`CLAUDE.md` quy tắc 8). Một bản đồ tĩnh chỉ cần chiếu Web Mercator và xếp một lưới thẻ `<img>`:
 
-**Lớp nền (cả hai variant)** — 5–6 `<path>` kẻ ngang/dọc giả đường phố, `stroke="var(--color-hairline-mid)"`, `stroke-width="6"`, `opacity="0.12"`, thêm vài đoạn mảnh hơn làm ngõ. Cố định trong code, không random — bản đồ nhảy múa mỗi lần render thì trông như lỗi.
+1. `ResizeObserver` đo khung.
+2. Chọn zoom lớn nhất mà toàn bộ tuyến vẫn lọt, chừa lề 12%.
+3. `x = (lon+180)/360 · 256·2^z`, `y = (1 − ln(tan φ + sec φ)/π)/2 · 256·2^z`.
+4. Xếp `<img src="https://tile.openstreetmap.org/{z}/{x}/{y}.png">` định vị tuyệt đối.
+5. Phủ `<svg>`: polyline tuyến (viền trắng dưới, `primary-dark` trên — để nổi trên nền tile nhiều màu) + hai ghim.
 
-**`variant="pickup"`** — một ghim ở tâm: `<circle r="8" fill="var(--color-primary)">` lồng trong `<circle r="22" fill="var(--color-primary)" opacity="0.18">` làm vòng bán kính.
+**Dòng `© OpenStreetMap` là bắt buộc** — điều khoản dùng tile yêu cầu, không phải chi tiết thẩm mỹ.
 
-**`variant="route"`** — `<polyline>` gãy khúc nối hai điểm, `stroke="var(--color-primary-dark)"`, `stroke-width="4"`, `stroke-linecap="round"`, `fill="none"`; ghim đón `fill="var(--color-primary)"`, ghim đến `fill="var(--color-ink)"`. Tooltip `34 phút • 15 km` là một `div` phủ lên góc trên, `bg-canvas rounded-pill px-lg py-sm .t-body-sm-strong shadow-level-2`.
+Cụm `+`/`−` và nút re-center **giờ làm thật** (đổi zoom, đưa khung về vừa khít tuyến). Chúng không bắn event vì không đổi bất kỳ lựa chọn nào của người dùng — khác với một nút bấm được mà không làm gì, thứ mục 8 gọi là khoảng mù.
 
-`aria-hidden="true"` cho cả SVG — nó không mang thông tin nào mà text xung quanh chưa nói.
+Màu: tile là ảnh bên ngoài, không phải token. Mọi thứ **ta vẽ** vẫn chỉ dùng token trong `globals.css`.
 
----
 
 ## 5. Mock data
 
-### 5.1 Sáu hạng xe
+### 5.1 Sáu hạng xe — giá tính theo km
 
 Thay bảng ở `mock-data.md` §2. Giữ `veh-bike` và `veh-car` (`CLAUDE.md` quy tắc 5), thêm 4 `id` mới. `type` vẫn chỉ `'bike' | 'car'` nên `vehicle_type` trong event không đổi kiểu.
 
-| `id` | `type` | `name` | `description` | `basePrice` | `etaMinutes` | `seats` |
-|---|---|---|---|---:|:--:|:--:|
-| `veh-bike` | `bike` | Green Bike | Xe máy điện, nhanh và tiết kiệm | 58000 | 2 | 1 |
-| `veh-bike-plus` | `bike` | Green Bike Plus | Xe máy điện đời mới, tài xế kinh nghiệm | 72000 | 3 | 1 |
-| `veh-mini` | `car` | Green Mini | Xe điện 3 chỗ, giá tốt nhất | 145000 | 3 | 3 |
-| `veh-car` | `car` | Green Car | Xe điện 4 chỗ, êm và mát | 149000 | 3 | 4 |
-| `veh-premium` | `car` | Green Premium | Xe điện hạng sang 4 chỗ | 161000 | 3 | 4 |
-| `veh-limo` | `car` | Green Limo | Xe điện 6 chỗ, rộng rãi cho nhóm | 194000 | 4 | 6 |
+**`basePrice` đã bị xoá.** Giá không còn là thuộc tính của hạng xe mà là hàm của (hạng xe, quãng đường):
+
+```
+base_price = round((openingFare + max(0, distance_km − 2) × pricePerKm) / 1000) × 1000
+```
+
+| `id` | `type` | `name` | `openingFare` | `pricePerKm` | `etaMinutes` | `seats` | 15 km ra |
+|---|---|---|---:|---:|:--:|:--:|---:|
+| `veh-bike` | `bike` | Green Bike | 15000 | 3300 | 2 | 1 | 58.000 |
+| `veh-bike-plus` | `bike` | Green Bike Plus | 20000 | 4000 | 3 | 1 | 72.000 |
+| `veh-mini` | `car` | Green Mini | 28000 | 9000 | 3 | 3 | 145.000 |
+| `veh-car` | `car` | Green Car | 32000 | 9000 | 3 | 4 | 149.000 |
+| `veh-premium` | `car` | Green Premium | 35000 | 9700 | 3 | 4 | 161.000 |
+| `veh-limo` | `car` | Green Limo | 46000 | 11400 | 4 | 6 | 194.000 |
 
 Ba điều phải biết trước khi áp dụng bảng này:
 
-1. **Giá `veh-bike` và `veh-car` đổi** — 25.000 → 58.000 và 75.000 → 149.000, để cùng thang với bốn hạng theo spec (tất cả cho cùng một chuyến 15 km). `id` giữ nguyên nên ghép dữ liệu theo `vehicle_id` vẫn được, nhưng `base_price` của phiên cũ và phiên mới **không so sánh trực tiếp được**. Hiện chưa sinh dữ liệu thật nên đây là thời điểm rẻ nhất để đổi.
-2. **58.000 và 72.000 là hai con số duy nhất không lấy từ spec** — bản hướng dẫn chỉ chụp được bốn hạng ô tô. Cần xác nhận.
-3. **`mock-data.md` §2 hiện ghi "Không thêm hạng xe khác — mỗi lựa chọn thêm sẽ làm loãng mẫu funnel".** Ghi chú đó bị ghi đè có chủ ý. Đổi lại: phân tích lựa chọn xe theo **`vehicle_type`** (2 nhóm bike/car) thay vì theo từng `vehicle_id`. Với 30 session ride thì 2 nhóm còn nói được điều gì đó, 6 nhóm thì không. Vẫn giữ `vehicle_id` trong event để sau này nhiều dữ liệu hơn thì bóc tách được.
+1. **Hệ số được chọn để một chuyến 15 km ra đúng giá cố định cũ** — cột cuối. 15 km là quãng đường của `FIXED_ROUTE` đã xoá, nên mọi ảnh chụp màn hình và ghi chép demo từ trước vẫn khớp; chỉ **cách tính** đổi, không phải **thang giá**.
+2. **`base_price` chỉ đọc được khi có `distance_km` đi kèm.** Đó là lý do `select_vehicle` mang thêm `distance_km` — người bỏ dở ở bước chọn xe không bao giờ sinh ra `confirm_ride`.
+3. **Phân tích lựa chọn xe theo `vehicle_type`** (2 nhóm bike/car) thay vì theo từng `vehicle_id`. Với 30 session ride thì 2 nhóm còn nói được điều gì đó, 6 nhóm thì không. Vẫn giữ `vehicle_id` trong event để sau này nhiều dữ liệu hơn thì bóc tách được.
 
-### 5.2 Hằng số điểm đón và tuyến đường
+### 5.2 Điểm đón mặc định — và `FIXED_ROUTE` đã bị xoá
 
 ```ts
 export const FIXED_PICKUP = {
+  id: 'pickup-current',
   label: 'Vị trí hiện tại',
   address: '128 Xuân Thủy, Cầu Giấy, Hà Nội',
+  lat: 21.0369,
+  lon: 105.7856,
 };
-
-export const FIXED_ROUTE = { distanceKm: 15, durationMin: 34 };
 ```
 
-`FIXED_PICKUP` thay cho `FIXED_DESTINATION` ở bản trước — xem khối giải thích ở Màn 1.
+Đây là **giá trị khởi tạo**, không còn là hằng số bất biến: Màn 2 có ô tìm điểm đón, và `confirm_pickup` ghi lại `pickup_id` / `pickup_label` / `pickup_source`.
 
-`FIXED_ROUTE` chỉ để hiển thị "34 phút • 15 km" ở Màn 3 và Màn 5.
+**`FIXED_ROUTE = { distanceKm: 15, durationMin: 34 }` đã bị xoá.** Quãng đường và thời gian giờ lấy từ `GET /api/route` (OSRM) theo đúng hai điểm người dùng chọn, nên chúng biến thiên và **đi vào event**: `confirm_ride` mang `distance_km`, `duration_min`, `route_source`.
 
-Cả hai **không đi vào event**: hằng số thì mọi document đều giống nhau, ghi vào chỉ tốn chỗ mà không phân biệt được session nào với session nào.
+`route_source` là `'osrm'` hoặc `'straight'`. Bắt buộc phải có: đường chim bay luôn ngắn hơn đường bộ đáng kể — đo thực tế Cầu Giấy → Nội Bài là **20,3 km** so với **25 km** đường thật — nên trộn hai loại sẽ kéo mọi thống kê quãng đường xuống một cách vô hình.
 
-### 5.3 Khoảng cách trong `Address`
+### 5.3 Toạ độ trong `Address`
 
-Thêm `distanceKm: number` vào interface `Address` — khoảng cách từ `FIXED_PICKUP` tới điểm đến đó, hiển thị ở Màn 1. Cũng **không đi vào event**.
+`distanceKm` đã bị xoá, thay bằng `lat` / `lon` **bắt buộc**:
 
-| `id` | `distanceKm` |
-|---|---:|
-| `addr-home` | 1.3 |
-| `addr-office` | 3.8 |
-| `addr-mall` | 4.6 |
-| `addr-school` | 15.2 |
-| `addr-airport` | 27.5 |
+| `id` | `lat` | `lon` | cách điểm đón (haversine) |
+|---|---:|---:|---:|
+| `addr-home` | 21.0052 | 105.7989 | 3.8 km |
+| `addr-office` | 21.0174 | 105.7836 | 2.2 km |
+| `addr-mall` | 21.0023 | 105.8160 | 5.0 km |
+| `addr-school` | 20.9886 | 105.9460 | 17.5 km |
+| `addr-airport` | 21.2189 | 105.8045 | 20.3 km |
 
-Danh sách ở Màn 1 sắp xếp theo `distanceKm` tăng dần, giống app thật.
+Khoảng cách hiển thị ở Màn 1 **tính tại chỗ** bằng `haversineKm()` từ điểm đón hiện tại. Trường hardcode cũ là khoảng cách tới điểm đón **cũ**, nên từ khi điểm đón đổi được nó bảo đảm có lúc hiện sai.
 
 ---
 
@@ -360,7 +376,9 @@ Ngoại lệ duy nhất: **ô tìm kiếm ở Màn 1** có lọc được danh s
 
 - **Không thêm màn chọn điểm đón riêng.** Điểm đón là hằng số `FIXED_PICKUP`, xác nhận ngay tại Màn 2. Thêm một màn nữa là đánh số lại toàn bộ `step_index`, làm dữ liệu cũ và mới không ghép được (`CLAUDE.md` quy tắc 6).
 - **Không thêm `EventName` mới.** Toàn bộ spec đã nằm gọn trong 19 event.
-- **Không dùng bản đồ thật (Leaflet / Google Maps).** Phá `CLAUDE.md` quy tắc 8, cần API key, và không thêm được gì cho phân tích funnel.
+- ~~**Không dùng bản đồ thật.**~~ Không còn áp dụng: `MapCanvas` giờ render tile OpenStreetMap thật và tuyến đường thật từ OSRM. Vẫn **không thêm thư viện bản đồ** — tile là thẻ `<img>`, tuyến là `fetch`, nên `CLAUDE.md` quy tắc 8 không bị phá. Xem mục 4.
+- **Không cho kéo/pan bản đồ.** Zoom và re-center là đủ; kéo thả cần quản lý trạng thái con trỏ và tải tile động — nhiều code cho thứ không ai dùng trong một luồng 6 bước.
+- **Không định tuyến nhiều chặng, không giao thông thời gian thực.**
 - **Không thêm màn thất bại.** App mô phỏng luôn thành công (`screen-map.md` §5).
 - ~~**Không đổi `max-width` xuống 430px.**~~ Không còn áp dụng: `screen-map.md` §6 đã chuyển sang desktop-first theo `apps/web/sample_ui/`. Panel trái của bố cục `split` rộng 480px; bố cục `wide` đặt bề ngang qua prop `maxWidth`.
 
@@ -404,4 +422,4 @@ grep -r "firebase-admin\|NEXT_PUBLIC_" apps/web/   # phải rỗng
 npm run typecheck && npm run lint && npm run build
 ```
 
-**Thứ tự code đề xuất:** `MapCanvas.tsx` → `mock-data.ts` (6 xe + `FIXED_ROUTE` + `distanceKm`) → `app-context.tsx` (2 trường) → Màn 1 → 2 → 3 → 4 → 5. Mỗi màn xong thì click kiểm `screen_view` đúng một lần trước khi sang màn sau.
+**Thứ tự code đề xuất:** `mock-data.ts` (toạ độ + bảng giá theo km) → `route.ts` + `pricing.ts` → BE `/api/route` → `MapCanvas.tsx` → `app-context.tsx` → Màn 1 → 2 → 3 → 4 → 5. Mỗi màn xong thì click kiểm `screen_view` đúng một lần trước khi sang màn sau.

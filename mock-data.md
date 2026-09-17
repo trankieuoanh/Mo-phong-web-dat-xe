@@ -23,19 +23,22 @@ export interface Address {
   label: string;      // tên ngắn hiển thị đậm
   address: string;    // địa chỉ đầy đủ hiển thị mờ bên dưới
   icon: 'home' | 'work' | 'school' | 'plane' | 'shop';
-  distanceKm: number;   // chỉ để hiển thị, KHÔNG vào event
+  lat: number;        // BẮT BUỘC — dùng để vẽ bản đồ và tính tuyến đường
+  lon: number;
 }
 ```
 
-Sắp xếp theo `distanceKm` tăng dần — giống app thật.
+| `id` | `label` | `address` | `icon` | `lat` | `lon` |
+|---|---|---|---|--:|--:|
+| `addr-home` | Nhà | Số 12, ngõ 34 Trần Duy Hưng, Cầu Giấy, Hà Nội | `home` | 21.0052 | 105.7989 |
+| `addr-office` | Công ty | Landmark 72, Phạm Hùng, Nam Từ Liêm, Hà Nội | `work` | 21.0174 | 105.7836 |
+| `addr-mall` | Trung tâm thương mại | Vincom Mega Mall Royal City, Thanh Xuân, Hà Nội | `shop` | 21.0023 | 105.8160 |
+| `addr-school` | Trường | VinUniversity, Ocean Park, Gia Lâm, Hà Nội | `school` | 20.9886 | 105.9460 |
+| `addr-airport` | Sân bay | Sân bay Quốc tế Nội Bài, Sóc Sơn, Hà Nội | `plane` | 21.2189 | 105.8045 |
 
-| `id` | `label` | `address` | `icon` | `distanceKm` |
-|---|---|---|---|---:|
-| `addr-home` | Nhà | Số 12, ngõ 34 Trần Duy Hưng, Cầu Giấy, Hà Nội | `home` | 1.3 |
-| `addr-office` | Công ty | Keangnam Landmark 72, Phạm Hùng, Nam Từ Liêm, Hà Nội | `work` | 3.8 |
-| `addr-mall` | Trung tâm thương mại | Vincom Mega Mall Royal City, Thanh Xuân, Hà Nội | `shop` | 4.6 |
-| `addr-school` | Trường | VinUniversity, Ocean Park, Gia Lâm, Hà Nội | `school` | 15.2 |
-| `addr-airport` | Sân bay | Sân bay Quốc tế Nội Bài, Sóc Sơn, Hà Nội | `plane` | 27.5 |
+Toạ độ tra từ chính Nominatim — cùng nguồn với địa chỉ người dùng tự tìm, nên hai nhánh `preset` và `search` nằm trên cùng một hệ quy chiếu.
+
+> **`distanceKm` đã bị xoá.** Nó là khoảng cách hardcode tới điểm đón **cũ** (`1.3`, `3.8`, … `27.5`). Từ khi điểm đón đổi được và tuyến đường tính thật, để lại trường đó là bảo đảm có lúc màn hình hiện "15.2 km" ngay cạnh một tuyến đường 31 km. Khoảng cách gợi ý giờ tính tại chỗ bằng `haversineKm()` từ điểm đón hiện tại — đúng cho cả địa chỉ gợi ý lẫn địa chỉ tự tìm, và không bao giờ lệch khỏi bản đồ.
 
 Bảng trên là danh sách **điểm đến gợi ý** ở màn `address_selection` ("Bạn muốn đi đến đâu?") — hiện khi ô tìm còn trống, dưới tiêu đề "Địa chỉ đã lưu".
 
@@ -52,6 +55,8 @@ export const FIXED_PICKUP = {
   id: 'pickup-current',                            // id ổn định, đi vào properties
   label: 'Vị trí hiện tại',
   address: '128 Xuân Thủy, Cầu Giấy, Hà Nội',
+  lat: 21.0369,
+  lon: 105.7856,
 };
 ```
 
@@ -61,11 +66,7 @@ Tên biến giữ nguyên `FIXED_PICKUP` để không phải sửa mọi chỗ i
 
 Điểm đến giữ tên khoá `address_id` trong `select_address` / `confirm_pickup` / `confirm_ride`; điểm đón dùng bộ khoá riêng `pickup_*`.
 
-Quãng đường của chuyến **vẫn là hằng số**, dùng để hiển thị "34 phút • 15 km" ở màn chọn xe và màn xác nhận, **không** vào event. Nó không đổi theo địa chỉ dù giờ đã có toạ độ thật: tính quãng đường thật cần dịch vụ định tuyến, mà app này không đặt xe thật nên con số đó không thêm gì cho phân tích funnel:
-
-```ts
-export const FIXED_ROUTE = { distanceKm: 15, durationMin: 34 };
-```
+> **`FIXED_ROUTE` đã bị xoá.** Nó từng là hằng số `{ distanceKm: 15, durationMin: 34 }` cấp số liệu cho chip "34 phút • 15 km". Quãng đường và thời gian giờ lấy từ `GET /api/route` (OSRM) theo đúng hai điểm người dùng chọn, nên chúng **biến thiên theo từng chuyến** và **đi vào event** — `confirm_ride` mang `distance_km`, `duration_min`, `route_source`. Xem `event-taxonomy.md`.
 
 ---
 
@@ -77,26 +78,50 @@ export interface Vehicle {
   type: 'bike' | 'car';
   name: string;
   description: string;
-  basePrice: number;   // VNĐ, giá cố định cho chuyến (không tính theo km)
+  openingFare: number;   // VNĐ — giá mở cửa, đã gồm INCLUDED_KM km đầu
+  pricePerKm: number;    // VNĐ mỗi km vượt quá INCLUDED_KM
   etaMinutes: number;
   seats: number;
 }
 ```
 
-| `id` | `type` | `name` | `description` | `basePrice` | `etaMinutes` | `seats` |
-|---|---|---|---|---|---|---|
-| `veh-bike` | `bike` | Green Bike | Xe máy điện, nhanh và tiết kiệm | 58000 | 2 | 1 |
-| `veh-bike-plus` | `bike` | Green Bike Plus | Xe máy điện đời mới, tài xế kinh nghiệm | 72000 | 3 | 1 |
-| `veh-mini` | `car` | Green Mini | Xe điện 3 chỗ, giá tốt nhất | 145000 | 3 | 3 |
-| `veh-car` | `car` | Green Car | Xe điện 4 chỗ, êm và mát | 149000 | 3 | 4 |
-| `veh-premium` | `car` | Green Premium | Xe điện hạng sang 4 chỗ | 161000 | 3 | 4 |
-| `veh-limo` | `car` | Green Limo | Xe điện 6 chỗ, rộng rãi cho nhóm | 194000 | 4 | 6 |
+| `id` | `type` | `name` | `description` | `openingFare` | `pricePerKm` | `etaMinutes` | `seats` |
+|---|---|---|---|--:|--:|--:|--:|
+| `veh-bike` | `bike` | Green Bike | Xe máy điện, nhanh và tiết kiệm | 15000 | 3300 | 2 | 1 |
+| `veh-bike-plus` | `bike` | Green Bike Plus | Xe máy điện đời mới, tài xế kinh nghiệm | 20000 | 4000 | 3 | 1 |
+| `veh-mini` | `car` | Green Mini | Xe điện 3 chỗ, giá tốt nhất | 28000 | 9000 | 3 | 3 |
+| `veh-car` | `car` | Green Car | Xe điện 4 chỗ, êm và mát | 32000 | 9000 | 3 | 4 |
+| `veh-premium` | `car` | Green Premium | Xe điện hạng sang 4 chỗ | 35000 | 9700 | 3 | 4 |
+| `veh-limo` | `car` | Green Limo | Xe điện 6 chỗ, rộng rãi cho nhóm | 46000 | 11400 | 4 | 6 |
 
-> **Sửa đổi so với bản trước** (`ride-flow-design.md` mục 5.1). Bản cũ chỉ có 2 lựa chọn (Xe máy / Ô tô) kèm ghi chú "không thêm hạng xe khác — làm loãng mẫu funnel". Ghi chú đó bị ghi đè có chủ ý để bám sát app GSM thật.
+### Giá tính theo quãng đường
+
+```ts
+export const INCLUDED_KM = 2;   // giá mở cửa đã bao gồm 2 km đầu
+
+export function calcFare(vehicle: Vehicle, distanceKm: number): number {
+  const extra = Math.max(0, distanceKm - INCLUDED_KM);
+  // Làm tròn tới 1.000đ — tiền lẻ tới hàng đơn vị trông như lỗi, không như giá.
+  return Math.round((vehicle.openingFare + extra * vehicle.pricePerKm) / 1000) * 1000;
+}
+```
+
+**Các hệ số được chọn để một chuyến 15 km ra đúng con số `basePrice` cũ.** Không phải trùng hợp — đó là ràng buộc tự đặt khi chuyển sang tính theo km: 15 km là quãng đường của `FIXED_ROUTE` đã xoá, nên mọi ảnh chụp màn hình và ghi chép demo từ trước vẫn khớp, và chỉ có **cách tính** đổi chứ không phải **thang giá**.
+
+| `id` | 15 km ra | `basePrice` cũ |
+|---|--:|--:|
+| `veh-bike` | 57.900 → **58.000** | 58.000 |
+| `veh-bike-plus` | **72.000** | 72.000 |
+| `veh-mini` | **145.000** | 145.000 |
+| `veh-car` | **149.000** | 149.000 |
+| `veh-premium` | 161.100 → **161.000** | 161.000 |
+| `veh-limo` | 194.200 → **194.000** | 194.000 |
+
+> **`basePrice` đã bị xoá khỏi `Vehicle`.** Giá không còn là thuộc tính của hạng xe mà là hàm của (hạng xe, quãng đường). Khoá event `base_price` giữ nguyên tên nhưng đổi nghĩa thành "giá của chuyến này" — xem `event-taxonomy.md` mục `vehicle_selection`.
 >
-> - `veh-bike` và `veh-car` **giữ nguyên `id`** (quy tắc 5), nhưng đổi `name` và `basePrice` để cùng thang giá với 4 hạng còn lại (đều cho cùng một chuyến 15 km). Hệ quả: `base_price` của phiên cũ và phiên mới **không so sánh trực tiếp được**.
-> - Đổi lại cách phân tích: gom theo **`vehicle_type`** (2 nhóm bike/car) thay vì theo từng `vehicle_id` (6 nhóm). Vài chục session mà chia 6 thì mỗi nhóm không còn nói được gì. `vehicle_id` vẫn nằm trong event để sau này nhiều dữ liệu hơn thì bóc tách được.
-> - **58.000 và 72.000 là hai con số duy nhất không lấy từ bản hướng dẫn thiết kế** — ảnh chụp chỉ có 4 hạng ô tô. Cần mentor xác nhận.
+> **Hệ quả cho phân tích:** `base_price` chỉ so sánh được giữa các session khi đã chuẩn hoá theo `distance_km`. Vì vậy `select_vehicle` mang `distance_km` đi kèm.
+
+> **Ghi chú cũ còn giá trị** (`ride-flow-design.md` mục 5.1): `veh-bike` và `veh-car` **giữ nguyên `id`** (quy tắc 5). Phân tích lựa chọn xe nên gom theo **`vehicle_type`** (2 nhóm) thay vì từng `vehicle_id` (6 nhóm) — vài chục session mà chia 6 thì mỗi nhóm không nói được gì.
 
 ---
 
@@ -182,8 +207,10 @@ Cùng interface với `Promo`, áp lên **tiền hàng** (`cart_total`), không 
 
 **Ride** (`ride_confirm`):
 ```
+base_price  = round((openingFare + max(0, distance_km - 2) × pricePerKm) / 1000) × 1000
 final_price = base_price - discount_amount
 ```
+`distance_km` lấy từ `GET /api/route` (OSRM). Khi dịch vụ định tuyến không trả lời, nó là khoảng cách đường chim bay và `route_source` ghi `"straight"` — giá vẫn tính bằng đúng công thức trên, chỉ đầu vào kém chính xác hơn.
 
 **Food** (`food_confirm`):
 ```
