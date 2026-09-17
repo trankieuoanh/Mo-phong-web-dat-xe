@@ -9,3 +9,4 @@ export * from './screens';
 export * from './mock-data';
 export * from './pricing';
 export * from './places';
+export * from './route';

@@ -31,9 +31,15 @@ export interface Place {
   /** Dia chi day du, hien thi mo ben duoi. */
   address: string;
   source: PlaceSource;
-  /** Chi co o nhanh `search` va o diem don mac dinh. Hien chua dung de ve ban do. */
-  lat?: number;
-  lon?: number;
+  /**
+   * BAT BUOC — moi nguon dia chi deu co toa do: 5 goi y va diem don mac dinh
+   * hardcode trong mock-data.ts, con ket qua tim duoc lay tu Nominatim.
+   *
+   * De optional nghia la moi cho ve ban do phai viet mot nhanh "khong co toa
+   * do" khong bao gio chay, va TypeScript khong con bat duoc loi quen gan.
+   */
+  lat: number;
+  lon: number;
 }
 
 /** Dia chi goi y -> Place, de hai nguon dung chung mot hinh dang trong UI. */
@@ -43,6 +49,8 @@ export function presetToPlace(address: Address): Place {
     label: address.label,
     address: address.address,
     source: 'preset',
+    lat: address.lat,
+    lon: address.lon,
   };
 }
 
@@ -58,6 +66,8 @@ export const DEFAULT_PICKUP: Place = {
   label: FIXED_PICKUP.label,
   address: FIXED_PICKUP.address,
   source: 'preset',
+  lat: FIXED_PICKUP.lat,
+  lon: FIXED_PICKUP.lon,
 };
 
 /** true = nguoi dung da doi khoi diem don do GPS de xuat. */

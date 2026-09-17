@@ -25,19 +25,10 @@ export const FIXED_PICKUP = {
   id: 'pickup-current',
   label: 'Vị trí hiện tại',
   address: '128 Xuân Thủy, Cầu Giấy, Hà Nội',
+  lat: 21.0369,
+  lon: 105.7856,
 };
 
-/**
- * Quang duong / thoi gian cua chuyen — HANG SO, chi de hien thi
- * "34 phut • 15 km" o man chon xe va man xac nhan.
- * KHONG ghi vao event: hang so thi moi document deu giong nhau,
- * khong phan biet duoc session nay voi session kia.
- *
- * Van la hang so DU dia chi tim duoc da co lat/lon: tinh quang duong that can
- * mot dich vu dinh tuyen, ma app nay khong dat xe that nen con so do khong them
- * gi cho phan tich funnel. Xem ride-flow-design.md muc 5.2.
- */
-export const FIXED_ROUTE = { distanceKm: 15, durationMin: 34 };
 
 // ─────────────────────────────────────────────────────────────
 // 1. Dia chi — luong Ride, man `address_selection`
@@ -53,46 +44,63 @@ export interface Address {
   /** Dia chi day du, hien thi mo ben duoi. */
   address: string;
   icon: 'home' | 'work' | 'school' | 'plane' | 'shop';
-  /** Khoang cach tu FIXED_PICKUP toi day. Chi de hien thi, KHONG ghi vao event. */
-  distanceKm: number;
+  /**
+   * BAT BUOC. Dung de ve ban do va tinh tuyen duong that.
+   * Toa do tra tu chinh Nominatim — cung nguon voi dia chi nguoi dung tu tim,
+   * nen hai nhanh `preset` va `search` nam tren cung mot he quy chieu.
+   */
+  lat: number;
+  lon: number;
 }
 
-/** Sap xep theo `distanceKm` tang dan — giong app that. */
+/**
+ * Nam dia chi goi y — hien khi o tim con trong.
+ *
+ * Truong `distanceKm` da bi XOA: no la khoang cach hardcode toi diem don CU.
+ * Tu khi diem don doi duoc va tuyen duong tinh that, de lai truong do la bao
+ * dam co luc man hinh hien "15.2 km" ngay canh mot tuyen duong 31 km.
+ * Khoang cach goi y gio tinh tai cho bang haversineKm() tu diem don hien tai.
+ */
 export const ADDRESSES: Address[] = [
   {
     id: 'addr-home',
     label: 'Nhà',
     address: 'Số 12, ngõ 34 Trần Duy Hưng, Cầu Giấy, Hà Nội',
     icon: 'home',
-    distanceKm: 1.3,
+    lat: 21.0052,
+    lon: 105.7989,
   },
   {
     id: 'addr-office',
     label: 'Công ty',
-    address: 'Keangnam Landmark 72, Phạm Hùng, Nam Từ Liêm, Hà Nội',
+    address: 'Landmark 72, Phạm Hùng, Nam Từ Liêm, Hà Nội',
     icon: 'work',
-    distanceKm: 3.8,
+    lat: 21.0174,
+    lon: 105.7836,
   },
   {
     id: 'addr-mall',
     label: 'Trung tâm thương mại',
     address: 'Vincom Mega Mall Royal City, Thanh Xuân, Hà Nội',
     icon: 'shop',
-    distanceKm: 4.6,
+    lat: 21.0023,
+    lon: 105.8160,
   },
   {
     id: 'addr-school',
     label: 'Trường',
     address: 'VinUniversity, Ocean Park, Gia Lâm, Hà Nội',
     icon: 'school',
-    distanceKm: 15.2,
+    lat: 20.9886,
+    lon: 105.9460,
   },
   {
     id: 'addr-airport',
     label: 'Sân bay',
     address: 'Sân bay Quốc tế Nội Bài, Sóc Sơn, Hà Nội',
     icon: 'plane',
-    distanceKm: 27.5,
+    lat: 21.2189,
+    lon: 105.8045,
   },
 ];
 
@@ -107,20 +115,27 @@ export interface Vehicle {
   type: VehicleType;
   name: string;
   description: string;
-  /** VND, gia co dinh cho chuyen — khong tinh theo km. */
-  basePrice: number;
+  /** VND — gia mo cua, DA GOM INCLUDED_KM km dau. */
+  openingFare: number;
+  /** VND cho moi km vuot qua INCLUDED_KM. */
+  pricePerKm: number;
   etaMinutes: number;
   seats: number;
 }
 
 /**
- * Sau hang xe — ride-flow-design.md muc 5.1.
+ * Sau hang xe — mock-data.md muc 2.
  *
- * `veh-bike` va `veh-car` GIU NGUYEN id (CLAUDE.md quy tac 5), nhung doi
- * `name` va `basePrice` de cung thang gia voi bon hang con lai (deu cho
- * cung mot chuyen 15 km). Hau qua: `base_price` cua phien cu va phien moi
- * KHONG so sanh truc tiep duoc — chap nhan duoc vi chua sinh du lieu that.
+ * `basePrice` DA BI XOA: gia khong con la thuoc tinh cua hang xe ma la ham cua
+ * (hang xe, quang duong) — xem calcFare() trong pricing.ts.
  *
+ * Cac he so duoc chon de MOT CHUYEN 15 KM ra dung con so `basePrice` cu
+ * (58.000 / 72.000 / 145.000 / 149.000 / 161.000 / 194.000). Do la rang buoc
+ * tu dat khi chuyen sang tinh theo km: 15 km la quang duong cua FIXED_ROUTE
+ * da xoa, nen moi anh chup man hinh va ghi chep demo tu truoc van khop, va
+ * chi co CACH TINH doi chu khong phai THANG GIA.
+ *
+ * `veh-bike` va `veh-car` GIU NGUYEN id (CLAUDE.md quy tac 5).
  * Phan tich lua chon xe nen gom theo `type` (2 nhom) chu khong theo `id`
  * (6 nhom) — vai chuc session ma chia 6 thi moi nhom khong con noi duoc gi.
  */
@@ -130,7 +145,8 @@ export const VEHICLES: Vehicle[] = [
     type: 'bike',
     name: 'Green Bike',
     description: 'Xe máy điện, nhanh và tiết kiệm',
-    basePrice: 58_000,
+    openingFare: 15_000,
+    pricePerKm: 3_300,
     etaMinutes: 2,
     seats: 1,
   },
@@ -139,7 +155,8 @@ export const VEHICLES: Vehicle[] = [
     type: 'bike',
     name: 'Green Bike Plus',
     description: 'Xe máy điện đời mới, tài xế kinh nghiệm',
-    basePrice: 72_000,
+    openingFare: 20_000,
+    pricePerKm: 4_000,
     etaMinutes: 3,
     seats: 1,
   },
@@ -148,7 +165,8 @@ export const VEHICLES: Vehicle[] = [
     type: 'car',
     name: 'Green Mini',
     description: 'Xe điện 3 chỗ, giá tốt nhất',
-    basePrice: 145_000,
+    openingFare: 28_000,
+    pricePerKm: 9_000,
     etaMinutes: 3,
     seats: 3,
   },
@@ -157,7 +175,8 @@ export const VEHICLES: Vehicle[] = [
     type: 'car',
     name: 'Green Car',
     description: 'Xe điện 4 chỗ, êm và mát',
-    basePrice: 149_000,
+    openingFare: 32_000,
+    pricePerKm: 9_000,
     etaMinutes: 3,
     seats: 4,
   },
@@ -166,7 +185,8 @@ export const VEHICLES: Vehicle[] = [
     type: 'car',
     name: 'Green Premium',
     description: 'Xe điện hạng sang 4 chỗ',
-    basePrice: 161_000,
+    openingFare: 35_000,
+    pricePerKm: 9_700,
     etaMinutes: 3,
     seats: 4,
   },
@@ -175,7 +195,8 @@ export const VEHICLES: Vehicle[] = [
     type: 'car',
     name: 'Green Limo',
     description: 'Xe điện 6 chỗ, rộng rãi cho nhóm',
-    basePrice: 194_000,
+    openingFare: 46_000,
+    pricePerKm: 11_400,
     etaMinutes: 4,
     seats: 6,
   },
