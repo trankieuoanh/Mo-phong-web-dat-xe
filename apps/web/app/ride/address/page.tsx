@@ -14,7 +14,7 @@
  */
 
 import { useRouter } from 'next/navigation';
-import type { Place } from '@gsm/shared';
+import { DEFAULT_PICKUP, type Place } from '@gsm/shared';
 import { BackButton } from '@/components/BackButton';
 import { Icon } from '@/components/Icon';
 import { MapCanvas } from '@/components/MapCanvas';
@@ -27,6 +27,9 @@ export default function AddressPage() {
   useScreenView('address_selection');
   const router = useRouter();
   const { ride, setRide } = useApp();
+
+  // Man nay chua biet diem den, nen ban do chi ghim diem don.
+  const pickup = ride.pickup ?? DEFAULT_PICKUP;
 
   function selectAddress(place: Place) {
     trackEvent({
@@ -50,7 +53,7 @@ export default function AddressPage() {
       variant="split"
       section="Di chuyển"
       tabs={['Đặt xe', 'Đang diễn ra']}
-      aside={<MapCanvas variant="pickup" fill />}
+      aside={<MapCanvas pickup={pickup} label={pickup.label} fill />}
       title="Bạn muốn đi đến đâu?"
       leading={<BackButton from="address_selection" to="home" href="/" />}
       trailing={
@@ -65,6 +68,7 @@ export default function AddressPage() {
         presetHeading="Địa chỉ đã lưu"
         selectedId={ride.destination?.id}
         onPick={selectAddress}
+        origin={pickup}
         leading={
           <Decor className="t-body-sm-strong inline-flex items-center gap-sm rounded-pill bg-canvas-soft px-lg py-sm text-primary-dark">
             <Icon name="target" size={18} /> Sử dụng vị trí hiện tại

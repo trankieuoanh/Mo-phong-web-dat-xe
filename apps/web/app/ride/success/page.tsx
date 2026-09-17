@@ -10,7 +10,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { calcRideTotals, getPromo, getVehicle } from '@gsm/shared';
+import { calcFare, calcRideTotals, getPromo, getVehicle } from '@gsm/shared';
 import { Icon } from '@/components/Icon';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { ScreenShell } from '@/components/ScreenShell';
@@ -29,6 +29,7 @@ export default function RideSuccessPage() {
     pickup: string;
     destination: string;
     vehicle: string;
+    distance: string;
     total: string;
   } | null>(null);
 
@@ -37,12 +38,14 @@ export default function RideSuccessPage() {
 
     const vehicle = getVehicle(ride.vehicleId ?? '');
     const promo = ride.promoId ? (getPromo(ride.promoId) ?? null) : null;
-    const totals = calcRideTotals(vehicle?.basePrice ?? 0, promo);
+    const distanceKm = ride.route?.distanceKm ?? 0;
+    const totals = calcRideTotals(vehicle ? calcFare(vehicle, distanceKm) : 0, promo);
 
     setSummary({
       pickup: ride.pickup?.label ?? '—',
       destination: ride.destination?.label ?? '—',
       vehicle: vehicle?.name ?? '—',
+      distance: ride.route ? `${ride.route.distanceKm} km · ${ride.route.durationMin} phút` : '—',
       total: formatVnd(totals.finalPrice),
     });
 
@@ -82,6 +85,7 @@ export default function RideSuccessPage() {
         <Row label="Điểm đón" value={summary?.pickup ?? '—'} />
         <Row label="Điểm đến" value={summary?.destination ?? '—'} />
         <Row label="Loại xe" value={summary?.vehicle ?? '—'} />
+        <Row label="Quãng đường" value={summary?.distance ?? '—'} />
         <Row label="Tổng thanh toán" value={summary?.total ?? '—'} />
       </div>
     </ScreenShell>

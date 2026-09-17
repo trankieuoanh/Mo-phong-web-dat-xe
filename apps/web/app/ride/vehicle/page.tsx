@@ -14,7 +14,7 @@
  */
 
 import { useRouter } from 'next/navigation';
-import { VEHICLES, type Vehicle } from '@gsm/shared';
+import { DEFAULT_PICKUP, VEHICLES, calcFare, type Vehicle } from '@gsm/shared';
 import { BackButton } from '@/components/BackButton';
 import { FlowGuard } from '@/components/FlowGuard';
 import { Icon, type IconName } from '@/components/Icon';
@@ -22,6 +22,7 @@ import { MapCanvas } from '@/components/MapCanvas';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { ScreenShell } from '@/components/ScreenShell';
 import { useApp } from '@/lib/app-context';
+import { routeOrFallback } from '@/lib/use-route';
 import { formatVnd } from '@/lib/format';
 import { trackEvent, useScreenView } from '@/lib/track';
 
@@ -41,11 +42,21 @@ function VehicleContent() {
   const router = useRouter();
   const { ride, setRide } = useApp();
 
-  function selectVehicle(id: string, type: Vehicle['type'], basePrice: number) {
+  const pickup = ride.pickup ?? DEFAULT_PICKUP;
+  const route = routeOrFallback(pickup, ride.destination!, ride.route);
+
+  function selectVehicle(id: string, type: Vehicle['type'], fare: number) {
     trackEvent({
       eventName: 'select_vehicle',
       screenName: 'vehicle_selection',
-      properties: { vehicle_id: id, vehicle_type: type, base_price: basePrice },
+      properties: {
+        vehicle_id: id,
+        vehicle_type: type,
+        // `base_price` gio la gia CUA CHUYEN NAY, khong con la hang so cua hang
+        // xe — nen `distance_km` phai di kem thi con so moi doc duoc.
+        base_price: fare,
+        distance_km: route.distanceKm,
+      },
     });
     setRide({ vehicleId: id });
   }
@@ -61,7 +72,7 @@ function VehicleContent() {
       variant="split"
       section="Di chuyển"
       tabs={['Đặt xe', 'Đang diễn ra']}
-      aside={<MapCanvas variant="route" fill />}
+      aside={<MapCanvas pickup={pickup} destination={ride.destination!} route={route} fill />}
       title="Chọn loại xe"
       leading={<BackButton from="vehicle_selection" to="pickup_confirm" href="/ride/pickup" />}
       trailing={
@@ -79,11 +90,15 @@ function VehicleContent() {
       }
     >
       <ul className="flex flex-col gap-md">
-        {VEHICLES.map((vehicle) => (
+        {VEHICLES.map((vehicle) => {
+          // calcFare la ham DUY NHAT tinh gia — man nay hien no, confirm_ride
+          // ghi no. Hai cho tu tinh se lam bao cao khong khop anh chup man hinh.
+          const fare = calcFare(vehicle, route.distanceKm);
+          return (
           <li key={vehicle.id}>
             <button
               type="button"
-              onClick={() => selectVehicle(vehicle.id, vehicle.type, vehicle.basePrice)}
+              onClick={() => selectVehicle(vehicle.id, vehicle.type, fare)}
               className={`flex w-full items-center gap-lg rounded-md bg-canvas-soft p-lg text-left text-ink transition-colors hover:bg-surface-pressed ${
                 vehicle.id === ride.vehicleId ? 'ring-2 ring-primary' : ''
               }`}
@@ -101,10 +116,11 @@ function VehicleContent() {
                 </span>
               </span>
 
-              <span className="t-body-md-strong shrink-0">{formatVnd(vehicle.basePrice)}</span>
+              <span className="t-body-md-strong shrink-0">{formatVnd(fare)}</span>
             </button>
           </li>
-        ))}
+          );
+        })}
       </ul>
 
       {/* card-soft-tinted — trang tri, ride-flow-design.md muc 8 */}

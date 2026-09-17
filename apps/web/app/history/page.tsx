@@ -37,6 +37,7 @@ interface Trip {
   pickup?: string;
   destination?: string;
   vehicle?: string;
+  distance?: string;
   payment?: string;
   /** food */
   itemCount?: number;
@@ -45,7 +46,7 @@ interface Trip {
   total: number;
 }
 
-const RIDE_COLUMNS = ['MÃ ĐƠN', 'ĐIỂM ĐÓN', 'ĐIỂM ĐẾN', 'LOẠI XE', 'CƯỚC PHÍ', 'THANH TOÁN', 'THỜI GIAN'];
+const RIDE_COLUMNS = ['MÃ ĐƠN', 'ĐIỂM ĐÓN', 'ĐIỂM ĐẾN', 'LOẠI XE', 'QUÃNG ĐƯỜNG', 'CƯỚC PHÍ', 'THANH TOÁN', 'THỜI GIAN'];
 const FOOD_COLUMNS = ['MÃ ĐƠN', 'SỐ MÓN', 'ƯU ĐÃI', 'TỔNG TIỀN', 'THỜI GIAN'];
 
 const PAYMENT_LABEL: Record<string, string> = { cash: 'Tiền mặt', qr: 'QR' };
@@ -86,6 +87,8 @@ function toTrip(event: EventDoc & { id?: string }): Trip {
       destination: str(p.address_label) ?? '—',
       // `vehicle_id` tra duoc ra ten vi VEHICLES la bang dong (khac dia chi).
       vehicle: getVehicle(str(p.vehicle_id) ?? '')?.name ?? '—',
+      // Chuyen ghi truoc khi co `distance_km` se hien '—' thay vi '0 km'.
+      distance: typeof p.distance_km === 'number' ? `${p.distance_km} km` : '—',
       payment: PAYMENT_LABEL[str(p.payment_method) ?? ''] ?? '—',
       total: num(p.final_price),
     };
@@ -278,6 +281,7 @@ export default function HistoryPage() {
                             {trip.destination}
                           </td>
                           <td className="t-body-sm px-lg py-md text-body">{trip.vehicle}</td>
+                          <td className="t-body-sm px-lg py-md text-body">{trip.distance}</td>
                         </>
                       ) : (
                         <>

@@ -14,7 +14,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { DEFAULT_PICKUP, type CartLine, type Place } from '@gsm/shared';
+import { DEFAULT_PICKUP, type CartLine, type Place, type RouteResult } from '@gsm/shared';
 import { getSessionId, getUserId, resetSession } from './session';
 import { resetPreviousScreen } from './track';
 
@@ -35,6 +35,16 @@ export interface RideDraft {
   destination?: Place;
   /** DIEM DON, mac dinh DEFAULT_PICKUP. Doi duoc o man 2. */
   pickup?: Place;
+  /**
+   * Tuyen duong giua pickup va destination — lay MOT LAN o man 2, dung lai o
+   * man 3 va man 5.
+   *
+   * Vi sao khong fetch lai o tung man: gia hien o man chon xe va gia ghi vao
+   * `confirm_ride` BAT BUOC la cung mot con so. Hai lan fetch co the ra hai
+   * quang duong hoi khac nhau, va khi do bao cao phan tich khong khop anh chup
+   * man hinh — dung cai ma pricing.ts da duoc tach ra de tranh.
+   */
+  route?: RouteResult;
   vehicleId?: string;
   promoId?: string | null;
   /** Ghi chu cho tai xe (man pickup_confirm). Chuoi rong = khong nhap. */

@@ -1,25 +1,36 @@
 'use client';
 
 /**
- * Ban do gia lap bang SVG. KHONG dung Leaflet/Google Maps —
- * them thu vien pha CLAUDE.md quy tac 8, can API key, va khong them duoc
- * gi cho phan tich funnel. Xem ride-flow-design.md muc 4.
+ * Ban do that: tile raster tu OpenStreetMap + tuyen duong ve de len bang SVG.
  *
- * Moi toa do la HANG SO trong file nay: ban do nhay mua moi lan re-render
- * trong nhu loi chu khong nhu ban do.
+ * KHONG dung Leaflet/Google Maps — CLAUDE.md quy tac 8 chot danh sach thu vien.
+ * Mot ban do tinh (khong keo tha) chi can chieu Web Mercator va xep mot luoi
+ * the <img>, khong dang mot dependency.
  *
- * Xep lop tu duoi len, mo phong cach ban do that duoc ve (sample_ui/main_screen.png):
- * nen -> cong vien/song -> khoi nha -> duong (net trang de len) -> nhan pho ->
- * POI -> ghim. Mau chi lay tu token trong globals.css (CLAUDE.md quy tac 4).
+ * Ban truoc ve mot luoi pho BIA voi tuyen duong hang so — hai chuyen di khac
+ * hoan toan van ra cung mot hinh. Gio ca nen lan tuyen deu theo toa do that.
+ *
+ * GHI CONG `© OpenStreetMap` LA BAT BUOC — dieu khoan dung tile yeu cau, khong
+ * phai chi tiet tham my.
  */
 
-import { FIXED_ROUTE } from '@gsm/shared';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { LatLon, Place, RouteResult } from '@gsm/shared';
 import { Icon } from '@/components/Icon';
 
+const TILE_SIZE = 256;
+const MIN_ZOOM = 3;
+const MAX_ZOOM = 18;
+/** Chua le quanh tuyen de ghim khong dinh sat mep. */
+const PADDING_RATIO = 0.12;
+
 interface MapCanvasProps {
-  /** `pickup`: mot ghim o tam. `route`: tuyen duong noi hai ghim. */
-  variant: 'pickup' | 'route';
-  /** Tooltip canh ghim — vi du ten diem don. */
+  pickup: Place;
+  /** Khong co = chi ghim diem don, chua biet diem den. */
+  destination?: Place;
+  /** Co tuyen thi khung nhin om tron tuyen; khong thi om hai ghim. */
+  route?: RouteResult | null;
+  /** Tooltip canh ghim diem don. */
   label?: string;
   /**
    * true khi ban do nam o cot `aside` cua bo cuc split: cao bang panel.
@@ -28,193 +39,287 @@ interface MapCanvasProps {
   fill?: boolean;
 }
 
-/** Khoi nha — x, y, w, h. */
-const BLOCKS: [number, number, number, number][] = [
-  [40, 40, 150, 100], [230, 30, 120, 110], [390, 50, 170, 90],
-  [600, 40, 140, 120], [780, 60, 140, 100],
-  [50, 210, 130, 120], [220, 200, 150, 130], [410, 220, 120, 110],
-  [600, 210, 160, 120], [800, 230, 120, 100],
-  [60, 390, 140, 110], [240, 400, 130, 100], [420, 380, 150, 120],
-  [620, 400, 130, 110], [790, 390, 130, 120],
-  [70, 560, 160, 110], [270, 570, 140, 100], [460, 560, 150, 110],
-  [660, 575, 130, 95], [830, 560, 100, 110],
-];
+// ─────────────────────────────────────────────────────────────
+// Chieu Web Mercator: lat/lon -> pixel the gioi o mot muc zoom
+// ─────────────────────────────────────────────────────────────
 
-/** Duong lon — ke ngang/doc, ve bang net trang day. */
-const AVENUES = [
-  'M0 175 H960', 'M0 355 H960', 'M0 530 H960',
-  'M205 0 V720', 'M580 0 V720', 'M765 0 V720',
-];
+function lonToWorldX(lon: number, zoom: number): number {
+  return ((lon + 180) / 360) * TILE_SIZE * 2 ** zoom;
+}
 
-/** Ngo nho, manh hon. */
-const LANES = ['M0 90 H960', 'M0 265 H960', 'M0 450 H960', 'M0 640 H960', 'M390 0 V720'];
+function latToWorldY(lat: number, zoom: number): number {
+  // Kep vi do: cong thuc Mercator phan ky o hai cuc.
+  const clamped = Math.max(-85.05112878, Math.min(85.05112878, lat));
+  const rad = (clamped * Math.PI) / 180;
+  const y = (1 - Math.log(Math.tan(rad) + 1 / Math.cos(rad)) / Math.PI) / 2;
+  return y * TILE_SIZE * 2 ** zoom;
+}
 
-/** Song chay cheo qua ban do. */
-const RIVER =
-  'M-20 700 C 180 610, 240 470, 400 400 C 560 330, 640 200, 700 -20 L 800 -20 C 740 210, 660 360, 470 450 C 300 530, 240 640, 90 720 Z';
+interface Viewport {
+  zoom: number;
+  /** Goc trai-tren cua khung, tinh bang pixel the gioi o `zoom`. */
+  originX: number;
+  originY: number;
+}
 
-/** Cong vien / ho nuoc. */
-const PARKS: [number, number, number, number][] = [
-  [820, 300, 120, 160],
-  [110, 640, 180, 120],
-];
+/** Zoom lon nhat ma toan bo `points` van lot trong khung `width`×`height`. */
+function fitZoom(points: LatLon[], width: number, height: number): number {
+  if (points.length < 2) return 15;
 
-/** Nhan ten pho: [x, y, xoay do, chu]. */
-const STREET_LABELS: [number, number, number, string][] = [
-  [90, 168, 0, 'P. Cầu Giấy'],
-  [640, 168, 0, 'P. Kim Mã'],
-  [300, 348, 0, 'Đ. Nguyễn Khang'],
-  [700, 348, 0, 'P. Đào Tấn'],
-  [140, 523, 0, 'P. Chùa Láng'],
-  [620, 523, 0, 'Vành Đai 1'],
-  [198, 300, -90, 'Vành Đai 2'],
-  [573, 250, -90, 'D. Quảng Hàm'],
-];
+  const usableW = width * (1 - PADDING_RATIO * 2);
+  const usableH = height * (1 - PADDING_RATIO * 2);
 
-/** Cham POI rai rac. */
-const POIS: [number, number][] = [
-  [120, 120], [300, 90], [480, 130], [700, 100], [860, 130],
-  [150, 280], [330, 270], [500, 300], [680, 280], [880, 250],
-  [130, 460], [310, 470], [520, 440], [690, 470], [870, 500],
-  [200, 620], [420, 650], [610, 620], [820, 660],
-];
+  for (let zoom = MAX_ZOOM; zoom >= MIN_ZOOM; zoom -= 1) {
+    const xs = points.map((p) => lonToWorldX(p.lon, zoom));
+    const ys = points.map((p) => latToWorldY(p.lat, zoom));
+    const spanX = Math.max(...xs) - Math.min(...xs);
+    const spanY = Math.max(...ys) - Math.min(...ys);
+    if (spanX <= usableW && spanY <= usableH) return zoom;
+  }
+  return MIN_ZOOM;
+}
 
-/** Tuyen duong: diem don (205,530) -> diem den (765,175), gay khuc theo luoi pho. */
-const ROUTE_PATH = '205,530 205,355 390,355 390,175 765,175';
+function centerOf(points: LatLon[]): LatLon {
+  if (points.length === 1) return points[0]!;
+  const lats = points.map((p) => p.lat);
+  const lons = points.map((p) => p.lon);
+  return {
+    lat: (Math.max(...lats) + Math.min(...lats)) / 2,
+    lon: (Math.max(...lons) + Math.min(...lons)) / 2,
+  };
+}
 
-const PICKUP = { x: 205, y: 530 };
-const DEST = { x: 765, y: 175 };
-/** Ghim don o variant `pickup` — dat gan tam ban do. */
-const SOLO = { x: 470, y: 355 };
-
-/** Giot nuoc cam vao (cx, cy) — day nhon cham dung toa do do. */
+/** Giot nuoc cam vao (x, y) — day nhon cham dung toa do do. */
 function Pin({ x, y, tone }: { x: number; y: number; tone: string }) {
   return (
     <g transform={`translate(${x} ${y})`}>
-      <ellipse cx="0" cy="2" rx="12" ry="4" fill="var(--color-ink)" opacity="0.14" />
+      <ellipse cx="0" cy="2" rx="10" ry="3.5" fill="var(--color-ink)" opacity="0.2" />
       <path
-        d="M0 0 C -10 -14, -14 -20, -14 -27 a14 14 0 1 1 28 0 c0 7 -4 13 -14 27 Z"
+        d="M0 0 C -8 -11, -11 -16, -11 -21 a11 11 0 1 1 22 0 c0 5 -3 10 -11 21 Z"
         fill={tone}
+        stroke="var(--color-canvas)"
+        strokeWidth="2"
       />
-      <circle cx="0" cy="-27" r="5.5" fill="var(--color-canvas)" />
+      <circle cx="0" cy="-21" r="4" fill="var(--color-canvas)" />
     </g>
   );
 }
 
-export function MapCanvas({ variant, label, fill = false }: MapCanvasProps) {
+export function MapCanvas({ pickup, destination, route, label, fill = false }: MapCanvasProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ width: 0, height: 0 });
+  /** Nguoi dung bam +/−; cong vao zoom vua khit. Nut re-center dat lai ve 0. */
+  const [zoomOffset, setZoomOffset] = useState(0);
+
+  // Do khung bang ResizeObserver — bo cuc `split` co be ngang thay doi theo
+  // cua so, va zoom vua khit phu thuoc kich thuoc that.
+  useLayoutEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (!entry) return;
+      const { width, height } = entry.contentRect;
+      setSize({ width, height });
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  /** Cac diem quyet dinh khung nhin: ca tuyen neu co, khong thi hai ghim. */
+  const points = useMemo<LatLon[]>(() => {
+    if (route && route.geometry.length > 1) {
+      return route.geometry.map(([lat, lon]) => ({ lat, lon }));
+    }
+    return destination ? [pickup, destination] : [pickup];
+  }, [route, pickup, destination]);
+
+  // Doi tuyen/diem thi bo muc zoom nguoi dung da chinh tay — neu khong, chuyen
+  // moi se ke thua zoom cua chuyen truoc va co the nam ngoai khung.
+  const pointsKey = points.map((p) => `${p.lat},${p.lon}`).join('|');
+  useEffect(() => {
+    setZoomOffset(0);
+  }, [pointsKey]);
+
+  const viewport = useMemo<Viewport | null>(() => {
+    if (size.width === 0 || size.height === 0) return null;
+
+    const base = fitZoom(points, size.width, size.height);
+    const zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, base + zoomOffset));
+    const center = centerOf(points);
+
+    return {
+      zoom,
+      originX: lonToWorldX(center.lon, zoom) - size.width / 2,
+      originY: latToWorldY(center.lat, zoom) - size.height / 2,
+    };
+  }, [points, size.width, size.height, zoomOffset]);
+
+  /** lat/lon -> toa do pixel trong khung. */
+  const project = useCallback(
+    (point: LatLon): [number, number] => {
+      if (!viewport) return [0, 0];
+      return [
+        lonToWorldX(point.lon, viewport.zoom) - viewport.originX,
+        latToWorldY(point.lat, viewport.zoom) - viewport.originY,
+      ];
+    },
+    [viewport],
+  );
+
+  /** Lua the <img> phu kin khung o muc zoom hien tai. */
+  const tiles = useMemo(() => {
+    if (!viewport) return [];
+
+    const count = 2 ** viewport.zoom;
+    const minTileX = Math.floor(viewport.originX / TILE_SIZE);
+    const maxTileX = Math.floor((viewport.originX + size.width) / TILE_SIZE);
+    const minTileY = Math.floor(viewport.originY / TILE_SIZE);
+    const maxTileY = Math.floor((viewport.originY + size.height) / TILE_SIZE);
+
+    const out: { key: string; src: string; left: number; top: number }[] = [];
+    for (let tx = minTileX; tx <= maxTileX; tx += 1) {
+      for (let ty = minTileY; ty <= maxTileY; ty += 1) {
+        // Ngoai hai cuc thi khong co tile; con kinh do thi cuon vong.
+        if (ty < 0 || ty >= count) continue;
+        const wrappedX = ((tx % count) + count) % count;
+        out.push({
+          key: `${viewport.zoom}/${tx}/${ty}`,
+          src: `https://tile.openstreetmap.org/${viewport.zoom}/${wrappedX}/${ty}.png`,
+          left: tx * TILE_SIZE - viewport.originX,
+          top: ty * TILE_SIZE - viewport.originY,
+        });
+      }
+    }
+    return out;
+  }, [viewport, size.width, size.height]);
+
+  const routeLine = useMemo(() => {
+    if (!viewport || !route || route.geometry.length < 2) return '';
+    return route.geometry
+      .map(([lat, lon]) => project({ lat, lon }).join(','))
+      .join(' ');
+  }, [viewport, route, project]);
+
+  const [pickupX, pickupY] = project(pickup);
+  const [destX, destY] = destination ? project(destination) : [0, 0];
+
   return (
     <div
-      className={`relative overflow-hidden rounded-xl bg-canvas ${
+      ref={ref}
+      className={`relative overflow-hidden rounded-xl bg-canvas-soft ${
         fill ? 'h-full min-h-0 w-full' : 'aspect-[4/3] w-full'
       }`}
     >
-      <svg
-        viewBox="0 0 960 720"
-        className="h-full w-full"
-        preserveAspectRatio="xMidYMid slice"
-        aria-hidden="true"
-      >
-        {/* 1. Nen */}
-        <rect x="0" y="0" width="960" height="720" fill="var(--color-canvas-softer)" />
+      {/* Lop 1 — tile nen.
+          Dung <img> tho chu KHONG dung next/image: tile la anh 256px co san
+          trên CDN cua OSM, cho no di qua bo toi uu cua Next chi them mot chang
+          proxy va lam hong viec dinh vi tuyet doi theo pixel. */}
+      {tiles.map((tile) => (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          key={tile.key}
+          src={tile.src}
+          alt=""
+          aria-hidden="true"
+          loading="lazy"
+          width={TILE_SIZE}
+          height={TILE_SIZE}
+          className="pointer-events-none absolute max-w-none select-none"
+          style={{ left: tile.left, top: tile.top }}
+        />
+      ))}
 
-        {/* 2. Cong vien + song */}
-        {PARKS.map(([x, y, w, h]) => (
-          <rect key={`p${x}`} x={x} y={y} width={w} height={h} rx="14" fill="var(--color-canvas-soft)" />
-        ))}
-        <path d={RIVER} fill="var(--color-surface-pressed)" opacity="0.7" />
+      {/* Lop 2 — tuyen duong va ghim */}
+      {viewport ? (
+        <svg
+          className="pointer-events-none absolute inset-0 h-full w-full"
+          aria-hidden="true"
+        >
+          {routeLine ? (
+            <>
+              {/* Vien trang ben duoi de tuyen noi tren nen tile nhieu mau. */}
+              <polyline
+                points={routeLine}
+                fill="none"
+                stroke="var(--color-canvas)"
+                strokeWidth="9"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <polyline
+                points={routeLine}
+                fill="none"
+                stroke="var(--color-primary-dark)"
+                strokeWidth="5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </>
+          ) : null}
 
-        {/* 3. Khoi nha */}
-        {BLOCKS.map(([x, y, w, h]) => (
-          <rect key={`b${x}-${y}`} x={x} y={y} width={w} height={h} rx="6" fill="var(--color-canvas)" />
-        ))}
+          <Pin x={pickupX} y={pickupY} tone="var(--color-primary-dark)" />
+          {/* Diem den dung `ink` — DESIGN.md cam mau accent thu hai. */}
+          {destination ? <Pin x={destX} y={destY} tone="var(--color-ink)" /> : null}
+        </svg>
+      ) : null}
 
-        {/* 4. Duong — vien mo truoc, long trang de len sau */}
-        <g fill="none" strokeLinecap="round">
-          {AVENUES.map((d) => (
-            <path key={`ao${d}`} d={d} stroke="var(--color-hairline-mid)" strokeWidth="24" opacity="0.07" />
-          ))}
-          {AVENUES.map((d) => (
-            <path key={`a${d}`} d={d} stroke="var(--color-canvas)" strokeWidth="18" />
-          ))}
-          {LANES.map((d) => (
-            <path key={`l${d}`} d={d} stroke="var(--color-canvas)" strokeWidth="8" />
-          ))}
-        </g>
-
-        {/* 5. Nhan ten pho */}
-        <g fill="var(--color-mute)" fontSize="13" fontFamily="var(--font-text)">
-          {STREET_LABELS.map(([x, y, rot, text]) => (
-            <text key={text} x={x} y={y} transform={`rotate(${rot} ${x} ${y})`}>
-              {text}
-            </text>
-          ))}
-        </g>
-
-        {/* 6. Cham POI */}
-        <g fill="var(--color-mute)" opacity="0.55">
-          {POIS.map(([x, y]) => (
-            <circle key={`${x}-${y}`} cx={x} cy={y} r="3.5" />
-          ))}
-        </g>
-
-        {/* 7. Ghim */}
-        {variant === 'pickup' ? (
-          <>
-            <circle cx={SOLO.x} cy={SOLO.y} r="40" fill="var(--color-primary)" opacity="0.14" />
-            <Pin x={SOLO.x} y={SOLO.y} tone="var(--color-ink)" />
-          </>
-        ) : (
-          <>
-            <polyline
-              points={ROUTE_PATH}
-              fill="none"
-              stroke="var(--color-primary-dark)"
-              strokeWidth="7"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-            <Pin x={PICKUP.x} y={PICKUP.y} tone="var(--color-primary-dark)" />
-            {/* Diem den dung `ink`, KHONG dung cam nhu logo that —
-                DESIGN.md cam mau accent thu hai. */}
-            <Pin x={DEST.x} y={DEST.y} tone="var(--color-ink)" />
-          </>
-        )}
-      </svg>
-
-      {/* Cum zoom — TRANG TRI, khong bam duoc (ride-flow-design.md muc 8). */}
-      <div
-        aria-hidden="true"
-        className="shadow-level-2 absolute top-lg left-lg flex flex-col overflow-hidden rounded-md bg-canvas text-ink"
-      >
-        <span className="grid size-9 place-items-center border-b border-surface-pressed">
+      {/* Lop 3 — dieu khien. Gio chung LAM THAT, khong con trang tri. */}
+      <div className="shadow-level-2 absolute top-lg left-lg flex flex-col overflow-hidden rounded-md bg-canvas text-ink">
+        <button
+          type="button"
+          aria-label="Phóng to"
+          onClick={() => setZoomOffset((v) => Math.min(v + 1, 4))}
+          className="grid size-9 place-items-center border-b border-surface-pressed hover:bg-canvas-soft"
+        >
           <Icon name="plus" size={18} />
-        </span>
-        <span className="grid size-9 place-items-center">
+        </button>
+        <button
+          type="button"
+          aria-label="Thu nhỏ"
+          onClick={() => setZoomOffset((v) => Math.max(v - 1, -4))}
+          className="grid size-9 place-items-center hover:bg-canvas-soft"
+        >
           <Icon name="minus" size={18} />
-        </span>
+        </button>
       </div>
 
-      {/* Nut re-center — TRANG TRI: khong co toa do that de re-center ve. */}
-      <span
-        aria-hidden="true"
-        className="shadow-level-2 absolute right-lg bottom-lg grid size-11 place-items-center rounded-full bg-canvas text-ink"
+      <button
+        type="button"
+        aria-label="Đưa bản đồ về vừa khít tuyến đường"
+        onClick={() => setZoomOffset(0)}
+        className="shadow-level-2 absolute right-lg bottom-lg grid size-11 place-items-center rounded-full bg-canvas text-ink hover:bg-canvas-soft"
       >
         <Icon name="target" size={20} />
-      </span>
+      </button>
 
       {label ? (
-        // Tooltip canh ghim, giong "198/6 Duong Cau Giay >" trong anh mau.
-        <div className="t-body-sm-strong shadow-level-2 absolute top-1/2 left-1/2 flex max-w-[70%] -translate-x-1/2 -translate-y-[calc(50%+56px)] items-center gap-sm rounded-pill bg-canvas px-lg py-sm text-ink">
+        <div className="t-body-sm-strong shadow-level-2 absolute top-lg left-1/2 flex max-w-[70%] -translate-x-1/2 items-center gap-sm rounded-pill bg-canvas px-lg py-sm text-ink">
           <span className="truncate">{label}</span>
-          <Icon name="chevron-right" size={16} className="text-body" />
         </div>
       ) : null}
 
-      {variant === 'route' ? (
-        <div className="t-body-sm-strong shadow-level-2 absolute top-lg right-lg rounded-pill bg-canvas px-lg py-sm text-ink">
-          {FIXED_ROUTE.durationMin} phút • {FIXED_ROUTE.distanceKm} km
+      {route ? (
+        <div className="shadow-level-2 absolute right-lg top-lg rounded-pill bg-canvas px-lg py-sm text-ink">
+          <span className="t-body-sm-strong">
+            {route.durationMin} phút • {route.distanceKm} km
+          </span>
+          {route.source === 'straight' ? (
+            // Noi that voi nguoi dung khi con so la duong chim bay — cung thong
+            // tin ma `route_source` ghi vao event.
+            <span className="t-caption block text-mute">ước lượng — đường chim bay</span>
+          ) : null}
         </div>
       ) : null}
+
+      {/* Ghi cong BAT BUOC theo dieu khoan dung tile OpenStreetMap. */}
+      <a
+        href="https://www.openstreetmap.org/copyright"
+        target="_blank"
+        rel="noreferrer noopener"
+        className="t-caption absolute right-0 bottom-0 bg-canvas/80 px-xs text-body"
+      >
+        © OpenStreetMap
+      </a>
     </div>
   );
 }

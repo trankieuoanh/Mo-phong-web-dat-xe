@@ -12,7 +12,7 @@
  */
 
 import { useState } from 'react';
-import { ADDRESSES, PRESET_PLACES, getAddress, type Address, type Place } from '@gsm/shared';
+import { PRESET_PLACES, getAddress, haversineKm, roundKm, type Address, type Place } from '@gsm/shared';
 import { Icon, type IconName } from '@/components/Icon';
 import { usePlaceSearch } from '@/lib/use-place-search';
 
@@ -33,10 +33,16 @@ function iconFor(place: Place): IconName {
   return preset ? PRESET_ICONS[preset.icon] : 'pin';
 }
 
-/** Khoang cach chi biet voi dia chi goi y — ket qua tim duoc khong co. */
-function distanceFor(place: Place): string | null {
-  const preset = ADDRESSES.find((a) => a.id === place.id);
-  return preset ? `${preset.distanceKm} km` : null;
+/**
+ * Khoang cach duong chim bay tu diem don toi mot dia chi.
+ *
+ * Tinh tai cho thay vi doc mot truong hardcode: `Address.distanceKm` cu la
+ * khoang cach toi diem don CU, nen tu khi diem don doi duoc no bao dam co luc
+ * hien sai. Cach nay dung cho ca dia chi goi y lan dia chi tu tim.
+ */
+function distanceFor(place: Place, origin?: Place): string | null {
+  if (!origin || origin.id === place.id) return null;
+  return `${roundKm(haversineKm(origin, place))} km`;
 }
 
 interface PlacePickerProps {
@@ -48,6 +54,8 @@ interface PlacePickerProps {
   onPick: (place: Place) => void;
   /** Hien them dong "Su dung vi tri hien tai" o dau (chi man diem den). */
   leading?: React.ReactNode;
+  /** Diem goc de tinh khoang cach goi y. Khong truyen thi khong hien km. */
+  origin?: Place;
 }
 
 export function PlacePicker({
@@ -56,6 +64,7 @@ export function PlacePicker({
   selectedId,
   onPick,
   leading,
+  origin,
 }: PlacePickerProps) {
   const [query, setQuery] = useState('');
   const { results, status, error } = usePlaceSearch(query);
@@ -114,6 +123,7 @@ export function PlacePicker({
                 place={place}
                 selected={place.id === selectedId}
                 onPick={onPick}
+                origin={origin}
               />
             ))}
           </ul>
@@ -135,6 +145,7 @@ export function PlacePicker({
                 place={place}
                 selected={place.id === selectedId}
                 onPick={onPick}
+                origin={origin}
               />
             ))}
           </ul>
@@ -148,12 +159,14 @@ function PlaceRow({
   place,
   selected,
   onPick,
+  origin,
 }: {
   place: Place;
   selected: boolean;
   onPick: (place: Place) => void;
+  origin?: Place;
 }) {
-  const distance = distanceFor(place);
+  const distance = distanceFor(place, origin);
 
   return (
     <li>

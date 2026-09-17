@@ -12,13 +12,14 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { PROMOS, calcDiscount, getVehicle, isRuleAvailable } from '@gsm/shared';
+import { DEFAULT_PICKUP, PROMOS, calcDiscount, calcFare, getVehicle, isRuleAvailable } from '@gsm/shared';
 import { BackButton } from '@/components/BackButton';
 import { FlowGuard } from '@/components/FlowGuard';
 import { Icon } from '@/components/Icon';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { ScreenShell } from '@/components/ScreenShell';
 import { useApp } from '@/lib/app-context';
+import { routeOrFallback } from '@/lib/use-route';
 import { formatVnd } from '@/lib/format';
 import { trackEvent, useScreenView } from '@/lib/track';
 
@@ -39,7 +40,11 @@ function PromoContent() {
   const router = useRouter();
   const { ride, setRide } = useApp();
 
-  const basePrice = getVehicle(ride.vehicleId!)?.basePrice ?? 0;
+  // BAT BUOC dung calcFare, khong doc mot gia co dinh nao: `minOrder` cua promo
+  // xet tren SO TIEN THAT cua chuyen. Doc nham la promo bi disable/enable sai.
+  const vehicle = getVehicle(ride.vehicleId!);
+  const route = routeOrFallback(ride.pickup ?? DEFAULT_PICKUP, ride.destination!, ride.route);
+  const basePrice = vehicle ? calcFare(vehicle, route.distanceKm) : 0;
 
   const [picked, setPicked] = useState<string | null>(ride.promoId ?? null);
   const [code, setCode] = useState('');

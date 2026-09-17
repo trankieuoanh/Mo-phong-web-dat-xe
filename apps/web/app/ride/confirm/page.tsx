@@ -12,7 +12,7 @@
  */
 
 import { useRouter } from 'next/navigation';
-import { DEFAULT_PICKUP, calcRideTotals, getPromo, getVehicle } from '@gsm/shared';
+import { DEFAULT_PICKUP, calcFare, calcRideTotals, getPromo, getVehicle } from '@gsm/shared';
 import { BackButton } from '@/components/BackButton';
 import { FlowGuard } from '@/components/FlowGuard';
 import { Icon, type IconName } from '@/components/Icon';
@@ -20,6 +20,7 @@ import { MapCanvas } from '@/components/MapCanvas';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { ScreenShell } from '@/components/ScreenShell';
 import { useApp, type PaymentMethod } from '@/lib/app-context';
+import { routeOrFallback } from '@/lib/use-route';
 import { formatVnd } from '@/lib/format';
 import { trackEvent, useScreenView } from '@/lib/track';
 
@@ -52,8 +53,10 @@ function RideConfirmContent() {
   const promo = ride.promoId ? (getPromo(ride.promoId) ?? null) : null;
   const paymentMethod = ride.paymentMethod ?? 'cash';
 
+  const route = routeOrFallback(pickup, destination, ride.route);
+
   // Cung mot ham voi luc ghi event — man hinh va du lieu KHONG THE lech nhau.
-  const totals = calcRideTotals(vehicle?.basePrice ?? 0, promo);
+  const totals = calcRideTotals(vehicle ? calcFare(vehicle, route.distanceKm) : 0, promo);
 
   function confirmRide() {
     trackEvent({
@@ -69,6 +72,11 @@ function RideConfirmContent() {
         address_source: destination.source,
         pickup_id: pickup.id,
         pickup_label: pickup.label,
+        distance_km: route.distanceKm,
+        duration_min: route.durationMin,
+        // 'osrm' | 'straight' — thieu khoa nay thi mot chuyen 8 km duong that va
+        // mot chuyen 8 km duong chim bay trong giong het nhau trong du lieu.
+        route_source: route.source,
         vehicle_id: ride.vehicleId,
         vehicle_type: vehicle?.type,
         promo_id: ride.promoId ?? null,
@@ -87,7 +95,7 @@ function RideConfirmContent() {
       variant="split"
       section="Di chuyển"
       tabs={['Đặt xe', 'Đang diễn ra']}
-      aside={<MapCanvas variant="route" fill />}
+      aside={<MapCanvas pickup={pickup} destination={destination} route={route} fill />}
       title="Xác nhận chuyến đi"
       leading={<BackButton from="ride_confirm" to="promo_selection" href="/ride/promo" />}
       footer={<PrimaryButton onClick={confirmRide}>Đặt xe</PrimaryButton>}
@@ -97,6 +105,10 @@ function RideConfirmContent() {
         <Row label="Điểm đón" value={pickup.label} />
         <Row label="Điểm đến" value={destination.label} />
         <Row label="Loại xe" value={vehicle?.name ?? '—'} />
+        <Row
+          label="Quãng đường"
+          value={`${route.distanceKm} km · ${route.durationMin} phút`}
+        />
         <Row label="Giá chuyến" value={formatVnd(totals.basePrice)} />
 
         <div className="mt-md">

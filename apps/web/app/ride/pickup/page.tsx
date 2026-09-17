@@ -12,7 +12,7 @@
  */
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { DEFAULT_PICKUP, isPickupChanged, type Place } from '@gsm/shared';
 import { BackButton } from '@/components/BackButton';
 import { FlowGuard } from '@/components/FlowGuard';
@@ -22,6 +22,7 @@ import { PlacePicker } from '@/components/PlacePicker';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { ScreenShell } from '@/components/ScreenShell';
 import { useApp } from '@/lib/app-context';
+import { useRoute } from '@/lib/use-route';
 import { trackEvent, useScreenView } from '@/lib/track';
 
 export default function PickupPage() {
@@ -43,6 +44,16 @@ function PickupContent() {
   // FlowGuard da bao dam `destination` ton tai; `pickup` luon co nho newRideDraft().
   const destination = ride.destination!;
   const pickup = ride.pickup ?? DEFAULT_PICKUP;
+
+  // Man dau tien biet du CA HAI diem, nen tuyen duong duoc lay o day va cat vao
+  // draft. Man chon xe va man xac nhan chi DOC lai — hai lan fetch co the ra hai
+  // quang duong hoi khac nhau, va khi do gia tren man hinh khong khop gia trong
+  // event (xem ghi chu o RideDraft.route).
+  const { route } = useRoute(pickup, destination);
+
+  useEffect(() => {
+    if (route) setRide({ route });
+  }, [route, setRide]);
 
   function choosePickup(place: Place) {
     // CHUA ban event — `confirm_pickup` o nut duoi moi la moc do, va nho vay
@@ -85,7 +96,7 @@ function PickupContent() {
       variant="split"
       section="Di chuyển"
       tabs={['Đặt xe', 'Đang diễn ra']}
-      aside={<MapCanvas variant="pickup" label={pickup.label} fill />}
+      aside={<MapCanvas pickup={pickup} destination={destination} route={route} fill />}
       title="Xác nhận điểm đón"
       leading={<BackButton from="pickup_confirm" to="address_selection" href="/ride/address" />}
       footer={<PrimaryButton onClick={confirmPickup}>Chọn điểm đón này</PrimaryButton>}
@@ -107,6 +118,7 @@ function PickupContent() {
             presetHeading="Địa chỉ đã lưu"
             selectedId={pickup.id}
             onPick={choosePickup}
+            origin={destination}
           />
         </>
       ) : (
