@@ -7,6 +7,7 @@
 export * from './types';
 export * from './screens';
 export * from './mock-data';
+export * from './food';
 export * from './pricing';
 export * from './places';
 export * from './route';

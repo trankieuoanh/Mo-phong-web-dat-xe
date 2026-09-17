@@ -7,8 +7,19 @@ export interface PlaceQuery {
   limit: number;
 }
 
+/** Query cua GET /api/restaurants — tim quan quanh mot toa do. */
+export interface RestaurantQuery {
+  lat: number;
+  lon: number;
+  limit: number;
+}
+
 export type PlaceQueryResult =
   | { ok: true; value: PlaceQuery }
+  | { ok: false; error: string };
+
+export type RestaurantQueryResult =
+  | { ok: true; value: RestaurantQuery }
   | { ok: false; error: string };
 
 /** Duoi 2 ky tu thi Nominatim tra rac; tren 120 thi chac chan la dan sai. */
@@ -43,4 +54,42 @@ export function validatePlaceQuery(params: URLSearchParams): PlaceQueryResult {
   }
 
   return { ok: true, value: { q, limit } };
+}
+
+/**
+ * Validate query cua GET /api/restaurants.
+ *
+ * `lat`/`lon` BAT BUOC: khong co toa do thi "gan ban" khong co nghia gi, va
+ * mot viewbox mac dinh se lang le tra ve quan o mot noi khac han.
+ */
+export function validateRestaurantQuery(params: URLSearchParams): RestaurantQueryResult {
+  const coords: { lat?: number; lon?: number } = {};
+
+  for (const field of ['lat', 'lon'] as const) {
+    const raw = params.get(field);
+    if (raw === null || raw.trim() === '') {
+      return { ok: false, error: `Missing required field: ${field}` };
+    }
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed)) {
+      return { ok: false, error: `Invalid value for ${field}: expected a number` };
+    }
+    const bound = field === 'lat' ? 90 : 180;
+    if (parsed < -bound || parsed > bound) {
+      return { ok: false, error: `Invalid value for ${field}: expected -${bound}..${bound}` };
+    }
+    coords[field] = parsed;
+  }
+
+  let limit = DEFAULT_LIMIT;
+  const rawLimit = params.get('limit');
+  if (rawLimit !== null) {
+    const parsed = Number(rawLimit);
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > MAX_LIMIT) {
+      return { ok: false, error: `Invalid value for limit: expected an integer 1..${MAX_LIMIT}` };
+    }
+    limit = parsed;
+  }
+
+  return { ok: true, value: { lat: coords.lat!, lon: coords.lon!, limit } };
 }

@@ -294,12 +294,25 @@ export const OFFERS: DiscountRule[] = [
 
 export type FoodCategory = 'main' | 'drink' | 'dessert';
 
+/**
+ * Bua an trong ngay. Truc nay VUONG GOC voi `FoodCategory`: mot mon uong van an
+ * duoc ca ba bua, con mot mon chinh chua chac hop bua sang.
+ */
+export type Meal = 'breakfast' | 'lunch' | 'dinner';
+
 export interface FoodItem {
   id: string;
   name: string;
+  /**
+   * Ten quan GOC cua mon — chi de hien thi o the mon khi KHONG loc theo quan.
+   * Khi nguoi dung chon mot quan that o dai "Gan ban", the mon phai hien ten
+   * quan DANG CHON chu khong phai truong nay (xem app/food/page.tsx).
+   */
   restaurant: string;
   price: number;
   category: FoodCategory;
+  /** Bua nao hop an mon nay — dung cho dai goi y sang/trua/toi. */
+  meals: Meal[];
   /** Khong di vao event — chi de hien thi. */
   description: string;
 }
@@ -311,6 +324,7 @@ export const FOOD_ITEMS: FoodItem[] = [
     restaurant: 'Bánh Mì 25',
     price: 35_000,
     category: 'main',
+    meals: ['breakfast', 'lunch'],
     description: 'Thịt nướng than hoa, pate gan và rau thơm trong vỏ bánh giòn.',
   },
   {
@@ -319,6 +333,7 @@ export const FOOD_ITEMS: FoodItem[] = [
     restaurant: 'Phở Thìn Bờ Hồ',
     price: 55_000,
     category: 'main',
+    meals: ['breakfast', 'lunch', 'dinner'],
     description: 'Nước dùng ninh xương 12 tiếng, bò tái mềm, hành trần.',
   },
   {
@@ -327,6 +342,7 @@ export const FOOD_ITEMS: FoodItem[] = [
     restaurant: 'Bún Chả Hương Liên',
     price: 50_000,
     category: 'main',
+    meals: ['lunch', 'dinner'],
     description: 'Chả viên và chả miếng nướng than, nước chấm chua ngọt.',
   },
   {
@@ -335,6 +351,7 @@ export const FOOD_ITEMS: FoodItem[] = [
     restaurant: 'Cơm Tấm Ba Ghiền',
     price: 60_000,
     category: 'main',
+    meals: ['lunch', 'dinner'],
     description: 'Sườn nướng mật ong, bì trộn thính, chả trứng hấp.',
   },
   {
@@ -343,6 +360,7 @@ export const FOOD_ITEMS: FoodItem[] = [
     restaurant: 'Bánh Xèo Ăn Là Ghiền',
     price: 65_000,
     category: 'main',
+    meals: ['lunch', 'dinner'],
     description: 'Vỏ bánh vàng giòn, nhân tôm thịt giá, ăn kèm rau sống.',
   },
   {
@@ -351,6 +369,7 @@ export const FOOD_ITEMS: FoodItem[] = [
     restaurant: 'Phúc Long',
     price: 45_000,
     category: 'drink',
+    meals: ['lunch', 'dinner'],
     description: 'Trà sữa đậm vị, trân châu đường đen nấu trong ngày.',
   },
   {
@@ -359,6 +378,7 @@ export const FOOD_ITEMS: FoodItem[] = [
     restaurant: 'Highlands Coffee',
     price: 29_000,
     category: 'drink',
+    meals: ['breakfast', 'lunch'],
     description: 'Cà phê robusta rang đậm, sữa đặc, đá viên.',
   },
   {
@@ -367,6 +387,7 @@ export const FOOD_ITEMS: FoodItem[] = [
     restaurant: 'Chè Bốn Mùa',
     price: 32_000,
     category: 'dessert',
+    meals: ['lunch', 'dinner'],
     description: 'Khúc bạch phô mai mềm, nhãn lồng và hạnh nhân rang.',
   },
 ];

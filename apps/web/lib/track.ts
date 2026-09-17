@@ -84,6 +84,13 @@ export function trackEvent(input: TrackEventInput): void {
     // API loi hoac mang rot TUYET DOI khong duoc lam vo luong UI:
     // mat mot event chap nhan duoc, ket nguoi dung thi khong.
   }).catch(() => {});
+
+  try {
+    const stored: unknown = JSON.parse(localStorage.getItem('gsm_event_log') ?? '[]');
+    const events: unknown[] = Array.isArray(stored) ? stored : [];
+    events.push({ ...body, client_created_at: new Date().toISOString() });
+    localStorage.setItem('gsm_event_log', JSON.stringify(events));
+  } catch {}
 }
 
 /** `add_to_cart` luon mang step_index = 3 du ban o man nao. */
