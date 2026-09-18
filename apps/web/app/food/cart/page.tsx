@@ -6,20 +6,45 @@
  */
 
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { SHIPPING_FEE, calcFoodTotals, getFoodItem } from '@gsm/shared';
 import { BackButton } from '@/components/BackButton';
+import { EmptyState } from '@/components/EmptyState';
 import { FlowGuard } from '@/components/FlowGuard';
+import { FoodThumb } from '@/components/FoodThumb';
 import { Icon } from '@/components/Icon';
 import { PrimaryButton } from '@/components/PrimaryButton';
+import { QuantityStepper } from '@/components/QuantityStepper';
 import { ScreenShell } from '@/components/ScreenShell';
+import { SummaryRow } from '@/components/SummaryRow';
 import { useApp } from '@/lib/app-context';
 import { formatVnd } from '@/lib/format';
 import { trackEvent, useScreenView } from '@/lib/track';
 
+/**
+ * Guard chi chan LUC VAO man, khong chan lien tuc — va su phan biet nay la mot
+ * quyet dinh ve SO LIEU, khong phai ve giao dien:
+ *
+ *   - Vao thang `/food/cart` voi gio rong (go tay URL) -> quay ve `/food`.
+ *     `useScreenView` nam BEN TRONG `FoodCartContent` nen khong he chay, tuc
+ *     khong co `screen_view` nao duoc ban. Giu nguyen hanh vi cu.
+ *   - Xoa het mon KHI DANG dung o day -> hien trang thai rong, KHONG day nguoi
+ *     dung di. Luc nay `screen_view` cua `food_cart` da ban tu khi mount roi,
+ *     nen o lai khong tao them event nao.
+ *
+ * Bo han guard se lam moi lan go tay URL cung dem mot `screen_view` o buoc 4 va
+ * lam sai ti le chuyen doi cua ca luong food.
+ */
 export default function FoodCartPage() {
   const { cart } = useApp();
+  const [entered, setEntered] = useState(false);
+
+  useEffect(() => {
+    if (cart.length > 0) setEntered(true);
+  }, [cart.length]);
+
   return (
-    <FlowGuard ready={cart.length > 0} fallback="/food">
+    <FlowGuard ready={cart.length > 0 || entered} fallback="/food">
       <FoodCartContent />
     </FlowGuard>
   );
@@ -31,6 +56,8 @@ function FoodCartContent() {
   const { cart, setCartQuantity, removeFromCart } = useApp();
 
   const totals = calcFoodTotals(cart, null, getFoodItem);
+  /** Xoa het mon khi dang o day — xem ghi chu o FoodCartPage ben tren. */
+  const empty = cart.length === 0;
 
   function changeQuantity(itemId: string, next: number) {
     if (next < 1) return;
@@ -82,90 +109,78 @@ function FoodCartContent() {
       maxWidth="max-w-[760px]"
       title="Giỏ hàng"
       leading={<BackButton from="food_cart" to="food_menu" href="/food" />}
-      footer={<PrimaryButton onClick={proceed}>Tiếp tục</PrimaryButton>}
+      footer={empty ? undefined : <PrimaryButton onClick={proceed}>Tiếp tục</PrimaryButton>}
     >
-      <ul className="flex flex-col gap-md">
-        {cart.map((line) => {
-          const item = getFoodItem(line.itemId);
-          if (!item) return null;
+      {empty ? (
+        <EmptyState
+          icon="bag"
+          title="Giỏ hàng đang trống"
+          description="Chọn vài món từ thực đơn để tiếp tục đặt đơn."
+          action={
+            <PrimaryButton fullWidth={false} onClick={() => router.push('/food')}>
+              Xem thực đơn
+            </PrimaryButton>
+          }
+        />
+      ) : (
+        <>
+          <ul className="flex flex-col gap-md">
+            {cart.map((line) => {
+              const item = getFoodItem(line.itemId);
+              if (!item) return null;
 
-          return (
-            <li
-              key={line.itemId}
-              className="flex items-center gap-lg rounded-md bg-canvas-soft p-lg"
-            >
-              <span className="grid size-14 shrink-0 place-items-center rounded-xl bg-canvas">
-                <span className="t-display-sm text-primary-dark">{item.name.charAt(0)}</span>
-              </span>
+              return (
+                <li
+                  key={line.itemId}
+                  className="flex items-center gap-lg rounded-xl bg-canvas-soft p-lg"
+                >
+                  <FoodThumb item={item} variant="tile" />
 
-              <div className="min-w-0 flex-1">
-                <span className="t-body-md-strong block truncate">{item.name}</span>
-                <span className="t-body-md-strong mt-xxs block">
-                  {formatVnd(item.price * line.quantity)}
-                </span>
-              </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="t-body-md-strong block truncate">{item.name}</span>
+                    {/* Don gia — khong co no thi mot dong "70.000d" voi so luong
+                        2 buoc nguoi dung tu chia nham. */}
+                    <span className="t-caption block text-body">
+                      {formatVnd(item.price)} × {line.quantity}
+                    </span>
+                    <span className="t-body-md-strong mt-xxs block">
+                      {formatVnd(item.price * line.quantity)}
+                    </span>
+                  </div>
 
-              <div className="flex items-center gap-sm">
-                <QtyButton
-                  label="Giảm số lượng"
-                  icon="minus"
-                  onClick={() => changeQuantity(line.itemId, line.quantity - 1)}
-                />
-                <span className="t-body-md-strong w-5 text-center">{line.quantity}</span>
-                <QtyButton
-                  label="Tăng số lượng"
-                  icon="plus"
-                  onClick={() => changeQuantity(line.itemId, line.quantity + 1)}
-                />
-              </div>
+                  <QuantityStepper
+                    quantity={line.quantity}
+                    onChange={(next) => changeQuantity(line.itemId, next)}
+                    label={item.name}
+                  />
 
-              <button
-                type="button"
-                aria-label={`Xoá ${item.name}`}
-                onClick={() => remove(line.itemId)}
-                className="grid size-11 shrink-0 place-items-center rounded-full text-mute transition-colors hover:bg-canvas hover:text-ink"
-              >
-                <Icon name="trash" size={20} />
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+                  <button
+                    type="button"
+                    aria-label={`Xoá ${item.name}`}
+                    onClick={() => remove(line.itemId)}
+                    className="grid size-9 shrink-0 place-items-center rounded-full text-mute transition-colors hover:bg-canvas hover:text-ink"
+                  >
+                    <Icon name="trash" size={20} />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
 
-      <div className="mt-2xl rounded-xl bg-canvas-soft p-2xl">
-        <Row label="Tiền hàng" value={formatVnd(totals.cartTotal)} />
-        <Row label="Phí giao hàng" value={formatVnd(SHIPPING_FEE)} />
-      </div>
+          <div className="mt-2xl rounded-xl bg-canvas-soft p-2xl">
+            <SummaryRow label="Tiền hàng" value={formatVnd(totals.cartTotal)} />
+            <SummaryRow label="Phí giao hàng" value={formatVnd(SHIPPING_FEE)} />
+            {/* Hang tong cong: ban cu dung lai o phi giao hang, tuc gio hang
+                khong noi cho nguoi dung biet ho sap tra bao nhieu — trong khi
+                moi buoc cua luong ride deu hien gia dang chay. */}
+            <SummaryRow
+              label="Tổng cộng"
+              value={formatVnd(totals.cartTotal + SHIPPING_FEE)}
+              emphasis
+            />
+          </div>
+        </>
+      )}
     </ScreenShell>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between py-xs">
-      <span className="t-body-sm text-body">{label}</span>
-      <span className="t-body-md-strong">{value}</span>
-    </div>
-  );
-}
-
-function QtyButton({
-  label,
-  icon,
-  onClick,
-}: {
-  label: string;
-  icon: 'plus' | 'minus';
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      onClick={onClick}
-      className="grid size-11 place-items-center rounded-full bg-canvas text-ink transition-colors hover:bg-surface-pressed"
-    >
-      <Icon name={icon} size={20} />
-    </button>
   );
 }

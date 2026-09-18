@@ -13,7 +13,8 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { DEFAULT_PICKUP, isPickupChanged, type Place } from '@gsm/shared';
+import { DEFAULT_PICKUP, isPickupChanged, type LatLon, type Place } from '@gsm/shared';
+import { reversePlace } from '@/lib/reverse-place';
 import { BackButton } from '@/components/BackButton';
 import { FlowGuard } from '@/components/FlowGuard';
 import { Icon } from '@/components/Icon';
@@ -62,6 +63,17 @@ function PickupContent() {
     setPickingPickup(false);
   }
 
+  /**
+   * Bam mot diem tren ban do de lam diem don.
+   *
+   * Di thang vao `choosePickup` nen cung KHONG ban event nao — `pickup_source`
+   * se mang `'map'` va tu di vao `confirm_pickup` khi bam nut xac nhan.
+   * Khong can them mot dong tracking nao o day.
+   */
+  async function pickPickupOnMap(point: LatLon) {
+    choosePickup(await reversePlace(point.lat, point.lon));
+  }
+
   function confirmPickup() {
     const driverNote = note.trim();
     trackEvent({
@@ -96,7 +108,16 @@ function PickupContent() {
       variant="split"
       section="Di chuyển"
       tabs={['Đặt xe', 'Đang diễn ra']}
-      aside={<MapCanvas pickup={pickup} destination={destination} route={route} fill />}
+      aside={
+        <MapCanvas
+          pickup={pickup}
+          destination={destination}
+          route={route}
+          label={pickingPickup ? 'Bấm lên bản đồ để chọn điểm đón' : undefined}
+          fill
+          onPick={pickingPickup ? pickPickupOnMap : undefined}
+        />
+      }
       title="Xác nhận điểm đón"
       leading={<BackButton from="pickup_confirm" to="address_selection" href="/ride/address" />}
       footer={<PrimaryButton onClick={confirmPickup}>Chọn điểm đón này</PrimaryButton>}

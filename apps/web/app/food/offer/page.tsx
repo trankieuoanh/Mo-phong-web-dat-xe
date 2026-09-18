@@ -6,22 +6,48 @@
  *
  * Uu dai ap len TIEN HANG (cart_total), khong ap len phi giao — tru
  * `offer-freeship` von giam dung bang SHIPPING_FEE (mock-data.md muc 5, 6).
+ *
+ * TICK ROI XAC NHAN, khong phai bam-la-di. Bam mot uu dai chi doi trang thai
+ * tai cho; `select_offer` ban khi bam nut o footer — dung mo hinh `select_promo`
+ * cua /ride/promo. Hai cai duoc:
+ *
+ *   1. Moi phien co DUNG MOT `select_offer`. Ban cu ban ngay luc bam roi dieu
+ *      huong, nen quay lai chon lai la sinh them mot event nua, va phan tich
+ *      phai tu doan cai nao moi la lua chon cuoi.
+ *   2. Trang thai da chon thuc su nhin thay duoc. Truoc day `ring-2 ring-primary`
+ *      gan nhu khong bao gio hien ra vi man hinh chuyen ngay khi bam.
  */
 
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { OFFERS, calcDiscount, calcFoodTotals, getFoodItem, isRuleAvailable } from '@gsm/shared';
 import { BackButton } from '@/components/BackButton';
 import { FlowGuard } from '@/components/FlowGuard';
+import { Icon } from '@/components/Icon';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { ScreenShell } from '@/components/ScreenShell';
 import { useApp } from '@/lib/app-context';
 import { formatVnd } from '@/lib/format';
 import { trackEvent, useScreenView } from '@/lib/track';
 
+/**
+ * Guard chi chan LUC VAO man — cung khuon voi `/food/cart`.
+ *
+ * Truoc day man nay thieu chot `entered`, nen no hanh xu khac han man gio hang
+ * ngay canh no: xoa het mon o gio hang thi duoc o lai va thay trang thai rong,
+ * con o day thi bi day ve `/food` giua chung. Hai man lien nhau trong cung mot
+ * luong khong nen phan ung khac nhau truoc cung mot thay doi.
+ */
 export default function FoodOfferPage() {
   const { cart } = useApp();
+  const [entered, setEntered] = useState(false);
+
+  useEffect(() => {
+    if (cart.length > 0) setEntered(true);
+  }, [cart.length]);
+
   return (
-    <FlowGuard ready={cart.length > 0} fallback="/food">
+    <FlowGuard ready={cart.length > 0 || entered} fallback="/food">
       <FoodOfferContent />
     </FlowGuard>
   );
@@ -34,13 +60,26 @@ function FoodOfferContent() {
 
   const { cartTotal } = calcFoodTotals(cart, null, getFoodItem);
 
-  function selectOffer(id: string, code: string, discountAmount: number) {
+  /**
+   * Lua chon tam, CHUA ghi vao context va chua ban event. Khoi tao tu `offerId`
+   * de quay lai man nay van thay uu dai da chon truoc do.
+   */
+  const [picked, setPicked] = useState<string | null>(offerId ?? null);
+
+  function applyOffer() {
+    const offer = OFFERS.find((o) => o.id === picked);
+    if (!offer) return;
+
     trackEvent({
       eventName: 'select_offer',
       screenName: 'food_offer_selection',
-      properties: { offer_id: id, offer_code: code, discount_amount: discountAmount },
+      properties: {
+        offer_id: offer.id,
+        offer_code: offer.code,
+        discount_amount: calcDiscount(offer, cartTotal),
+      },
     });
-    setOfferId(id);
+    setOfferId(offer.id);
     router.push('/food/confirm');
   }
 
@@ -55,37 +94,65 @@ function FoodOfferContent() {
       variant="wide"
       section="Đặt đồ ăn"
       tabs={['Đặt món', 'Đang diễn ra', 'Đơn đã lưu']}
-      maxWidth="max-w-[600px]"
+      maxWidth="max-w-[760px]"
       title="Chọn ưu đãi"
       leading={<BackButton from="food_offer_selection" to="food_cart" href="/food/cart" />}
+      /* Pattern M — footer doi vai tro theo viec da tick hay chua. Ban cu chi co
+         mot nut "Bo qua" dang `subtle`, nen buoc nay la man duy nhat trong ca
+         app khong co hanh dong chinh o footer. */
       footer={
-        <PrimaryButton variant="subtle" onClick={skipOffer}>
-          Bỏ qua
-        </PrimaryButton>
+        picked ? (
+          <PrimaryButton onClick={applyOffer}>Áp dụng ưu đãi</PrimaryButton>
+        ) : (
+          <PrimaryButton variant="subtle" onClick={skipOffer}>
+            Bỏ qua ưu đãi và tiếp tục
+          </PrimaryButton>
+        )
       }
     >
       <ul className="flex flex-col gap-md">
         {OFFERS.map((offer) => {
           const available = isRuleAvailable(offer, cartTotal);
           const discount = calcDiscount(offer, cartTotal);
+          const selected = offer.id === picked;
 
           return (
             <li key={offer.id}>
               <button
                 type="button"
                 disabled={!available}
-                onClick={() => selectOffer(offer.id, offer.code, discount)}
-                className={`w-full rounded-md bg-canvas-soft p-lg text-left text-ink transition-colors enabled:hover:bg-surface-pressed disabled:cursor-not-allowed disabled:opacity-50 ${
-                  offer.id === offerId ? 'ring-2 ring-primary' : ''
+                aria-pressed={selected}
+                onClick={() => setPicked(selected ? null : offer.id)}
+                className={`flex w-full items-center gap-lg rounded-xl bg-canvas-soft p-lg text-left text-ink transition-colors enabled:hover:bg-surface-pressed enabled:active:bg-surface-pressed disabled:cursor-not-allowed disabled:opacity-50 ${
+                  selected ? 'ring-2 ring-primary' : ''
                 }`}
               >
-                <span className="t-body-md-strong block">{offer.title}</span>
-                <span className="t-body-sm mt-xxs block text-body">{offer.description}</span>
-                <span className="t-caption mt-xxs block text-mute">
-                  {available
-                    ? `Giảm ${formatVnd(discount)}`
-                    : `Cần đơn tối thiểu ${formatVnd(offer.minOrder)}`}
+                <span className="grid size-11 shrink-0 place-items-center rounded-full bg-canvas text-primary-dark">
+                  <Icon name="ticket" size={22} />
                 </span>
+
+                <span className="min-w-0 flex-1">
+                  <span className="t-body-md-strong block">{offer.title}</span>
+                  <span className="t-body-sm mt-xxs block text-body">{offer.description}</span>
+                  <span className="t-caption mt-xxs block text-mute">
+                    {available
+                      ? `Giảm ${formatVnd(discount)}`
+                      : `Cần đơn tối thiểu ${formatVnd(offer.minOrder)}`}
+                  </span>
+                </span>
+
+                {/* Pattern C — bong tich. Uu dai khong du dieu kien khong co o
+                    nay: `opacity-50` cong dong ly do o tren da noi du. */}
+                {available ? (
+                  <span
+                    aria-hidden="true"
+                    className={`grid size-6 shrink-0 place-items-center rounded-full ${
+                      selected ? 'bg-primary-dark text-on-primary' : 'bg-canvas'
+                    }`}
+                  >
+                    {selected ? <Icon name="check" size={14} /> : null}
+                  </span>
+                ) : null}
               </button>
             </li>
           );

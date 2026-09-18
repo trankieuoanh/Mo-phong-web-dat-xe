@@ -81,3 +81,22 @@ body {
   background: var(--color-canvas-softer);
   color: var(--color-ink);
 }
+
+/**
+ * Vien focus dung chung cho moi phan tu bam duoc.
+ *
+ * Truoc day toan bo apps/web KHONG co mot quy tac focus nao (`grep focus-visible`
+ * tra ve rong), va o tim o man menu con dat `outline-none`. Di het mot luong
+ * bang phim Tab la mat dau con tro hoan toan — day la lo hong a11y, khong phai
+ * chi tiet tham my.
+ *
+ * `:focus-visible` chu khong phai `:focus`: bam chuot vao nut thi khong hien
+ * vien, chi khi dieu huong bang ban phim moi hien.
+ *
+ * Mau lay `primary-dark` chu khong phai `primary` — cung ly do da ghi o
+ * tailwind-theme.md muc 0b: `#00B4B8` khong du tuong phan.
+ */
+:focus-visible {
+  outline: 2px solid var(--color-primary-dark);
+  outline-offset: 2px;
+}

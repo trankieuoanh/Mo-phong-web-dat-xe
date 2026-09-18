@@ -86,7 +86,9 @@ export default function RideSuccessPage() {
       footer={<PrimaryButton onClick={backToHome}>Về trang chủ</PrimaryButton>}
     >
       <div className="flex flex-col items-center py-3xl">
-        <div className="grid size-20 place-items-center rounded-full bg-primary text-on-primary">
+        {/* `primary-dark` chu KHONG phai `primary`: trang tren #00B4B8 chi dat
+            2.6:1, duoi chuan AA (tailwind-theme.md muc 0b). */}
+        <div className="grid size-20 place-items-center rounded-full bg-primary-dark text-on-primary">
           <Icon name="check" size={40} />
         </div>
         <h1 className="t-display-md mt-lg text-center">Đặt xe thành công</h1>
