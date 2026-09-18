@@ -300,95 +300,373 @@ export type FoodCategory = 'main' | 'drink' | 'dessert';
  */
 export type Meal = 'breakfast' | 'lunch' | 'dinner';
 
+/**
+ * Kieu bep. KHONG phai mot nhan tu dat: day la truc de noi mon an voi tag
+ * `cuisine` THAT cua quan tren OpenStreetMap.
+ *
+ * Danh sach nay duoc chon tu mau 120 quan an that o Ha Noi (50% co tag
+ * `cuisine`), theo tan suat giam dan: vietnamese 28, regional 6, japanese 5,
+ * korean 3, pizza 3, noodle 3, barbecue 3, dessert 2, french 2, pho 2...
+ * Bang quy doi tag tho -> gia tri o day nam trong food.ts (`CUISINE_ALIASES`).
+ */
+export type Cuisine =
+  | 'vietnamese'
+  | 'japanese'
+  | 'korean'
+  | 'grill'
+  | 'pizza'
+  | 'american'
+  | 'seafood'
+  | 'cafe'
+  | 'dessert';
+
 export interface FoodItem {
   id: string;
   name: string;
-  /**
-   * Ten quan GOC cua mon — chi de hien thi o the mon khi KHONG loc theo quan.
-   * Khi nguoi dung chon mot quan that o dai "Gan ban", the mon phai hien ten
-   * quan DANG CHON chu khong phai truong nay (xem app/food/page.tsx).
-   */
-  restaurant: string;
   price: number;
   category: FoodCategory;
+  /** Noi mon voi tag `cuisine` that cua quan — xem menuOf() trong food.ts. */
+  cuisine: Cuisine;
   /** Bua nao hop an mon nay — dung cho dai goi y sang/trua/toi. */
   meals: Meal[];
   /** Khong di vao event — chi de hien thi. */
   description: string;
+  /**
+   * Duong dan anh trong apps/web/public, vi du `/food/banh-mi-01.jpg`.
+   *
+   * ANH THAT, tai san ve repo bang scripts/fetch-food-images.mjs tu Wikimedia
+   * Commons. App KHONG goi mang de lay anh — tep nam san trong `public`.
+   *
+   * Giay phep va tac gia tung anh ghi o `apps/web/public/food/CREDITS.md`. Anh
+   * Commons phan lon la CC BY/CC BY-SA nen viec ghi cong la BAT BUOC, khong phai
+   * phep lich su.
+   *
+   * Van optional: mon nao khong tim duoc anh dung thi de trong, va `FoodThumb`
+   * lui ve khung co glyph theo kieu bep. Mot o glyph thi that tha, con mot tam
+   * anh sai mon thi khong.
+   *
+   * KHONG di vao event.
+   */
+  image?: string;
 }
 
+/**
+ * Thuc don dung chung cho MOI quan that.
+ *
+ * KHONG con truong `restaurant`: ten quan gio den tu OpenStreetMap chu khong
+ * phai tu file nay. Mot mon duoc gan vao quan nao la do tag `cuisine` THAT cua
+ * quan do quyet dinh (food.ts), nen mot quan japanese se khong con hien ra
+ * "Banh Mi 25" nua.
+ *
+ * Gia thi van phai tu dat: khong nguon mo nao co gia mon an that.
+ */
 export const FOOD_ITEMS: FoodItem[] = [
+  // ── vietnamese — kieu bep pho bien nhat trong mau (28/60) ──
   {
     id: 'banh-mi-01',
     name: 'Bánh mì thịt nướng',
-    restaurant: 'Bánh Mì 25',
     price: 35_000,
     category: 'main',
+    cuisine: 'vietnamese',
     meals: ['breakfast', 'lunch'],
     description: 'Thịt nướng than hoa, pate gan và rau thơm trong vỏ bánh giòn.',
+    image: '/food/banh-mi-01.jpg',
   },
   {
     id: 'pho-bo-02',
     name: 'Phở bò tái',
-    restaurant: 'Phở Thìn Bờ Hồ',
     price: 55_000,
     category: 'main',
+    cuisine: 'vietnamese',
     meals: ['breakfast', 'lunch', 'dinner'],
     description: 'Nước dùng ninh xương 12 tiếng, bò tái mềm, hành trần.',
+    image: '/food/pho-bo-02.jpg',
   },
   {
     id: 'bun-cha-03',
     name: 'Bún chả Hà Nội',
-    restaurant: 'Bún Chả Hương Liên',
     price: 50_000,
     category: 'main',
+    cuisine: 'vietnamese',
     meals: ['lunch', 'dinner'],
     description: 'Chả viên và chả miếng nướng than, nước chấm chua ngọt.',
+    image: '/food/bun-cha-03.jpg',
   },
   {
     id: 'com-tam-04',
     name: 'Cơm tấm sườn bì chả',
-    restaurant: 'Cơm Tấm Ba Ghiền',
     price: 60_000,
     category: 'main',
+    cuisine: 'vietnamese',
     meals: ['lunch', 'dinner'],
     description: 'Sườn nướng mật ong, bì trộn thính, chả trứng hấp.',
+    image: '/food/com-tam-04.jpg',
   },
   {
     id: 'banh-xeo-05',
     name: 'Bánh xèo miền Tây',
-    restaurant: 'Bánh Xèo Ăn Là Ghiền',
     price: 65_000,
     category: 'main',
+    cuisine: 'vietnamese',
     meals: ['lunch', 'dinner'],
     description: 'Vỏ bánh vàng giòn, nhân tôm thịt giá, ăn kèm rau sống.',
+    image: '/food/banh-xeo-05.jpg',
   },
+
+  // ── cafe — tag `cafe`, `juice`, `bubble_tea` ──
   {
     id: 'tra-sua-06',
     name: 'Trà sữa trân châu đường đen',
-    restaurant: 'Phúc Long',
     price: 45_000,
     category: 'drink',
+    cuisine: 'cafe',
     meals: ['lunch', 'dinner'],
     description: 'Trà sữa đậm vị, trân châu đường đen nấu trong ngày.',
+    image: '/food/tra-sua-06.jpg',
   },
   {
     id: 'ca-phe-07',
     name: 'Cà phê sữa đá',
-    restaurant: 'Highlands Coffee',
     price: 29_000,
     category: 'drink',
+    cuisine: 'cafe',
     meals: ['breakfast', 'lunch'],
     description: 'Cà phê robusta rang đậm, sữa đặc, đá viên.',
+    image: '/food/ca-phe-07.jpg',
   },
+  {
+    id: 'nuoc-ep-27',
+    name: 'Nước ép cam tươi',
+    price: 39_000,
+    category: 'drink',
+    cuisine: 'cafe',
+    meals: ['breakfast', 'lunch', 'dinner'],
+    description: 'Cam vắt nguyên chất, không thêm đường.',
+    image: '/food/nuoc-ep-27.jpg',
+  },
+
+  // ── dessert — tag `dessert`, `crepe`, `ice_cream` ──
   {
     id: 'che-08',
     name: 'Chè khúc bạch',
-    restaurant: 'Chè Bốn Mùa',
     price: 32_000,
     category: 'dessert',
+    cuisine: 'dessert',
     meals: ['lunch', 'dinner'],
     description: 'Khúc bạch phô mai mềm, nhãn lồng và hạnh nhân rang.',
+    image: '/food/che-08.jpg',
+  },
+  {
+    id: 'kem-28',
+    name: 'Kem dừa Thái',
+    price: 45_000,
+    category: 'dessert',
+    cuisine: 'dessert',
+    meals: ['lunch', 'dinner'],
+    description: 'Kem dừa trong sọ dừa tươi, lạc rang và thạch dừa.',
+    image: '/food/kem-28.jpg',
+  },
+  {
+    id: 'banh-flan-29',
+    name: 'Bánh flan cà phê',
+    price: 28_000,
+    category: 'dessert',
+    cuisine: 'dessert',
+    meals: ['breakfast', 'lunch', 'dinner'],
+    description: 'Flan trứng mịn, rưới cà phê đắng và caramel.',
+    image: '/food/banh-flan-29.jpg',
+  },
+
+  // ── japanese — tag `japanese`, `sushi`, `ramen` ──
+  {
+    id: 'sushi-09',
+    name: 'Sushi cá hồi 8 miếng',
+    price: 145_000,
+    category: 'main',
+    cuisine: 'japanese',
+    meals: ['lunch', 'dinner'],
+    description: 'Cá hồi Na Uy phi lê, cơm giấm nắm tay, kèm wasabi.',
+    image: '/food/sushi-09.jpg',
+  },
+  {
+    id: 'ramen-10',
+    name: 'Ramen tonkotsu',
+    price: 120_000,
+    category: 'main',
+    cuisine: 'japanese',
+    meals: ['lunch', 'dinner'],
+    description: 'Nước hầm xương heo 10 tiếng, chashu, trứng lòng đào.',
+    image: '/food/ramen-10.jpg',
+  },
+  {
+    id: 'gyoza-11',
+    name: 'Gyoza chiên 6 chiếc',
+    price: 65_000,
+    category: 'main',
+    cuisine: 'japanese',
+    meals: ['lunch', 'dinner'],
+    description: 'Há cảo Nhật vỏ mỏng, nhân thịt bắp cải, áp chảo giòn đáy.',
+    image: '/food/gyoza-11.jpg',
+  },
+
+  // ── korean — tag `korean`, `hàn`, `hàn_quốc`, `sochu` ──
+  {
+    id: 'kimbap-12',
+    name: 'Kimbap bò',
+    price: 70_000,
+    category: 'main',
+    cuisine: 'korean',
+    meals: ['breakfast', 'lunch'],
+    description: 'Cơm cuộn rong biển, bò xào, củ cải muối và trứng.',
+    image: '/food/kimbap-12.jpg',
+  },
+  {
+    id: 'bibimbap-13',
+    name: 'Cơm trộn Bibimbap',
+    price: 95_000,
+    category: 'main',
+    cuisine: 'korean',
+    meals: ['lunch', 'dinner'],
+    description: 'Cơm nóng, rau theo mùa, trứng ốp và tương ớt gochujang.',
+    image: '/food/bibimbap-13.jpg',
+  },
+  {
+    id: 'ga-ran-14',
+    name: 'Gà rán sốt cay Hàn Quốc',
+    price: 135_000,
+    category: 'main',
+    cuisine: 'korean',
+    meals: ['lunch', 'dinner'],
+    description: 'Gà chiên hai lần, sốt gochujang mật ong, rắc vừng.',
+    image: '/food/ga-ran-14.png',
+  },
+
+  // ── grill — tag `barbecue`, `nướng`, `thịt_nướng`, `yakiniku`, `steak_house` ──
+  {
+    id: 'suon-nuong-15',
+    name: 'Sườn nướng BBQ',
+    price: 155_000,
+    category: 'main',
+    cuisine: 'grill',
+    meals: ['dinner'],
+    description: 'Sườn heo ướp mật ong nướng than, ăn kèm bắp và khoai.',
+    image: '/food/suon-nuong-15.jpg',
+  },
+  {
+    id: 'ba-chi-nuong-16',
+    name: 'Ba chỉ bò nướng',
+    price: 165_000,
+    category: 'main',
+    cuisine: 'grill',
+    meals: ['dinner'],
+    description: 'Ba chỉ bò Mỹ thái lát, nướng tại bàn, chấm muối ớt xanh.',
+    image: '/food/ba-chi-nuong-16.jpg',
+  },
+  {
+    id: 'bo-nuong-17',
+    name: 'Bò nướng tiêu đen',
+    price: 175_000,
+    category: 'main',
+    cuisine: 'grill',
+    meals: ['lunch', 'dinner'],
+    description: 'Thăn bò áp chảo sốt tiêu đen, khoai tây nghiền.',
+    image: '/food/bo-nuong-17.jpg',
+  },
+
+  // ── pizza — tag `pizza`, `italian` ──
+  {
+    id: 'pizza-margherita-18',
+    name: 'Pizza Margherita',
+    price: 149_000,
+    category: 'main',
+    cuisine: 'pizza',
+    meals: ['lunch', 'dinner'],
+    description: 'Sốt cà chua San Marzano, mozzarella và húng quế tươi.',
+    image: '/food/pizza-margherita-18.jpg',
+  },
+  {
+    id: 'pizza-hai-san-19',
+    name: 'Pizza hải sản',
+    price: 189_000,
+    category: 'main',
+    cuisine: 'pizza',
+    meals: ['lunch', 'dinner'],
+    description: 'Tôm, mực, thanh cua trên nền phô mai kéo sợi.',
+    image: '/food/pizza-hai-san-19.jpg',
+  },
+  {
+    id: 'mi-y-20',
+    name: 'Mì Ý sốt bò bằm',
+    price: 125_000,
+    category: 'main',
+    cuisine: 'pizza',
+    meals: ['lunch', 'dinner'],
+    description: 'Spaghetti al dente, sốt bolognese hầm hai tiếng.',
+    image: '/food/mi-y-20.jpg',
+  },
+
+  // ── american — tag `burger`, `hot_dog`, `sandwich`, `american`, `diner` ──
+  {
+    id: 'burger-21',
+    name: 'Burger bò phô mai',
+    price: 115_000,
+    category: 'main',
+    cuisine: 'american',
+    meals: ['lunch', 'dinner'],
+    description: 'Bò xay 150g nướng vỉ, cheddar tan chảy, dưa chuột muối.',
+    image: '/food/burger-21.jpg',
+  },
+  {
+    id: 'khoai-tay-22',
+    name: 'Khoai tây chiên phô mai',
+    price: 59_000,
+    category: 'main',
+    cuisine: 'american',
+    meals: ['lunch', 'dinner'],
+    description: 'Khoai cắt múi chiên giòn, rưới sốt phô mai nóng.',
+    image: '/food/khoai-tay-22.jpg',
+  },
+  {
+    id: 'hot-dog-23',
+    name: 'Hot dog xúc xích Đức',
+    price: 85_000,
+    category: 'main',
+    cuisine: 'american',
+    meals: ['breakfast', 'lunch'],
+    description: 'Xúc xích nướng, hành phi, mù tạt vàng và tương cà.',
+    image: '/food/hot-dog-23.jpg',
+  },
+
+  // ── seafood — tag `seafood`, `hải_sản` ──
+  {
+    id: 'tom-nuong-24',
+    name: 'Tôm sú nướng muối ớt',
+    price: 195_000,
+    category: 'main',
+    cuisine: 'seafood',
+    meals: ['dinner'],
+    description: 'Tôm sú tươi nướng than, chấm muối ớt xanh Nha Trang.',
+    image: '/food/tom-nuong-24.jpg',
+  },
+  {
+    id: 'muc-chien-25',
+    name: 'Mực chiên giòn',
+    price: 145_000,
+    category: 'main',
+    cuisine: 'seafood',
+    meals: ['lunch', 'dinner'],
+    description: 'Mực ống tẩm bột chiên giòn, ăn kèm sốt mayo chanh.',
+    image: '/food/muc-chien-25.jpg',
+  },
+  {
+    id: 'lau-hai-san-26',
+    name: 'Lẩu hải sản chua cay',
+    price: 320_000,
+    category: 'main',
+    cuisine: 'seafood',
+    meals: ['dinner'],
+    description: 'Nước lẩu Thái chua cay, tôm mực ngao và rau ăn kèm.',
+    image: '/food/lau-hai-san-26.jpg',
   },
 ];
 

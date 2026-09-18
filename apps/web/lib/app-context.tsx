@@ -53,10 +53,29 @@ export interface RideDraft {
   paymentMethod?: PaymentMethod;
 }
 
+/**
+ * Phan cua luong food PHAI song qua dieu huong. Xem food-flow-design.md muc 5.
+ *
+ * Co y KHONG chua bo loc cua man menu (o tim, chip bua, chip loai mon):
+ * screen-map.md muc 3 chot rang chung bi quen khi roi man, va thu can giu lai
+ * thi da nam trong event (`discovery_source`). Chi hai thu len day:
+ *
+ *   - `origin`: dia chi giao. Man confirm phai noi duoc giao toi dau.
+ *   - `restaurantId` / `restaurantName`: quan dang xem. Truoc day day la state
+ *     cuc bo cua app/food/page.tsx nen MAT ngay khi mo mot mon — do la ly do man
+ *     chi tiet mon va man confirm khong hien noi ten quan.
+ */
+export interface FoodDraft {
+  origin?: Place;
+  restaurantId?: string;
+  restaurantName?: string;
+}
+
 interface StoredState {
   ride: RideDraft;
   cart: CartLine[];
   offerId?: string | null;
+  food: FoodDraft;
 }
 
 interface AppContextValue extends StoredState {
@@ -72,6 +91,7 @@ interface AppContextValue extends StoredState {
   setCartQuantity: (itemId: string, quantity: number) => void;
   removeFromCart: (itemId: string) => void;
   setOfferId: (offerId: string | null) => void;
+  setFood: (patch: Partial<FoodDraft>) => void;
   clearCart: () => void;
 
   /** Bam "Ve trang chu" o man success: session moi + xoa sach draft. */
@@ -88,6 +108,8 @@ interface AppContextValue extends StoredState {
 const RIDE_KEY = 'gsm_ride_draft_v2';
 const CART_KEY = 'gsm_cart';
 const OFFER_KEY = 'gsm_offer';
+/** Phai khop DRAFT_KEYS trong lib/session.ts, neu khong reset se bo sot. */
+const FOOD_KEY = 'gsm_food_draft';
 
 const AppContext = createContext<AppContextValue | null>(null);
 
@@ -127,6 +149,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [ride, setRideState] = useState<RideDraft>(newRideDraft());
   const [cart, setCart] = useState<CartLine[]>([]);
   const [offerId, setOfferIdState] = useState<string | null | undefined>(undefined);
+  const [food, setFoodState] = useState<FoodDraft>({});
 
   // Doc storage trong useEffect, KHONG luc render — tranh hydration mismatch.
   useEffect(() => {
@@ -135,6 +158,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setRideState(newRideDraft(readJson<RideDraft>(RIDE_KEY, {})));
     setCart(readJson<CartLine[]>(CART_KEY, []));
     setOfferIdState(readJson<string | null | undefined>(OFFER_KEY, undefined));
+    setFoodState(readJson<FoodDraft>(FOOD_KEY, {}));
     setHydrated(true);
   }, []);
 
@@ -150,6 +174,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (hydrated) writeJson(OFFER_KEY, offerId);
   }, [offerId, hydrated]);
+
+  useEffect(() => {
+    if (hydrated) writeJson(FOOD_KEY, food);
+  }, [food, hydrated]);
 
   const setRide = useCallback((patch: Partial<RideDraft>) => {
     setRideState((prev) => ({ ...prev, ...patch }));
@@ -183,9 +211,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const setOfferId = useCallback((value: string | null) => setOfferIdState(value), []);
 
+  const setFood = useCallback((patch: Partial<FoodDraft>) => {
+    setFoodState((prev) => ({ ...prev, ...patch }));
+  }, []);
+
   const clearCart = useCallback(() => {
     setCart([]);
     setOfferIdState(undefined);
+    // Quan da chon di theo gio hang: gio rong thi "mon tai X" khong con nghia gi.
+    // `origin` cung xoa — phien sau se hoi lai GPS.
+    setFoodState({});
   }, []);
 
   const resetAll = useCallback(() => {
@@ -194,6 +229,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setRideState(newRideDraft());
     setCart([]);
     setOfferIdState(undefined);
+    setFoodState({});
   }, []);
 
   const value = useMemo<AppContextValue>(
@@ -204,12 +240,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ride,
       cart,
       offerId,
+      food,
       setRide,
       clearRide,
       addToCart,
       setCartQuantity,
       removeFromCart,
       setOfferId,
+      setFood,
       clearCart,
       resetAll,
     }),
@@ -220,12 +258,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ride,
       cart,
       offerId,
+      food,
       setRide,
       clearRide,
       addToCart,
       setCartQuantity,
       removeFromCart,
       setOfferId,
+      setFood,
       clearCart,
       resetAll,
     ],

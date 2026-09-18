@@ -9,12 +9,28 @@ import { ADDRESSES, FIXED_PICKUP, type Address } from './mock-data';
 
 /**
  * `preset` = mot trong 5 dia chi goi y o mock-data.md muc 1 (hoac diem don
- * mac dinh). `search` = nguoi dung tu go tim, du lieu tu Nominatim.
+ * mac dinh). `search` = nguoi dung tu go tim, du lieu tu Photon.
+ * `map` = nguoi dung tu bam mot diem tren ban do.
  *
  * Gia tri nay di THANG vao properties cua `select_address` / `confirm_pickup`
- * / `confirm_ride` — xem event-taxonomy.md.
+ * / `change_address` / `confirm_ride` — xem event-taxonomy.md.
+ *
+ * VI SAO `map` TACH RIENG chu khong gop vao `search`: analysis-spec.md dinh
+ * nghia `search_usage_rate` la "nguoi dung co THUC SU can o tim khong, hay 5
+ * goi y da du". Gop luot bam tren ban do vao do thi chi so nay tra loi sai mot
+ * cau hoi UX that. Ba cach chon dia chi la ba hanh vi khac nhau, nen dem rieng.
  */
-export type PlaceSource = 'preset' | 'search';
+export type PlaceSource = 'preset' | 'search' | 'map';
+
+/**
+ * `id` cua mot diem bam tren ban do: `map-<lat>-<lon>` lam tron 5 chu so (~1 m).
+ *
+ * Suy tu chinh toa do chu KHONG random: hai lan bam cung mot cho phai ra cung
+ * mot id, khong thi khong bao gio gom nhom duoc (CLAUDE.md quy tac 5).
+ */
+export function mapPlaceId(lat: number, lon: number): string {
+  return `map-${lat.toFixed(5)}-${lon.toFixed(5)}`;
+}
 
 /**
  * Mot dia diem, du den tu ADDRESSES hay tu Nominatim.
@@ -40,6 +56,27 @@ export interface Place {
    */
   lat: number;
   lon: number;
+}
+
+/**
+ * Mot quan an THAT tren OpenStreetMap — `Place` cong cac tag OSM doc duoc.
+ *
+ * Moi truong duoi day deu la DU LIEU THAT tu `extratags` cua Nominatim, khong
+ * phai mock. Nhung OSM la du lieu cong dong nen phu song thua: trong mau 120
+ * quan o Ha Noi, chi 50% co `cuisine`, va it hon nua co `openingHours`.
+ * Vi vay cac truong nay deu optional/rong duoc, va UI phai doc duoc khi thieu —
+ * loc bo quan thieu tag se lam danh sach "gan ban" rong mot cach kho hieu.
+ */
+export interface Restaurant extends Place {
+  /**
+   * Tag `cuisine` da tach theo `;`. RONG khi quan khong khai bao.
+   * Gia tri con nguyen van OSM (`vietnamese`, `thịt_nướng`, `hàn_quốc`...) —
+   * viec quy doi ve kieu bep cua ta nam o `cuisinesOf()` trong food.ts.
+   */
+  cuisine: string[];
+  /** Tag `opening_hours` nguyen van, vi du "Mo-Su 09:00-20:00" hoac "24/7". */
+  openingHours?: string;
+  phone?: string;
 }
 
 /** Dia chi goi y -> Place, de hai nguon dung chung mot hinh dang trong UI. */

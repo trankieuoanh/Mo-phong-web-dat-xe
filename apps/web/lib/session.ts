@@ -21,6 +21,7 @@ export const DRAFT_KEYS = [
   'gsm_ride_draft',
   'gsm_cart',
   'gsm_offer',
+  'gsm_food_draft',
 ] as const;
 
 function isBrowser(): boolean {
