@@ -13,6 +13,7 @@ import { eventsRouter } from './routes/events.routes.js';
 import { healthRouter } from './routes/health.routes.js';
 import { placesRouter } from './routes/places.routes.js';
 import { routeRouter } from './routes/route.routes.js';
+import { tilesRouter } from './routes/tiles.routes.js';
 
 const PORT = Number(process.env.PORT ?? 4000);
 const WEB_ORIGIN = process.env.WEB_ORIGIN ?? 'http://localhost:3000';
@@ -28,6 +29,9 @@ app.use('/api', eventsRouter);
 // chua co credential Firebase.
 app.use('/api', placesRouter);
 app.use('/api', routeRouter);
+// Do xem nha cung cap tile nao con song. Cung nhom voi hai router tren: khong
+// cham Firestore nen tra loi duoc ca khi chua co credential Firebase.
+app.use('/api', tilesRouter);
 
 app.use((_req, res) => {
   res.status(404).json({ error: 'Not found' });

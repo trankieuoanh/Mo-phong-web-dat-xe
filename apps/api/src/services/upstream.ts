@@ -15,6 +15,22 @@ interface GateOptions {
   maxEntries: number;
 }
 
+/**
+ * Ket qua RONG co duoc cache khong? Mac dinh la KHONG.
+ *
+ * Mot mang rong la mot cau tra loi hop le, nen ban dau no duoc cache nhu moi
+ * gia tri khac. Nhung hau qua thi khong hop le chut nao: mot lan "khong tim
+ * thay quan nao" se dong bang dai "Gan ban" suot CA TTL, va nut "Thu lai" tra
+ * ve dung cai mang rong do tuc thi — bam bao nhieu lan cung vo ich, va nhin tu
+ * phia nguoi dung thi app don gian la hong.
+ *
+ * Ket qua rong gan nhu luon la dau hieu cua mot van de tam thoi (upstream chap
+ * chon, ban kinh hoi hep, toa do vua doi), nen hoi lai la dung.
+ */
+function shouldCache(value: unknown): boolean {
+  return !(Array.isArray(value) && value.length === 0);
+}
+
 interface CacheEntry<T> {
   at: number;
   value: T;
@@ -81,7 +97,7 @@ export function createUpstreamGate(options: GateOptions): UpstreamGate {
         lastCallAt = Date.now();
 
         const value = await work();
-        write(key, value);
+        if (shouldCache(value)) write(key, value);
         return value;
       });
 
