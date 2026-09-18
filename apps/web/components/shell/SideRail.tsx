@@ -33,6 +33,7 @@ import type { Flow } from '@gsm/shared';
 import { GsmLogo } from '@/components/GsmLogo';
 import { Icon, type IconName } from '@/components/Icon';
 import { trackSelectFlow, type FlowEntryScreen } from '@/lib/track';
+import { activeFlowOf, selectFlowScreenFor } from './flow-nav';
 
 const COLLAPSED_KEY = 'gsm_rail_collapsed';
 
@@ -43,11 +44,8 @@ const COLLAPSED_KEY = 'gsm_rail_collapsed';
  * NOI nguoi dung nhay luong (event-taxonomy.md muc 1: doc `screen_name`, khong
  * phai `previous_screen`).
  */
-const FLOW_ENTRY: Record<string, FlowEntryScreen> = {
-  '/': 'home',
-  '/ride/address': 'address_selection',
-  '/food': 'food_menu',
-};
+// Bang FLOW_ENTRY da chuyen sang ./flow-nav.ts de TopBar (tab luong o man hep)
+// dung chung dung mot nguon — hai ban sao se lech nhau vao luc khong ai de y.
 
 interface RailItem {
   icon: IconName;
@@ -66,10 +64,12 @@ const ITEMS: RailItem[] = [
   // "Dat xe" dung truoc vi day la luong MAC DINH cua `/`.
   { icon: 'car', label: 'Đặt xe', flow: 'ride', href: '/ride/address' },
   { icon: 'bag', label: 'Đặt đồ ăn', flow: 'food', href: '/food' },
+  // Bon muc duoi la link THAT, deu tro toi man NGOAI FUNNEL: chung khong co
+  // trong SCREENS va khong bao gio ban event (CLAUDE.md quy tac 9).
   { icon: 'clock', label: 'Hoạt động', href: '/history' },
-  { icon: 'users', label: 'Tài khoản phụ' },
-  { icon: 'headset', label: 'Trung tâm hỗ trợ' },
-  { icon: 'doc', label: 'Điều khoản & Chính sách' },
+  { icon: 'users', label: 'Tài khoản phụ', href: '/account' },
+  { icon: 'headset', label: 'Trung tâm hỗ trợ', href: '/support' },
+  { icon: 'doc', label: 'Điều khoản & Chính sách', href: '/terms' },
 ];
 
 export function SideRail() {
@@ -100,19 +100,7 @@ export function SideRail() {
     });
   }
 
-  /** Khac undefined = dang o mot man dau luong, tab con doi luong duoc. */
-  const entryScreen: FlowEntryScreen | undefined = FLOW_ENTRY[pathname];
-
-  /**
-   * Luong dang dung. `/` tinh la ride — day chinh la "mac dinh la dat xe":
-   * khong co dong nay thi o `/` khong muc nao sang len.
-   */
-  const activeFlow: Flow | null =
-    pathname === '/' || pathname.startsWith('/ride')
-      ? 'ride'
-      : pathname.startsWith('/food')
-        ? 'food'
-        : null;
+  const activeFlow: Flow | null = activeFlowOf(pathname);
 
   function chooseFlow(screenName: FlowEntryScreen, flow: Flow, href: string) {
     // Ban DONG BO truoc push — xem ghi chu o trackSelectFlow.
@@ -140,9 +128,12 @@ export function SideRail() {
       </span>
 
       {ITEMS.map((item) => {
+        /** Muc co href ma khong co flow = link toi mot man ngoai funnel. */
+        const isPlainLink = item.flow === undefined && item.href !== undefined;
+
         const active =
           (item.flow !== undefined && item.flow === activeFlow) ||
-          (item.href === '/history' && pathname === '/history');
+          (isPlainLink && pathname === item.href);
 
         const tone = active
           ? 'border-primary bg-canvas-soft text-primary-dark'
@@ -156,12 +147,12 @@ export function SideRail() {
           </>
         );
 
-        // Muc "Hoat dong" — link that o moi man.
-        if (item.href === '/history') {
+        // Bon muc ngoai funnel — link that o moi man.
+        if (isPlainLink) {
           return (
             <Link
               key={item.label}
-              href={item.href}
+              href={item.href!}
               title={item.label}
               aria-label={item.label}
               aria-current={active ? 'page' : undefined}
@@ -172,15 +163,20 @@ export function SideRail() {
           );
         }
 
-        // Tab luong KIA, o mot trong ba man dau luong — cho duy nhat doi luong duoc.
-        if (item.flow && entryScreen && !active) {
+        // Tab luong doi duoc: o ba man dau luong, HOAC o mot man ngoai funnel.
+        // Luat day du (ke ca khi nao KHONG doi duoc) nam o selectFlowScreenFor.
+        const selectScreen = item.flow
+          ? selectFlowScreenFor(pathname, item.flow, item.href!)
+          : null;
+
+        if (selectScreen) {
           return (
             <button
               key={item.label}
               type="button"
               title={item.label}
               aria-label={item.label}
-              onClick={() => chooseFlow(entryScreen, item.flow!, item.href!)}
+              onClick={() => chooseFlow(selectScreen, item.flow!, item.href!)}
               className={`${rowBase} ${tone} hover:bg-canvas-soft`}
             >
               {body}
@@ -203,7 +199,12 @@ export function SideRail() {
           );
         }
 
-        // Con lai: trang tri thuan tuy.
+        // Con lai DUY NHAT mot truong hop: tab cua luong KIA khi dang o GIUA
+        // luong (vi du tab "Dat do an" luc dang o /ride/vehicle) —
+        // `selectFlowScreenFor` tra null, va `active` la false.
+        //
+        // Trang tri thuan tuy, dung nhu y dinh o dau file: nhay luong tu giua
+        // luong tao mot session khong phan tich duoc.
         return (
           <span key={item.label} aria-hidden="true" title={item.label} className={`${rowBase} ${tone}`}>
             {body}
