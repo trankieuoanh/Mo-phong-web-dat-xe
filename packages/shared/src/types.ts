@@ -7,7 +7,7 @@
 export type Flow = 'ride' | 'food';
 export type FlowValue = Flow | 'none';
 
-/** event-taxonomy.md muc 5 — 23 gia tri. */
+/** event-taxonomy.md muc 5 — 26 gia tri. */
 export type EventName =
   // chung
   | 'screen_view'
@@ -22,6 +22,9 @@ export type EventName =
   | 'select_promo'
   | 'skip_promo'
   | 'confirm_ride'
+  | 'driver_searching'
+  | 'driver_assigned'
+  | 'cancel_ride'
   // food — bon cach tim mon o man menu (event-taxonomy.md muc 4)
   | 'search_item'
   | 'filter_category'
@@ -37,7 +40,7 @@ export type EventName =
   | 'skip_offer'
   | 'place_order';
 
-/** event-taxonomy.md muc 2 — 13 man hinh. */
+/** event-taxonomy.md muc 2 — 14 man hinh. */
 export type ScreenName =
   | 'home'
   | 'address_selection'
@@ -45,6 +48,7 @@ export type ScreenName =
   | 'vehicle_selection'
   | 'promo_selection'
   | 'ride_confirm'
+  | 'finding_driver'
   | 'ride_success'
   | 'food_menu'
   | 'food_item_detail'
@@ -99,6 +103,9 @@ export const EVENT_NAMES = [
   'select_promo',
   'skip_promo',
   'confirm_ride',
+  'driver_searching',
+  'driver_assigned',
+  'cancel_ride',
   'search_item',
   'filter_category',
   'select_meal',

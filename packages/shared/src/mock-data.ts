@@ -218,7 +218,44 @@ export interface DiscountRule {
   maxDiscount?: number;
   /** Gia tri toi thieu de ap dung. */
   minOrder: number;
+
+  // ── Bon dieu kien duoi day deu OPTIONAL, va deu chi gac QUYEN DUNG ──
+  //
+  // Vang het = mot luat chi phu thuoc `minOrder`, tuc dung y het ba ma dau
+  // tien viet truoc khi co chung. Do la ly do chung phai optional: them dieu
+  // kien moi khong duoc lam mot luat cu nao doi nghia.
+  //
+  // KHONG cai nao trong so nay tham gia tinh TIEN. Ly do o dau calcDiscount()
+  // trong pricing.ts — mot uu dai da chon thi thuoc ve nguoi dung roi.
+
+  /** Chi ap cho cac hang xe nay. Vang = moi hang. Chi luong Ride. */
+  vehicleTypes?: VehicleType[];
+  /** Quang duong toi thieu (km). Chi luong Ride. */
+  minDistanceKm?: number;
+  /**
+   * Gio vang, cua so nua mo [from, to) theo gio dia phuong 0-23.
+   * `from > to` nghia la vat qua nua dem (21 -> 2).
+   */
+  activeHours?: { from: number; to: number };
+  /**
+   * Tien giam tinh TREN cai gi. Mac dinh 'subtotal' (gia chuyen / tien hang).
+   *
+   * 'shipping' = giam tren PHI GIAO. Phan biet nay khong phai tieu xao: mot ma
+   * "giam 50% phi giao" ma tinh 50% tren tien hang thi sai bet, con
+   * `offer-freeship` truoc day bi `Math.min(value, cartTotal)` cat mat nen don
+   * duoi 15.000d khong he duoc mien phi giao that.
+   *
+   * `minOrder` VAN xet tren tien hang du appliesTo la gi — "don toi thieu" noi
+   * ve don hang, khong noi ve phi giao.
+   */
+  appliesTo?: 'subtotal' | 'shipping';
 }
+
+/** Nhan tieng Viet cua hang xe — dung khi giai thich vi sao mot ma bi khoa. */
+export const VEHICLE_TYPE_LABELS: Record<VehicleType, string> = {
+  bike: 'xe máy',
+  car: 'ô tô',
+};
 
 /** Luong Ride, man `promo_selection`. */
 export const PROMOS: DiscountRule[] = [
@@ -251,6 +288,48 @@ export const PROMOS: DiscountRule[] = [
     maxDiscount: 40_000,
     minOrder: 0,
   },
+  {
+    id: 'promo-bike',
+    code: 'GSMBIKE',
+    title: 'Giảm 15% xe máy, tối đa 20.000đ',
+    description: 'Chỉ áp dụng cho Green Bike',
+    type: 'percent',
+    value: 15,
+    maxDiscount: 20_000,
+    minOrder: 0,
+    vehicleTypes: ['bike'],
+  },
+  {
+    id: 'promo-car',
+    code: 'GSMCAR',
+    title: 'Giảm 30.000đ cho xe ô tô',
+    description: 'Áp dụng cho chuyến ô tô từ 80.000đ',
+    type: 'fixed',
+    value: 30_000,
+    minOrder: 80_000,
+    vehicleTypes: ['car'],
+  },
+  {
+    id: 'promo-lunch',
+    code: 'GSMTRUA',
+    title: 'Giờ vàng trưa: giảm 25.000đ',
+    description: 'Đặt xe từ 11:00 đến 13:00, chuyến từ 40.000đ',
+    type: 'fixed',
+    value: 25_000,
+    minOrder: 40_000,
+    activeHours: { from: 11, to: 13 },
+  },
+  {
+    id: 'promo-far',
+    code: 'GSMFAR',
+    title: 'Chuyến xa: giảm 12%, tối đa 50.000đ',
+    description: 'Áp dụng cho chuyến từ 8 km',
+    type: 'percent',
+    value: 12,
+    maxDiscount: 50_000,
+    minOrder: 0,
+    minDistanceKm: 8,
+  },
 ];
 
 /**
@@ -266,6 +345,10 @@ export const OFFERS: DiscountRule[] = [
     type: 'fixed',
     value: SHIPPING_FEE,
     minOrder: 0,
+    // `appliesTo` la thu lam cai `title` tren kia thanh su that. Truoc day base
+    // la cartTotal, nen `Math.min(15_000, cartTotal)` cat mat phan giam o don
+    // nho: don 10.000d chi duoc giam 10.000d, tuc VAN tra phi giao 5.000d.
+    appliesTo: 'shipping',
   },
   {
     id: 'offer-15',
@@ -285,6 +368,49 @@ export const OFFERS: DiscountRule[] = [
     type: 'fixed',
     value: 25_000,
     minOrder: 150_000,
+  },
+  {
+    id: 'offer-ship-half',
+    code: 'SHIP50',
+    title: 'Giảm 50% phí giao',
+    description: 'Giảm nửa phí giao hàng cho mọi đơn',
+    type: 'percent',
+    value: 50,
+    minOrder: 0,
+    // 50% cua PHI GIAO (7.500d), khong phai 50% cua tien hang.
+    appliesTo: 'shipping',
+  },
+  {
+    id: 'offer-breakfast',
+    code: 'SANG20',
+    title: 'Bữa sáng: giảm 20%, tối đa 20.000đ',
+    description: 'Đặt món từ 05:00 đến 10:00',
+    type: 'percent',
+    value: 20,
+    maxDiscount: 20_000,
+    minOrder: 0,
+    activeHours: { from: 5, to: 10 },
+  },
+  {
+    id: 'offer-latenight',
+    code: 'DEM15K',
+    title: 'Ăn khuya: giảm 15.000đ',
+    description: 'Đặt món từ 21:00 đến 02:00, đơn từ 60.000đ',
+    type: 'fixed',
+    value: 15_000,
+    minOrder: 60_000,
+    // Cua so DUY NHAT vat qua nua dem trong ca hai danh sach — day chinh la ca
+    // ma `isHourInWindow` phai xu ly rieng, xem pricing.ts.
+    activeHours: { from: 21, to: 2 },
+  },
+  {
+    id: 'offer-big',
+    code: 'FOOD50K',
+    title: 'Giảm 50.000đ cho đơn từ 300.000đ',
+    description: 'Áp dụng cho đơn hàng từ 300.000đ',
+    type: 'fixed',
+    value: 50_000,
+    minOrder: 300_000,
   },
 ];
 
@@ -694,3 +820,74 @@ export const getOffer = (id: string): DiscountRule | undefined =>
 
 export const getFoodItem = (id: string): FoodItem | undefined =>
   FOOD_ITEMS.find((f) => f.id === id);
+
+// ─────────────────────────────────────────────────────────────
+// 5. Tai xe gia — luong Ride, man `finding_driver`, `driver_arriving`
+// ─────────────────────────────────────────────────────────────
+
+export interface MockDriver {
+  id: string;
+  name: string;
+  phone: string;
+  plate: string;
+  /** Emoji avatar de hien thi, khong di vao event. */
+  avatar: string;
+}
+
+/**
+ * Danh sach tai xe mock. Dung de random khi demo chuyen tu finding_driver
+ * sang driver_arriving. Cac truong di thang vao event `driver_assigned` va
+ * `cancel_ride` (properties.driver_*).
+ */
+export const MOCK_DRIVERS: MockDriver[] = [
+  {
+    id: 'drv-01',
+    name: 'Nguyễn Văn An',
+    phone: '0901 234 567',
+    plate: '30A-12345',
+    avatar: '👨‍✈️',
+  },
+  {
+    id: 'drv-02',
+    name: 'Trần Văn Bình',
+    phone: '0912 345 678',
+    plate: '30B-23456',
+    avatar: '👨‍✈️',
+  },
+  {
+    id: 'drv-03',
+    name: 'Lê Minh Châu',
+    phone: '0923 456 789',
+    plate: '30C-34567',
+    avatar: '👩‍✈️',
+  },
+  {
+    id: 'drv-04',
+    name: 'Phạm Văn Dũng',
+    phone: '0934 567 890',
+    plate: '30D-45678',
+    avatar: '👨‍✈️',
+  },
+  {
+    id: 'drv-05',
+    name: 'Hoàng Thị Lan',
+    phone: '0945 678 901',
+    plate: '30E-56789',
+    avatar: '👩‍✈️',
+  },
+  {
+    id: 'drv-06',
+    name: 'Vũ Minh Nam',
+    phone: '0956 789 012',
+    plate: '30F-67890',
+    avatar: '👨‍✈️',
+  },
+];
+
+/**
+ * Chon ngau nhien mot tai xe tu pool.
+ */
+export function getRandomDriver(): MockDriver {
+  const idx = Math.floor(Math.random() * MOCK_DRIVERS.length);
+  return MOCK_DRIVERS[idx]!;
+}
