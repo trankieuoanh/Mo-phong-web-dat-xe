@@ -6,15 +6,19 @@
  *
  * KHONG ban event nao — component cha quyet dinh ban gi khi `onPick` chay.
  *
- * SUY BIEN EM khi Nominatim rot / mat mang: hien mot dong canh bao NHUNG VAN
- * liet ke dia chi goi y, de luong di tiep duoc. Cung tinh than voi
- * `trackEvent().catch(() => {})` — ha tang loi khong duoc ket nguoi dung.
+ * SUY BIEN EM khi Photon rot / apps/api khong tra loi / mat mang: hien mot dong
+ * canh bao NHUNG VAN liet ke dia chi goi y, de luong di tiep duoc. Cung tinh
+ * than voi `trackEvent().catch(() => {})` — ha tang loi khong duoc ket nguoi dung.
+ *
+ * Nhanh do chi chay khi `status === 'error'`, nen no phu thuoc vao viec
+ * `usePlaceSearch` CO han cho: mot request treo mai se ket o 'loading' va khong
+ * bao gio roi xuong day. Xem REQUEST_TIMEOUT_MS trong lib/use-place-search.ts.
  */
 
 import { useState } from 'react';
 import { PRESET_PLACES, getAddress, haversineKm, roundKm, type Address, type Place } from '@gsm/shared';
 import { Icon, type IconName } from '@/components/Icon';
-import { usePlaceSearch } from '@/lib/use-place-search';
+import { MIN_QUERY_LENGTH, usePlaceSearch } from '@/lib/use-place-search';
 
 const PRESET_ICONS: Record<Address['icon'], IconName> = {
   home: 'home',
@@ -69,7 +73,9 @@ export function PlacePicker({
   const [query, setQuery] = useState('');
   const { results, status, error } = usePlaceSearch(query);
 
-  const searching = query.trim().length >= 3;
+  // Dung DUNG nguong ma hook goi API, khong chep tay mot so khac: lech nhau thi
+  // co mot khoang go phim ban request di ma khong bao gio ve ket qua ra.
+  const searching = query.trim().length >= MIN_QUERY_LENGTH;
 
   return (
     <div>

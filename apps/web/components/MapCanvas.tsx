@@ -76,6 +76,11 @@ interface MapCanvasProps {
    * Khong truyen = ban do chi de xem (van keo va zoom duoc).
    */
   onPick?: (point: LatLon) => void;
+  /**
+   * Vi tri tai xe hien tai (dung cho man driver_arriving).
+   * Neu truyen, se ve them mot ghim tai xe (icon xe) tren ban do.
+   */
+  driverPosition?: LatLon;
 }
 
 /**
@@ -180,6 +185,7 @@ export function MapCanvas({
   label,
   fill = false,
   onPick,
+  driverPosition,
 }: MapCanvasProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -259,8 +265,10 @@ export function MapCanvas({
     if (route && route.geometry.length > 1) {
       return route.geometry.map(([lat, lon]) => ({ lat, lon }));
     }
-    return destination ? [pickup, destination] : [pickup];
-  }, [route, pickup, destination]);
+    const base = destination ? [pickup, destination] : [pickup];
+    // Them vi tri tai xe de khung nhin om ca tai xe
+    return driverPosition ? [...base, driverPosition] : base;
+  }, [route, pickup, destination, driverPosition]);
 
   // Doi tuyen/diem thi bo CA zoom lan pan nguoi dung da chinh tay — neu khong,
   // chuyen moi se ke thua khung nhin cua chuyen truoc va co the nam ngoai khung.
@@ -296,6 +304,9 @@ export function MapCanvas({
     },
     [viewport],
   );
+
+  // Project driver position de dung trong SVG (sau khi project da duoc khai bao)
+  const [driverX, driverY] = driverPosition ? project(driverPosition) : [0, 0];
 
   /** Lua the <img> phu kin khung o muc zoom hien tai. */
   const tiles = useMemo(() => {
@@ -483,6 +494,19 @@ export function MapCanvas({
           <Pin x={pickupX} y={pickupY} tone="var(--color-primary-dark)" />
           {/* Diem den dung `ink` — DESIGN.md cam mau accent thu hai. */}
           {destination ? <Pin x={destX} y={destY} tone="var(--color-ink)" /> : null}
+
+          {/* Driver marker — icon xe, mau cam */}
+          {driverPosition ? (
+            <g transform={`translate(${driverX} ${driverY})`}>
+              <ellipse cx="0" cy="2" rx="10" ry="3.5" fill="var(--color-ink)" opacity="0.2" />
+              <circle cx="0" cy="-8" r="18" fill="var(--color-warning)" stroke="var(--color-canvas)" strokeWidth="2" />
+              <path d="M5 17h14" stroke="var(--color-on-warning)" strokeWidth="1.5" strokeLinecap="round" />
+              <path d="M4 17v-4.2a2 2 0 0 1 .2-.9l1.9-3.8A2 2 0 0 1 7.9 7h8.2a2 2 0 0 1 1.8 1.1l1.9 3.8a2 2 0 0 1 .2.9V17" stroke="var(--color-on-warning)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M4 17v2h3v-2M17 17v2h3v-2" stroke="var(--color-on-warning)" strokeWidth="1.5" strokeLinecap="round" />
+              <circle cx="7.5" cy="13.5" r="1" fill="var(--color-on-warning)" />
+              <circle cx="16.5" cy="13.5" r="1" fill="var(--color-on-warning)" />
+            </g>
+          ) : null}
         </svg>
       ) : null}
 

@@ -11,16 +11,26 @@
  */
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
-import { DEFAULT_PICKUP, PROMOS, calcDiscount, calcFare, getVehicle, isRuleAvailable } from '@gsm/shared';
+import { useEffect, useState } from 'react';
+import {
+  DEFAULT_PICKUP,
+  PROMOS,
+  calcDiscount,
+  calcFare,
+  getVehicle,
+  ruleBlock,
+  type DiscountRule,
+  type RuleContext,
+} from '@gsm/shared';
 import { BackButton } from '@/components/BackButton';
+import { DiscountCodeInput } from '@/components/DiscountCodeInput';
 import { FlowGuard } from '@/components/FlowGuard';
 import { Icon } from '@/components/Icon';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { ScreenShell } from '@/components/ScreenShell';
 import { useApp } from '@/lib/app-context';
 import { routeOrFallback } from '@/lib/use-route';
-import { formatVnd } from '@/lib/format';
+import { formatRuleBlock, formatVnd } from '@/lib/format';
 import { trackEvent, useScreenView } from '@/lib/track';
 
 export default function PromoPage() {
@@ -47,24 +57,26 @@ function PromoContent() {
   const basePrice = vehicle ? calcFare(vehicle, route.distanceKm) : 0;
 
   const [picked, setPicked] = useState<string | null>(ride.promoId ?? null);
-  const [code, setCode] = useState('');
-  const [codeError, setCodeError] = useState('');
 
-  /** Go dung `code` thi tick promo tuong ung — CHUA ban event. */
-  function applyCode() {
-    const typed = code.trim().toUpperCase();
-    const found = PROMOS.find((p) => p.code.toUpperCase() === typed);
+  /**
+   * Gio dia phuong, cho cac ma "gio vang".
+   *
+   * Doc trong useEffect chu KHONG luc render: Next prerender client component
+   * o server, ma gio server (UTC) lech gio may (UTC+7) — dung cai bay hydration
+   * ghi o dau lib/session.ts. Cung khuon voi mealOfHour() o app/food/page.tsx.
+   *
+   * `undefined` o luot render dau khien ma gio vang hien KHOA, va server lan
+   * client deu ve ra cung mot HTML nhu vay. Effect chay xong moi mo khoa.
+   */
+  const [hour, setHour] = useState<number>();
+  useEffect(() => setHour(new Date().getHours()), []);
 
-    if (!found) {
-      setCodeError('Mã không hợp lệ');
-      return;
-    }
-    if (!isRuleAvailable(found, basePrice)) {
-      setCodeError(`Cần đơn tối thiểu ${formatVnd(found.minOrder)}`);
-      return;
-    }
-    setCodeError('');
-    setPicked(found.id);
+  /** Boi canh xet dieu kien linh hoat — hang xe, quang duong, gio. */
+  const ctx: RuleContext = { vehicleType: vehicle?.type, distanceKm: route.distanceKm, hour };
+
+  /** Go dung ma thi tick promo tuong ung — CHUA ban event. */
+  function pickByCode(rule: DiscountRule) {
+    setPicked(rule.id);
   }
 
   function confirmSelection() {
@@ -127,23 +139,7 @@ function PromoContent() {
         </span>
       </div>
 
-      <div className="flex items-center gap-md">
-        <input
-          type="text"
-          value={code}
-          onChange={(e) => {
-            setCode(e.target.value);
-            setCodeError('');
-          }}
-          placeholder="Bạn có mã ưu đãi? Nhập tại đây."
-          aria-label="Mã ưu đãi"
-          className="t-body-md min-w-0 flex-1 rounded-md bg-canvas-soft p-lg text-ink outline-none placeholder:text-mute"
-        />
-        <PrimaryButton variant="subtle" fullWidth={false} onClick={applyCode}>
-          Áp dụng
-        </PrimaryButton>
-      </div>
-      {codeError ? <p className="t-caption mt-xs text-mute">{codeError}</p> : null}
+      <DiscountCodeInput rules={PROMOS} subtotal={basePrice} ctx={ctx} onApply={pickByCode} />
 
       <div aria-hidden="true" className="mt-lg flex items-center gap-lg rounded-xl bg-canvas-soft p-2xl">
         <span className="grid size-11 shrink-0 place-items-center rounded-full bg-canvas text-primary-dark">
@@ -159,7 +155,8 @@ function PromoContent() {
 
       <ul className="mt-lg flex flex-col gap-md">
         {PROMOS.map((promo) => {
-          const available = isRuleAvailable(promo, basePrice);
+          const block = ruleBlock(promo, basePrice, ctx);
+          const available = block === null;
           const discount = calcDiscount(promo, basePrice);
 
           return (
@@ -167,10 +164,7 @@ function PromoContent() {
               <button
                 type="button"
                 disabled={!available}
-                onClick={() => {
-                  setPicked((prev) => (prev === promo.id ? null : promo.id));
-                  setCodeError('');
-                }}
+                onClick={() => setPicked((prev) => (prev === promo.id ? null : promo.id))}
                 className={`flex w-full items-center gap-lg rounded-md bg-canvas-soft p-lg text-left text-ink transition-colors enabled:hover:bg-surface-pressed disabled:cursor-not-allowed disabled:opacity-50 ${
                   promo.id === picked ? 'ring-2 ring-primary' : ''
                 }`}
@@ -178,17 +172,13 @@ function PromoContent() {
                 <span className="flex-1">
                   <span className="t-body-md-strong block">{promo.title}</span>
                   <span className="t-body-sm mt-xxs block text-body">{promo.description}</span>
-                  {available ? (
-                    <span className="t-caption mt-xxs block text-mute">
-                      Giảm {formatVnd(discount)}
-                    </span>
-                  ) : (
-                    // Hien thi nhung disable, KEM DONG GIAI THICH — nguoi dung thay duoc
-                    // ly do, va ta khong ghi event cho lua chon bi disable.
-                    <span className="t-caption mt-xxs block text-mute">
-                      Cần đơn tối thiểu {formatVnd(promo.minOrder)}
-                    </span>
-                  )}
+                  {/* Hien thi nhung disable, KEM DONG GIAI THICH — nguoi dung thay duoc
+                      ly do, va ta khong ghi event cho lua chon bi disable.
+                      `formatRuleBlock` noi dung dieu kien nao chua thoa, khong
+                      con gan cung "Can don toi thieu" cho moi truong hop. */}
+                  <span className="t-caption mt-xxs block text-mute">
+                    {block ? formatRuleBlock(block) : `Giảm ${formatVnd(discount)}`}
+                  </span>
                 </span>
 
                 <span

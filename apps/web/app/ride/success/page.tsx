@@ -1,11 +1,12 @@
 'use client';
 
 /**
- * screen_name: `ride_success` — step 6
+ * screen_name: `ride_success` — step 7
  * Event: screen_view, back_to_home.
  *
  * Route that, khong phai toast/modal — de funnel co moc ket thuc ro rang.
  * Khong co man loi/that bai: app mo phong LUON thanh cong.
+ * Hien thi thong tin tai xe tu ride.driverInfo.
  */
 
 import { useRouter } from 'next/navigation';
@@ -32,6 +33,10 @@ export default function RideSuccessPage() {
     vehicle: string;
     distance: string;
     total: string;
+    driverName?: string;
+    driverPhone?: string;
+    driverPlate?: string;
+    driverEta?: number;
   } | null>(null);
 
   useEffect(() => {
@@ -59,6 +64,10 @@ export default function RideSuccessPage() {
       vehicle: vehicle?.name ?? '—',
       distance: route ? `${route.distanceKm} km · ${route.durationMin} phút` : '—',
       total: route ? formatVnd(totals.finalPrice) : '—',
+      driverName: ride.driverInfo?.name,
+      driverPhone: ride.driverInfo?.phone,
+      driverPlate: ride.driverInfo?.plate,
+      driverEta: ride.driverInfo?.etaMin,
     });
 
     // Clear `ride` sau confirm_ride — screen-map.md muc 3.
@@ -97,7 +106,31 @@ export default function RideSuccessPage() {
         </p>
       </div>
 
-      <div className="rounded-xl bg-canvas-soft p-2xl">
+      <div className="rounded-xl bg-canvas-soft p-2xl space-y-lg">
+        {summary?.driverName && (
+          <div className="flex items-center gap-md p-md rounded-lg bg-primary-soft border border-primary">
+            <div className="size-12 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+              <Icon name="users" size={20} className="text-on-primary" />
+            </div>
+            <div className="flex-1">
+              <h3 className="t-body-md-strong">{summary.driverName}</h3>
+              <div className="flex items-center gap-md mt-xs text-sm text-body">
+                <span className="flex items-center gap-xs">
+                  <Icon name="users" size={14} /> {summary.driverPlate}
+                </span>
+                <span className="flex items-center gap-xs">
+                  <Icon name="phone" size={14} /> {summary.driverPhone}
+                </span>
+              </div>
+              {summary.driverEta && (
+                <p className="t-body-sm mt-xs text-primary flex items-center gap-xs">
+                  <Icon name="clock" size={14} /> Còn {summary.driverEta} phút đến đón
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
         <Row label="Điểm đón" value={summary?.pickup ?? '—'} />
         <Row label="Điểm đến" value={summary?.destination ?? '—'} />
         <Row label="Loại xe" value={summary?.vehicle ?? '—'} />

@@ -20,14 +20,24 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { OFFERS, calcDiscount, calcFoodTotals, getFoodItem, isRuleAvailable } from '@gsm/shared';
+import {
+  OFFERS,
+  SHIPPING_FEE,
+  calcDiscount,
+  calcFoodTotals,
+  getFoodItem,
+  ruleBlock,
+  type DiscountRule,
+  type RuleContext,
+} from '@gsm/shared';
 import { BackButton } from '@/components/BackButton';
+import { DiscountCodeInput } from '@/components/DiscountCodeInput';
 import { FlowGuard } from '@/components/FlowGuard';
 import { Icon } from '@/components/Icon';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { ScreenShell } from '@/components/ScreenShell';
 import { useApp } from '@/lib/app-context';
-import { formatVnd } from '@/lib/format';
+import { formatRuleBlock, formatVnd } from '@/lib/format';
 import { trackEvent, useScreenView } from '@/lib/track';
 
 /**
@@ -66,6 +76,24 @@ function FoodOfferContent() {
    */
   const [picked, setPicked] = useState<string | null>(offerId ?? null);
 
+  /**
+   * Gio dia phuong, cho cac uu dai theo khung gio (bua sang, an khuya).
+   *
+   * Doc trong useEffect chu KHONG luc render — cung ly do va cung khuon voi
+   * mealOfHour() o app/food/page.tsx: gio server (UTC) lech gio may (UTC+7)
+   * nen doc luc render la mot hydration mismatch.
+   */
+  const [hour, setHour] = useState<number>();
+  useEffect(() => setHour(new Date().getHours()), []);
+
+  /** Luong food khong co hang xe lan quang duong — chi co gio. */
+  const ctx: RuleContext = { hour };
+
+  /** Go dung ma thi tick uu dai tuong ung — CHUA ban event. */
+  function pickByCode(rule: DiscountRule) {
+    setPicked(rule.id);
+  }
+
   function applyOffer() {
     const offer = OFFERS.find((o) => o.id === picked);
     if (!offer) return;
@@ -76,7 +104,10 @@ function FoodOfferContent() {
       properties: {
         offer_id: offer.id,
         offer_code: offer.code,
-        discount_amount: calcDiscount(offer, cartTotal),
+        // SHIPPING_FEE di kem: uu dai `appliesTo: 'shipping'` giam tren phi
+        // giao. Con so nay PHAI trung voi so hien o day, o /food/confirm va
+        // trong `place_order` — xem ghi chu dau calcDiscount().
+        discount_amount: calcDiscount(offer, cartTotal, SHIPPING_FEE),
       },
     });
     setOfferId(offer.id);
@@ -110,10 +141,18 @@ function FoodOfferContent() {
         )
       }
     >
+      {/* O nhap ma — dua luong food ve ngang voi /ride/promo. Truoc day chi
+          luong ride co, nen `offer_usage` va `promo_usage` khong so sanh duoc
+          voi nhau vi mot ben thieu han mot cach tuong tac. */}
+      <div className="mb-lg">
+        <DiscountCodeInput rules={OFFERS} subtotal={cartTotal} ctx={ctx} onApply={pickByCode} />
+      </div>
+
       <ul className="flex flex-col gap-md">
         {OFFERS.map((offer) => {
-          const available = isRuleAvailable(offer, cartTotal);
-          const discount = calcDiscount(offer, cartTotal);
+          const block = ruleBlock(offer, cartTotal, ctx);
+          const available = block === null;
+          const discount = calcDiscount(offer, cartTotal, SHIPPING_FEE);
           const selected = offer.id === picked;
 
           return (
@@ -134,10 +173,10 @@ function FoodOfferContent() {
                 <span className="min-w-0 flex-1">
                   <span className="t-body-md-strong block">{offer.title}</span>
                   <span className="t-body-sm mt-xxs block text-body">{offer.description}</span>
+                  {/* `formatRuleBlock` noi dung dieu kien nao chua thoa — gio,
+                      don toi thieu... — chu khong gan cung mot cau cho moi ca. */}
                   <span className="t-caption mt-xxs block text-mute">
-                    {available
-                      ? `Giảm ${formatVnd(discount)}`
-                      : `Cần đơn tối thiểu ${formatVnd(offer.minOrder)}`}
+                    {block ? formatRuleBlock(block) : `Giảm ${formatVnd(discount)}`}
                   </span>
                 </span>
 

@@ -92,7 +92,8 @@ function RideConfirmContent() {
       },
     });
     // KHONG await truoc khi dieu huong — trackEvent tra void, keepalive lo phan con lai.
-    router.push('/ride/success');
+    setRide({ driverStatus: 'searching' });
+    router.push('/ride/finding-driver');
   }
 
   return (

@@ -14,7 +14,13 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { DEFAULT_PICKUP, type CartLine, type Place, type RouteResult } from '@gsm/shared';
+import {
+  DEFAULT_PICKUP,
+  type CartLine,
+  type Place,
+  type RouteResult,
+  type MockDriver,
+} from '@gsm/shared';
 import { getSessionId, getUserId, resetSession } from './session';
 import { resetPreviousScreen } from './track';
 
@@ -51,6 +57,10 @@ export interface RideDraft {
   driverNote?: string;
   /** Man ride_confirm. Mac dinh 'cash'. Chi 2 lua chon de khong chia nho mau. */
   paymentMethod?: PaymentMethod;
+  /** Trang thai tim/da tim tai xe. Dung de dieu huong va FlowGuard. */
+  driverStatus?: 'idle' | 'searching' | 'assigned' | 'arriving' | 'cancelled';
+  /** Thong tin tai xey da chap nhan don. Set khi chuyen sang driver_arriving. */
+  driverInfo?: Pick<MockDriver, 'id' | 'name' | 'phone' | 'plate'> & { etaMin: number };
 }
 
 /**
