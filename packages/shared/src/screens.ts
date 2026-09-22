@@ -25,7 +25,8 @@ export const SCREENS: Record<ScreenName, ScreenSpec> = {
   vehicle_selection: { route: '/ride/vehicle', stepIndex: 3, flow: 'ride' },
   promo_selection: { route: '/ride/promo', stepIndex: 4, flow: 'ride' },
   ride_confirm: { route: '/ride/confirm', stepIndex: 5, flow: 'ride' },
-  ride_success: { route: '/ride/success', stepIndex: 6, flow: 'ride' },
+  finding_driver: { route: '/ride/finding-driver', stepIndex: 6, flow: 'ride' },
+  ride_success: { route: '/ride/success', stepIndex: 7, flow: 'ride' },
 
   // food
   food_menu: { route: '/food', stepIndex: 1, flow: 'food' },
