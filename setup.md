@@ -132,15 +132,36 @@ File `apps/api/.env.example` đã commit sẵn với giá trị trống, để n
 
 Không cần API key: Nominatim miễn phí. Đổi lại nó giới hạn **1 request/giây**, nên hàng đợi và cache nằm ở `apps/api/src/services/upstream.ts`; xem `api-endpoints.md` mục 3b.
 
-### Ba dịch vụ ngoài mà app gọi
+### Bốn dịch vụ ngoài mà app gọi
 
 | Dịch vụ | Dùng cho | API key | Khi nó chết |
 |---|---|---|---|
-| **Nominatim** (`nominatim.openstreetmap.org`) | `GET /api/places` — tìm địa chỉ | không | Panel hiện cảnh báo, vẫn liệt kê 5 địa chỉ gợi ý |
+| **Photon** (`photon.komoot.io`) | `GET /api/places`, `GET /api/reverse` — địa chỉ | không | Panel hiện cảnh báo, vẫn liệt kê 5 địa chỉ gợi ý; nhãn địa chỉ lùi về mặc định |
+| **Overpass** (`overpass-api.de`) | `GET /api/restaurants` — quán ăn | không | Dải "Gần bạn" hiện lỗi kèm nút Thử lại; ba cách tìm món còn lại vẫn chạy |
 | **OSRM** (`router.project-osrm.org`) | `GET /api/route` — tuyến đường | không | Dùng đường nối thẳng, ghi `route_source: "straight"` |
-| **Tile OSM** (`tile.openstreetmap.org`) | Nền bản đồ trong `MapCanvas` | không | Bản đồ trắng, tuyến và ghim vẫn vẽ |
+| **Tile Stadia** (`tiles.stadiamaps.com`) | Nền bản đồ trong `MapCanvas` | không, khi chạy localhost | Tự chuyển sang `tile.openstreetmap.fr`; hết đường thì hiện "Không tải được nền bản đồ" |
 
-Cả ba là **hạ tầng cộng đồng miễn phí**, chỉ hợp cho demo cục bộ. `api-endpoints.md` đã chốt không deploy công khai trước khi sinh xong dữ liệu — điều đó giờ còn thêm một lý do nữa.
+Cả bốn là **hạ tầng cộng đồng miễn phí**, chỉ hợp cho demo cục bộ.
+
+> **Stadia chặn theo `Referer`.** Gọi không kèm header đó sẽ nhận `401` — nên `curl` trần sẽ báo tile chết trong khi trình duyệt vẫn tải được bình thường. Thêm `-e http://localhost:3000/` khi tự kiểm tra. Nếu sau này đem deploy lên hosting thật thì phải đăng ký một tài khoản Stadia miễn phí; dự án này chỉ chạy localhost nên chưa cần.
+
+> ## ⚠️ `*.openstreetmap.org` có thể bị chặn — và đó là lỗi khó đoán nhất của dự án này
+>
+> Trên máy đang phát triển dự án, **toàn bộ tên miền `*.openstreetmap.org` không kết nối được**, trong khi OSRM, Photon, Overpass và mọi thứ khác vẫn thông. Triệu chứng nhìn thấy:
+>
+> - **Bản đồ trắng ở CẢ hai luồng** — một ô xám vẫn có nút zoom và dòng ghi công (`tile.openstreetmap.org`).
+> - **Dải "Gần bạn" luôn rỗng**, không báo lỗi gì (`nominatim.openstreetmap.org`).
+>
+> Hai triệu chứng trông như hai lỗi giao diện riêng biệt, nhưng chỉ là **một sự thật về mạng**. Đây là lý do dự án đã chuyển tile sang CARTO, địa chỉ sang Photon và quán ăn sang Overpass.
+>
+> Kiểm tra nhanh từ chính máy chạy dự án:
+> ```bash
+> curl -s -o /dev/null -w '%{http_code}\n' -e http://localhost:3000/ \
+>   https://tiles.stadiamaps.com/tiles/osm_bright/13/6720/3638.png
+> curl -s -o /dev/null -w '%{http_code}\n' https://overpass-api.de/api/status
+> curl -s -o /dev/null -w '%{http_code}\n' 'https://photon.komoot.io/reverse?lat=21.03&lon=105.78'
+> ```
+> Cả ba phải ra `200`. Cái nào ra `000` thì tính năng tương ứng sẽ hỏng **im lặng** chứ không báo lỗi rõ ràng. `api-endpoints.md` đã chốt không deploy công khai trước khi sinh xong dữ liệu — điều đó giờ còn thêm một lý do nữa.
 
 Không có mạng thì app **vẫn chạy hết luồng**: chỉ mất bản đồ nền và độ chính xác của quãng đường.
 
@@ -181,7 +202,7 @@ analysis/
   fetch_events.py       # kéo collection events → output/events.csv
   metrics.py            # tính chỉ số theo analysis-spec.md
   output/               # .gitignore — CSV và biểu đồ sinh ra
-  .env                  # .gitignore — đường dẫn tới service account JSON
+  .env                  # .gitignore — TUỲ CHỌN, xem bên dưới
 ```
 
 ```bash
@@ -201,7 +222,31 @@ pip install -r requirements.txt
 Nếu PowerShell chặn script kích hoạt (`cannot be loaded because running scripts is disabled`), chạy một lần:
 `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`
 
-Script Python dùng file service account JSON trực tiếp (`GOOGLE_APPLICATION_CREDENTIALS`), khác với app Next.js dùng 3 biến môi trường — vì script chạy offline, không qua hosting.
+### Credential cho phần Python — không cần cấu hình gì thêm
+
+`fetch_events.py` thử **ba đường**, theo thứ tự:
+
+| # | Nguồn | Khi nào dùng |
+|---|---|---|
+| 1 | Biến `GOOGLE_APPLICATION_CREDENTIALS` đã export sẵn | Chạy trên CI, hoặc bạn tự export |
+| 2 | `analysis/.env` → cùng biến đó | Khi muốn đọc một project Firebase **khác** |
+| 3 | `apps/api/.env` → 3 biến `FIREBASE_*` | **Mặc định.** Ai chạy được `npm run dev` thì chạy được luôn script này |
+
+Nhờ đường 3 mà **không phải tải thêm service account key JSON nào** — bắt tải là tạo ra file bí mật thứ hai phải quản lý, cho đúng một quyền truy cập.
+
+> **Trước đây đường 2 là thứ tài liệu hứa nhưng code không có.** `fetch_events.py` đọc thẳng `os.environ`, mà không chỗ nào nạp `analysis/.env`, nên làm đúng y hướng dẫn thì script vẫn báo thiếu credential — phải tự `export` ngoài shell. Giờ nó nạp file đó thật.
+
+Script Python dựng credential từ dict (`type`, `project_id`, `client_email`, `private_key`, `token_uri`) thay vì đọc file JSON — cùng ba biến mà `apps/api/src/db/firebase-admin.ts` dùng, kể cả dòng `.replace('\\n', '\n')` cho private key.
+
+### Seed dữ liệu giả lập
+
+`scripts/seed-events.js` cũng dùng đúng cơ chế đó (thử `serviceAccountKey.json` ở gốc repo trước, không có thì đọc `apps/api/.env`):
+
+```bash
+node scripts/seed-events.js --dry-run   # xem trước, không cần credential
+node scripts/seed-events.js             # ghi ~7.800 document
+node scripts/seed-events.js --clear     # dọn lại, chỉ xoá document có seed_batch
+```
 
 ---
 
@@ -247,6 +292,32 @@ netstat -ano | findstr :3000         # Windows — cột cuối là PID
 taskkill /PID <PID> /F
 ```
 
+### Trang mở được nhưng mọi thứ gọi API cứ quay mãi
+
+Ô tìm địa chỉ quay skeleton không bao giờ dứt, bản đồ không vẽ tuyến, dải "Gần bạn" trống — mà **không có lỗi nào in ra**, kể cả `EADDRINUSE`.
+
+Nguyên nhân thường gặp: lần `npm run dev` trước bị **Ctrl+Z** (treo) chứ không tắt hẳn. Tiến trình ở trạng thái đó **vẫn giữ cổng 4000** nên socket vẫn `LISTEN` và bắt tay TCP thành công — nhưng nó bị dừng nên **không bao giờ trả lời**. Lần chạy mới thấy cổng bận, còn trình duyệt thì chỉ thấy request treo vô hạn.
+
+Nhận ra bằng cột `STAT` có chữ **`T`**:
+
+```bash
+ps -eo pid,stat,args | grep Mo-phong-web-dat-xe | grep -v grep
+#   33547 Tl   node ... src/server.ts      ← T = đã bị treo
+```
+
+Dọn (phải `-9`: tiến trình đang dừng không xử lý `SIGTERM`):
+
+```bash
+ps -eo pid,stat,args | grep Mo-phong-web-dat-xe | grep -v grep \
+  | awk '$2 ~ /T/ {print $1}' | xargs -r kill -9
+ss -ltn | grep -E ":3000|:4000"      # phải không in gì
+npm run dev
+```
+
+> Tắt bằng **Ctrl+C**, không phải Ctrl+Z. Ctrl+Z chỉ đẩy tiến trình vào nền ở trạng thái dừng.
+
+Từ phía FE, ô tìm địa chỉ giờ **bỏ cuộc sau 6 giây** và hiện cảnh báo kèm 5 gợi ý thay vì quay mãi (`REQUEST_TIMEOUT_MS` trong `apps/web/lib/use-place-search.ts`) — nhưng đó chỉ là đường lui, BE vẫn phải dọn.
+
 ### `:4000/api/health` trả OK nhưng `:3000/api/health` hỏng
 Sai `rewrites` trong `apps/web/next.config.ts` — **không phải** sai Express. BE vẫn sống, chỉ là Next.js không chuyển tiếp request sang nó.
 
@@ -266,6 +337,25 @@ Làm Phase 1 để sửa. Event bị mất nhưng luồng UI không vỡ — đ�
 
 ### `The default Firebase app already exists`
 Mất `getApps()[0] ??` trong `apps/api/src/db/firebase-admin.ts`. `tsx watch` chạy lại module nhiều lần trong cùng một tiến trình, nên `initializeApp()` gọi thẳng sẽ ném lỗi ngay lần sửa file thứ hai.
+
+### Bản đồ hiện chữ "API KEY REQUIRED" chéo trên mọi tile
+
+Nhà cung cấp tile đã chuyển sang bắt buộc API key. Đây **không phải lỗi Google Maps** — dự án không dùng Google Maps, không dùng thư viện bản đồ nào, và không có API key nào cả (`CLAUDE.md` quy tắc 8).
+
+Chuyện đã xảy ra một lần với CARTO: họ khoá **toàn bộ** raster miễn phí (`light_all`, `voyager`, cả tên miền cũ `cartodb-basemaps-*.global.ssl.fastly.net`), nhưng vẫn trả HTTP 200 kèm PNG hợp lệ — chỉ là đã in chữ lên. Vì `onError` của thẻ `<img>` không bao giờ bắn, cơ chế tự chuyển nhà cung cấp trong `MapCanvas.tsx` **không cứu được**.
+
+Xem nhà cung cấp nào còn dùng được:
+```bash
+curl localhost:3000/api/tiles
+```
+
+Nhà cung cấp bị đóng dấu sẽ **vắng mặt** trong danh sách trả về. Nếu danh sách trống hoặc thiếu đúng cái đang cần, thêm một nhà cung cấp mới vào `TILE_PROVIDERS` ở `packages/shared/src/tiles.ts` — **đừng** đi đăng ký API key rồi nhét vào `NEXT_PUBLIC_*`, tiền tố đó nhúng giá trị thẳng vào bundle trình duyệt (quy tắc 2).
+
+Tự kiểm tra một nhà cung cấp mới trước khi thêm, bằng đúng tile biển sâu mà phép dò dùng:
+```bash
+curl -so /dev/null -w '%{size_download}\n' <URL tile z=13 x=6707 y=3740>
+```
+Dưới 800 byte là sạch. Trên ngưỡng đó nghĩa là giữa Biển Đông đang có chữ.
 
 ### Số `screen_view` nhiều gấp đôi số màn đã đi qua
 `useRef` chưa chặn được lần chạy thứ hai của React Strict Mode trong `next dev`. Nếu không sửa thì **mọi tỉ lệ funnel đều sai gấp đôi** — xem `screen-map.md` mục 4.

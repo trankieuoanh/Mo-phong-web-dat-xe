@@ -125,6 +125,20 @@ export interface EventQuery {
   flow?: 'ride' | 'food';
   from?: Date;
   to?: Date;
+  /**
+   * Trai `properties` thanh cot `prop_<ten>` o cap cao nhat.
+   *
+   * Cho cong cu BI doc JSON truc tiep: `properties` la map long nhau va MOI LOAI
+   * EVENT CO BO KHOA KHAC NHAU, nen Power BI dung mot cot kieu Record ma nguoi
+   * dung phai tu bam Expand, va expand ra khong deu giua cac dong.
+   *
+   * Tien to `prop_` co y TRUNG voi analysis/fetch_events.py — hai duong doc du
+   * lieu cho ra cung ten cot, nen bieu do Power BI va bieu do matplotlib noi ve
+   * cung mot thu.
+   */
+  flat?: boolean;
+  /** Chan so document tra ve. Vang = tra het, y nhu truoc. */
+  limit?: number;
 }
 
 export type QueryValidationResult =
@@ -166,6 +180,26 @@ export function validateEventQuery(params: URLSearchParams): QueryValidationResu
       return { ok: false, error: `Invalid value for ${key}: expected an ISO date (e.g. 2026-09-01)` };
     }
     query[key] = parsed;
+  }
+
+  // `flat=1` / `flat=true`. Bat ky gia tri nao khac deu bi tu choi thay vi coi
+  // nhu false: `flat=0` ma lang le tra ve dang long nhau thi nguoi dung ngoi do
+  // tim xem minh go sai o dau.
+  const flat = params.get('flat');
+  if (flat !== null) {
+    if (flat !== '1' && flat !== 'true') {
+      return { ok: false, error: 'Invalid value for flat: expected "1" or "true"' };
+    }
+    query.flat = true;
+  }
+
+  const limit = params.get('limit');
+  if (limit !== null) {
+    const parsed = Number(limit);
+    if (!Number.isInteger(parsed) || parsed < 1) {
+      return { ok: false, error: 'Invalid value for limit: expected a positive integer' };
+    }
+    query.limit = parsed;
   }
 
   return { ok: true, value: query };

@@ -30,9 +30,16 @@ app/
     success/page.tsx            # /food/success           food_success
 
   history/page.tsx              # /history    NGOÀI FUNNEL — không có screen_name
+  account/page.tsx              # /account    NGOÀI FUNNEL
+  support/page.tsx              # /support    NGOÀI FUNNEL
+  terms/page.tsx                # /terms      NGOÀI FUNNEL
 ```
 
 **`/history` không nằm trong funnel.** Nó không có trong `SCREENS`, **không gọi `useScreenView`, không gọi `trackEvent`**, nên không xuất hiện trong bất kỳ số liệu nào. Nó đọc `GET /api/events?user_id=...` và dựng lại lịch sử chuyến đi từ chính các event `confirm_ride` / `place_order`. Lọc theo `user_id` chứ không phải `session_id`, nên bảng bền qua nhiều phiên — đúng nghĩa "lịch sử người dùng", và là màn hữu ích nhất khi demo cho mentor.
+
+**Ba màn sidebar còn lại cũng ngoài funnel.** `/account` (Tài khoản phụ), `/support` (Trung tâm hỗ trợ), `/terms` (Điều khoản & Chính sách) — dựng theo `sample_ui/tai_khoan_phu.png`, `trung_tam_ho_tro.png`, `dieu_khoan_va_chinh_sach.png`. Chúng là **nội dung tĩnh**, không phải bước nào của luồng nào, nên cũng không có trong `SCREENS` và không bắn event. Cả bốn màn ngoài funnel bọc bằng `AppShell` **trực tiếp**, không qua `ScreenShell` — `ScreenShell` mang theo khái niệm panel + footer CTA của một bước funnel.
+
+> `dieu_khoan_va_chinh_sach.png` chụp **trang web marketing** của Green SM (nav riêng, hero banner, breadcrumb, thanh cookie), không phải màn trong app. Chỉ lấy **nội dung** — bốn tên chính sách — chứ không dựng lại lớp vỏ, nếu không màn này sẽ có hệ điều hướng khác hẳn 13 màn còn lại.
 
 > **Không có `/login`.** Dự án không có authentication — đây là quyết định có chủ ý, xem `api-endpoints.md`. Một màn đăng nhập giả chỉ thêm một đường đi lạc mà không đo thêm được gì. `UserMenu` ở top bar vì vậy là trang trí hoàn toàn; nó chỉ hiện `user_id` đang dùng, để demo thấy ngay khoá mà `/history` tra.
 
@@ -89,15 +96,25 @@ interface AppState {
   };
   cart:  CartLine[];                 // { itemId, quantity }
   offerId?: string | null;
+  food:  {
+    origin?: Place;                  // địa chỉ giao — GPS hoặc người dùng chọn
+    restaurantId?: string;           // quán đang xem
+    restaurantName?: string;
+  };
 }
 ```
 
 - Một `AppProvider` duy nhất trong `app/layout.tsx`.
-- Ghi kèm `sessionStorage` (`gsm_ride_draft_v2`, `gsm_cart`, `gsm_offer`) để F5 giữa luồng không mất lựa chọn.
+- Ghi kèm `sessionStorage` (`gsm_ride_draft_v2`, `gsm_cart`, `gsm_offer`, `gsm_food_draft`) để F5 giữa luồng không mất lựa chọn.
+
+> **`food` giữ đúng hai thứ phải sống qua điều hướng, không hơn.** Bộ lọc của màn menu (ô tìm, chip bữa, chip loại món) **vẫn không lên context** — xem đoạn ngay dưới, quyết định đó không đổi. Nhưng địa chỉ giao và quán đã chọn thì phải sống: trước đây quán là state cục bộ của `app/food/page.tsx` nên mất ngay khi mở một món, và đó là lý do màn chi tiết món lẫn màn xác nhận không hiển thị nổi tên quán.
+>
+> `clearCart()` xoá luôn `food`: giỏ rỗng thì "món tại X" không còn nghĩa gì.
 
 > **Vì sao lưu cả object `Place` chứ không chỉ `id`.** Địa chỉ người dùng tự tìm có `id` dạng `osm-*`, **không tra ngược ra tên bằng `getAddress()` được** — bảng tra chỉ có 5 dòng gợi ý (`mock-data.md` mục 1). Nhãn vì thế phải đi theo state.
 >
 > **Vì sao khoá là `_v2`.** Hình dạng `ride` đã đổi (`addressId: string` → `destination: Place`). `readJson` có `try/catch` nhưng **không kiểm tra hình dạng**, nên một draft cũ còn trong tab của người dùng sẽ trả về `{addressId: '…'}` và làm màn confirm nổ. Đổi khoá là cách rẻ nhất để bỏ draft cũ đi; khoá cũ vẫn nằm trong `DRAFT_KEYS` để lần reset đầu tiên dọn nốt nó.
+- **Bộ lọc ở màn menu food KHÔNG vào `AppContext`.** Ô tìm, chip bữa, quán đang chọn, chip loại món đều là `useState` cục bộ của `app/food/page.tsx`: rời màn là quên, và đó là đúng — chúng là cách *tìm* món, không phải lựa chọn cần mang sang bước sau. Thứ cần mang sang đã nằm trong event (`discovery_source`).
 - Giỏ hàng lưu **`itemId` + `quantity`**, không lưu `price`/`name` — giá lấy từ `@gsm/shared` lúc render, để đổi giá trong mock không làm giỏ hàng cũ sai.
 - Clear: `ride` sau `confirm_ride`; `cart` + `offerId` sau `place_order`; tất cả sau `back_to_home`.
 - **`route` phải bị xoá cùng lúc với việc đổi `destination`** (`/ride/address`). Tuyến đường đã cắt trong draft thuộc về điểm đến trước đó; giữ lại thì sau `change_address`, bấm Back của trình duyệt về `/ride/vehicle` sẽ thấy giá tính theo quãng đường cũ, và `confirm_ride` ghi `distance_km` không khớp `address_label` trong cùng một document.
@@ -165,7 +182,7 @@ Không có màn lỗi/thất bại — app mô phỏng luôn thành công.
 
 ## 6. Responsive
 
-**Desktop-first.** Khung tham chiếu là **web Green SM trên máy tính**, không phải app điện thoại — xem 4 ảnh chụp trong `apps/web/sample_ui/` (`homepage.png`, `main_screen.png`, `history.png`, `login.png`). Cả bốn đều có rail icon dọc bên trái, top bar, và nội dung hai cột.
+**Desktop-first.** Khung tham chiếu là **web Green SM trên máy tính**, không phải app điện thoại — xem 7 ảnh chụp trong `apps/web/sample_ui/` (`homepage.png`, `main_screen.png`, `history.png`, `login.png`, `tai_khoan_phu.png`, `trung_tam_ho_tro.png`, `dieu_khoan_va_chinh_sach.png`). Tất cả đều có rail icon dọc bên trái và top bar — trừ `dieu_khoan_va_chinh_sach.png`, vốn là trang marketing chứ không phải màn trong app.
 
 > Bản trước của mục này chốt mobile-first `max-width: 480px`. Đã đổi vì ảnh mẫu cho thấy sản phẩm thật là web desktop; giữ một cột 480px giữa màn 1600px làm bản mô phỏng không nhận ra là Green SM. Thay đổi này **thuần trình bày** — không route nào, không event nào, không `step_index` nào bị ảnh hưởng.
 
@@ -182,7 +199,15 @@ Không có màn lỗi/thất bại — app mô phỏng luôn thành công.
 ```
 
 - **`SideRail`** — 6 mục. **Hai trạng thái**: mở rộng `w-[264px]` có nhãn chữ (mặc định, như `homepage.png`) và thu gọn `w-[72px]` chỉ-icon (như `main_screen.png`); nút "Thu gọn menu" ở đáy chuyển qua lại, lựa chọn nhớ ở `localStorage['gsm_rail_collapsed']` (đọc trong `useEffect`, không đọc lúc render — bẫy hydration). Dưới `lg` (1024px) rail ẩn hoàn toàn.
-- **Hai mục luồng là TAB** — đây là nơi **duy nhất** đổi luồng được (màn `/` không còn hai card). Một quy tắc: *tab của luồng đang đứng = active (`border-primary` + `bg-canvas-soft`, `aria-current="page"`), **không** bấm được; tab luồng kia = bấm được, bắn `select_flow`* — nhưng chỉ ở **ba màn đầu luồng** `/`, `/ride/address`, `/food` (bảng `FLOW_ENTRY` trong `SideRail.tsx`). Vào sâu hơn thì cả hai trở lại **trang trí**: nhảy luồng từ giữa luồng tạo session lai không phân tích được. Mục "Hoạt động" bấm được ở mọi nơi (link `/history`); ba mục còn lại luôn trang trí (`ride-flow-design.md` §8).
+- **Hai mục luồng là TAB** — trên desktop đây là nơi **duy nhất** đổi luồng được (màn `/` không còn hai card). Dưới `lg` rail bị ẩn hẳn, nên cặp tab luồng xuất hiện lại trong `TopBar` (`lg:hidden`) và chạy **đúng luật này**; cả hai đọc chung bảng ở `components/shell/flow-nav.ts` để không bao giờ lệch nhau. Không có nó thì dưới 1024px người dùng không có cách nào rời khỏi luồng đang đứng. Luật đầy đủ nằm ở **một hàm duy nhất** — `selectFlowScreenFor()` trong `components/shell/flow-nav.ts` — và cả rail lẫn top bar đều đọc từ đó. Ba trạng thái:
+
+| Đang ở | Tab luồng đang đứng | Tab luồng kia |
+|---|---|---|
+| Ba màn đầu luồng (`/`, `/ride/address`, `/food`) | active, không bấm | **bấm được**, bắn `select_flow` với `screen_name` của màn đang đứng |
+| Giữa luồng (`/ride/vehicle`…) | active, không bấm | **trang trí** — nhảy luồng từ giữa luồng tạo session lai không phân tích được |
+| Ngoài funnel (`/history`, `/account`, `/support`, `/terms`) | — (không tab nào active) | **cả hai bấm được**, bắn `select_flow` với `screen_name` của màn **ĐÍCH** |
+
+> Hàng thứ ba từng là một **đường cụt**: cả hai tab render thành `<span aria-hidden>`, nên từ bốn màn đó không có cách nào quay lại luồng ngoài nút Back của trình duyệt. Nguyên nhân là luật của hàng thứ hai bị áp nhầm — điều kiện kiểm tra "có tra được `FLOW_ENTRY[pathname]` không", mà màn ngoài funnel cũng tra không ra, dù người dùng ở đó **không hề đang dở dang** luồng nào. Bốn mục dưới bấm được ở mọi nơi — chúng là link thật tới bốn màn ngoài funnel: "Hoạt động" → `/history`, "Tài khoản phụ" → `/account`, "Trung tâm hỗ trợ" → `/support`, "Điều khoản & Chính sách" → `/terms`.
 - `/` được tính là luồng **ride** — đó chính là "mặc định là đặt xe". Lối vào luồng ride ở `/` không nằm ở rail mà là ô tìm kiếm giữa panel, nên tab "Đặt xe" ở `/` chỉ phải làm đúng một việc: báo rằng đây là luồng mặc định.
 
 > **Ghi đè `DESIGN.md`.** `DESIGN.md` §"Màn 1" mô tả Home là "2 nút tính năng chính". Từ thay đổi này, Home **không còn** hai nút đó — chúng thành hai tab ở `SideRail`, còn Home là màn đặt xe (bố cục `split`). `DESIGN.md` giữ nguyên vì nó là brief gốc kiêm nguồn token; mục này là bản ghi đè, cùng cách `ride-flow-design.md` §5.1 ghi đè bảng xe của `mock-data.md`.

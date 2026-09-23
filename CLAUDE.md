@@ -14,7 +14,8 @@ Không có backend thật, không đặt xe thật, không thanh toán. Mọi l�
 | Bất kỳ việc gì liên quan tới event | **`event-taxonomy.md`** ← hợp đồng dữ liệu, nguồn sự thật |
 | Dựng màn hình, routing, state, giỏ hàng | `screen-map.md` |
 | Dựng giao diện 6 màn luồng đặt xe | `ride-flow-design.md` |
-| Giao diện phải trông như thế nào | `apps/web/sample_ui/` — 4 ảnh chụp web Green SM thật |
+| Dựng giao diện 6 màn luồng food | `food-flow-design.md` |
+| Giao diện phải trông như thế nào | `apps/web/sample_ui/` — 7 ảnh chụp web Green SM thật |
 | Hiểu code FE có sẵn: file nào làm gì, component nào dùng ở đâu | `fe-structure.md` |
 | Hiểu code BE có sẵn: 4 lớp, luồng một request | `be-structure.md` |
 | Cần nội dung địa chỉ / món ăn / khuyến mãi | `mock-data.md` |
@@ -53,9 +54,9 @@ Không có test tự động — `techstack.md` đã chốt là kiểm thử b�
 4. **Không tự sinh giá trị màu/spacing/radius mới.** Mọi giá trị phải truy được về token trong `DESIGN.md` qua bảng ở `tailwind-theme.md`.
 5. **Không đổi `id` trong `mock-data.md`** (`addr-home`, `banh-mi-01`, `veh-bike`…). Chúng đi thẳng vào `properties` của event; đổi id làm dữ liệu cũ và mới không ghép được.
 6. **Thêm event mới phải cập nhật `event-taxonomy.md` trước khi code**, kèm `packages/shared/src/types.ts` (union + mảng `EVENT_NAMES`) và `packages/shared/src/screens.ts` nếu là màn mới.
-7. **Không tự gõ `step_index` trong page.** `trackEvent` tra bảng `SCREENS` ở `packages/shared/src/screens.ts`. Chỉ hai ngoại lệ được truyền tay, và cả hai đã gói sẵn thành helper trong `apps/web/lib/track.ts`: `trackAddToCart` (`step_index` luôn = 3) và `trackSelectFlow` (`step_index` luôn = 0, `flow` = luồng vừa chọn — dùng ở cả `home`, `address_selection` và `food_menu`).
-8. **Không thêm thư viện** ngoài những gì `techstack.md` đã chốt: Next.js, React, Tailwind (FE); Express, cors, firebase-admin, tsx (BE); concurrently (root, devDependency). Không Redux/Zustand (dùng Context), không axios (dùng `fetch`), không thư viện UI component, **không thư viện icon** (dùng `apps/web/components/Icon.tsx`), **không thư viện bản đồ** — `MapCanvas.tsx` render tile OpenStreetMap bằng thẻ `<img>` và gọi OSRM bằng `fetch`, nên không cần Leaflet.
-9. **`/history` không được gọi `useScreenView` hay `trackEvent`.** Route này cố ý nằm ngoài funnel, không có trong `SCREENS`, và chỉ ĐỌC lại event đã có. Thêm event vào đó là làm bẩn mọi tỉ lệ conversion. Kiểm tra: `grep -rn "trackEvent(\|useScreenView(" apps/web/app/history` → phải rỗng.
+7. **Không tự gõ `step_index` trong page.** `trackEvent` tra bảng `SCREENS` ở `packages/shared/src/screens.ts`. Chỉ hai ngoại lệ được truyền tay, và cả hai đã gói sẵn thành helper trong `apps/web/lib/track.ts`: `trackAddToCart` (`step_index` luôn = 3) và `trackSelectFlow` (`step_index` luôn = 0, `flow` = luồng vừa chọn — `screen_name` là `home`, `address_selection` hoặc `food_menu`). Bấm tab luồng từ một màn **ngoài funnel** cũng bắn event này, khi đó `screen_name` là màn **đích** vì màn đang đứng không có tên nào để ghi — luật đầy đủ ở `selectFlowScreenFor()` trong `components/shell/flow-nav.ts`.
+8. **Không thêm thư viện** ngoài những gì `techstack.md` đã chốt: Next.js, React, Tailwind (FE); Express, cors, firebase-admin, tsx (BE); concurrently (root, devDependency). Không Redux/Zustand (dùng Context), không axios (dùng `fetch`), không thư viện UI component, **không thư viện icon** (dùng `apps/web/components/Icon.tsx`), **không thư viện bản đồ** — `MapCanvas.tsx` render tile OpenStreetMap bằng thẻ `<img>`, gọi OSRM bằng `fetch`, và tự viết cả phép chiếu Web Mercator hai chiều lẫn thao tác kéo/bấm-chọn-vị-trí, nên không cần Leaflet.
+9. **Bốn route ngoài funnel không được gọi `useScreenView` hay `trackEvent`:** `/history`, `/account`, `/support`, `/terms`. Chúng cố ý không có trong `SCREENS` — `/history` chỉ ĐỌC lại event đã có, ba route kia là màn tĩnh của sidebar. Thêm event vào đó là làm bẩn mọi tỉ lệ conversion. Kiểm tra: `grep -rn "trackEvent(\|useScreenView(" apps/web/app/{history,account,support,terms}` → phải rỗng.
 10. **Bản đồ phải giữ dòng ghi công `© OpenStreetMap`.** Điều khoản dùng tile yêu cầu, không phải chi tiết thẩm mỹ. Kiểm tra: `grep -n "OpenStreetMap" apps/web/components/MapCanvas.tsx`.
 11. **Không thêm màn đăng nhập.** Dự án không có authentication — quyết định có chủ ý, xem `api-endpoints.md`. `UserMenu` ở top bar là trang trí hoàn toàn.
 
@@ -72,39 +73,57 @@ apps/web/                 Next.js 15 — CHỈ FE, cổng 3000
     page.tsx              Home — man dat xe mac dinh (screen_name `home`)
     globals.css           @theme + class typography
     ride/{address,pickup,vehicle,promo,confirm,success}/page.tsx
-    food/page.tsx  food/item/[itemId]/page.tsx  food/{cart,offer,confirm,success}/page.tsx
+    food/page.tsx  (menu — 4 bộ lọc)  food/item/[itemId]/page.tsx
+    food/{cart,offer,confirm,success}/page.tsx
     history/page.tsx      NGOÀI FUNNEL — lịch sử chuyến đi, chỉ đọc, không bắn event
+    account/page.tsx      NGOÀI FUNNEL — Tài khoản phụ (trạng thái rỗng)
+    support/page.tsx      NGOÀI FUNNEL — Trung tâm hỗ trợ (4 thẻ tĩnh)
+    terms/page.tsx        NGOÀI FUNNEL — Điều khoản & Chính sách (4 thẻ tĩnh)
   lib/
     session.ts            session_id / user_id / resetSession
     track.ts              trackEvent + trackAddToCart + trackSelectFlow + useScreenView
-    app-context.tsx       state ride + cart
+    app-context.tsx       state ride + cart + food (origin, quan da chon)
     use-place-search.ts   hook goi GET /api/places (debounce 400ms + abort)
+    use-restaurants.ts    hook goi GET /api/restaurants — quan gan + tim theo ten
+    use-current-place.ts  hook GPS, lui ve DEFAULT_PICKUP khi bi tu choi
+    use-tile-providers.ts hook goi GET /api/tiles — loc nha cung cap tile da hong
+    reverse-place.ts      toa do -> Place co ten, qua GET /api/reverse
     use-route.ts          hook goi GET /api/route + duong lui straightRoute
     format.ts             formatVnd
   components/             ScreenShell, Panel, PrimaryButton, BackButton, FlowGuard,
-                          MapCanvas, PlacePicker, Icon, GsmLogo
-    shell/                AppShell, SideRail (2 muc dau la TAB chuyen luong), TopBar, UserMenu
-  sample_ui/              4 ảnh chụp web Green SM thật — tham chiếu khi dựng UI
+                          MapCanvas, PlacePicker, Icon, GsmLogo,
+                          FoodThumb, QuantityStepper, SummaryRow, RestaurantCard,
+                          EmptyState, Skeleton, InfoCardGrid
+    shell/                AppShell, SideRail (2 muc dau la TAB chuyen luong), TopBar,
+                          UserMenu, flow-nav.ts (luat doi luong dung chung)
+  sample_ui/              7 ảnh chụp web Green SM thật — tham chiếu khi dựng UI
+                          (dieu_khoan_va_chinh_sach.png là trang MARKETING, không
+                          phải màn trong app — chỉ lấy nội dung, bỏ vỏ)
 
 apps/api/                 Express + tsx — CHỈ BE, cổng 4000
   src/server.ts           express + cors + json
   src/routes/             events.routes.ts, health.routes.ts,
-                          places.routes.ts, route.routes.ts
+                          places.routes.ts (places + reverse + restaurants),
+                          route.routes.ts, tiles.routes.ts
   src/validators/         event.validator.ts  ← whitelist 8 field
                           place.validator.ts, route.validator.ts
   src/services/           event.service.ts    ← platform + serverTimestamp
-                          place.service.ts    ← Nominatim (địa chỉ)
+                          photon.service.ts   ← Photon (địa chỉ + reverse)
+                          overpass.service.ts ← Overpass (quán ăn thật)
                           route.service.ts    ← OSRM (tuyến đường)
+                          tiles.service.ts    ← dò tile, phát hiện watermark API key
                           upstream.ts         ← hàng đợi + cache dùng chung
   src/db/firebase-admin.ts
   .env                    credential Firebase (gitignored)
 
 packages/shared/src/      @gsm/shared — dùng chung web + api, KHÔNG có bước build
-  types.ts                Flow, EventName (19), ScreenName (13), EventPayload
+  types.ts                Flow, EventName (23), ScreenName (13), EventPayload
   screens.ts              SCREENS — bảng route/step_index/flow
   mock-data.ts            dữ liệu tĩnh
+  food.ts                 normalizeVi, mealOfHour, menuOf — logic tìm món
   places.ts               Place, PlaceSource, DEFAULT_PICKUP, PRESET_PLACES
   route.ts                RouteResult, haversineKm, straightRoute
+  tiles.ts                TILE_PROVIDERS + PROBE_TILE — bảng tile dùng chung web/api
   pricing.ts              calcFare (giá theo km), calcDiscount, calcRideTotals,
                           calcFoodTotals
 

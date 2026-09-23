@@ -102,6 +102,24 @@ Cùng file, cùng handler `GET`, chỉ khác điều kiện `where` khi query Fi
 | `user_id` | string | **Bền qua nhiều phiên.** Nguồn dữ liệu cho màn `/history` |
 | `flow` | `ride` \| `food` | |
 | `from` / `to` | ISO date | |
+| `flat` | `1` \| `true` | Trải `properties` thành cột `prop_<tên>` ở cấp cao nhất |
+| `limit` | số nguyên > 0 | Chặn số document trả về. Vắng = trả hết |
+
+#### `flat=1` — cho công cụ BI đọc JSON trực tiếp
+
+```
+GET /api/events?flat=1
+```
+
+`properties` là map lồng nhau và **mỗi loại event có bộ khoá khác nhau**. Power BI / Tableau đọc thẳng JSON sẽ dựng một cột kiểu Record mà người dùng phải tự bấm Expand, và expand ra không đều giữa các dòng.
+
+`flat=1` trả về bảng phẳng: 10 field top-level giữ nguyên, `properties` biến thành các cột `prop_<tên>`. **Mọi dòng có cùng tập khoá**, khoá thiếu là `null` — phần này mới là phần quan trọng: nếu để mỗi dòng chỉ mang khoá của riêng nó thì Power BI suy kiểu bảng bằng cách đọc vài dòng đầu, và `prop_final_price` (chỉ xuất hiện ở `confirm_ride`, một event hiếm trong dòng sự kiện) có thể không lọt vào mẫu — lúc đó cột đó **biến mất khỏi bảng mà không báo gì**.
+
+Tiền tố `prop_` **cố ý trùng** với `analysis/fetch_events.py`, nên hai đường đọc dữ liệu cho ra cùng tên cột và biểu đồ Power BI nói về cùng một thứ với biểu đồ matplotlib.
+
+> **`limit` đi vào query Firestore, không cắt sau khi lấy về** — mỗi document đọc lên là một lượt đọc tính vào hạn mức (free tier 50.000/ngày). Ngoại lệ duy nhất là nhánh `user_id` (sắp trong bộ nhớ): ở đó không thể limit phía Firestore vì "200 document đầu theo thứ tự tuỳ ý" không phải "200 document đầu theo thời gian".
+
+> **Hạn mức đọc là thứ chặn trước tiên khi nối BI.** Một lần refresh toàn bộ ≈ số document trong collection. Với ~7.800 document: 1 lần/ngày = thoải mái, 6 lần/ngày = sát trần 50.000, mỗi giờ = vượt gần 4 lần. Dùng `from=` để chỉ kéo phần mới nếu cần refresh dày.
 
 > **`user_id` cố ý không dùng `orderBy` của Firestore.** Một `where('user_id','==')` cộng một `orderBy('created_at')` trên field khác sẽ bị Firestore từ chối và bắt tạo composite index — tức người chạy dự án phải bấm link, đợi index build, rồi mới demo được. Dữ liệu một người dùng chỉ vài trăm document, nên service lấy về rồi **sắp xếp trong bộ nhớ**. Đổi lại là không phải cấu hình gì thêm sau khi clone.
 
@@ -110,6 +128,12 @@ Cùng file, cùng handler `GET`, chỉ khác điều kiện `where` khi query Fi
 GET /api/places?q=Hồ Gươm&limit=6
 ```
 File: `apps/api/src/routes/places.routes.ts` → `validators/place.validator.ts` → `services/place.service.ts`.
+
+Nguồn: **[Photon](https://photon.komoot.io/)** (komoot), chạy trên dữ liệu OpenStreetMap. Miễn phí, không API key.
+
+> **Vì sao không còn dùng Nominatim.** Trên máy chạy dự án này, **toàn bộ `*.openstreetmap.org` không kết nối được** — cả `nominatim.openstreetmap.org` lẫn `tile.openstreetmap.org` — trong khi OSRM và mọi dịch vụ khác vẫn thông. Ô tìm địa chỉ vì thế im lặng không ra kết quả nào. Photon chạy trên đúng dữ liệu OSM, khác mỗi tên miền và hạ tầng, và **giữ nguyên `osm_type` + `osm_id`** nên `id` dạng `osm-N240109189` không đổi (`CLAUDE.md` quy tắc 5).
+
+> **`bbox` là bắt buộc.** Photon chỉ *ưu tiên* theo `lat`/`lon` chứ không cắt, nên tìm "Hồ Gươm" trả về một tiệm ăn ở München ngay ở kết quả thứ hai. Nominatim trước đây chặn bằng `countrycodes=vn`; Photon không có tham số đó nên phải dùng khung bao Việt Nam `102.1,8.2,109.6,23.4`.
 
 **Response (200):** mảng `Place` (kiểu ở `packages/shared/src/places.ts`)
 ```json
@@ -123,7 +147,7 @@ File: `apps/api/src/routes/places.routes.ts` → `validators/place.validator.ts`
 | `q` | string, 2–120 ký tự | ✅ |
 | `limit` | số nguyên 1–8, mặc định 6 | ❌ |
 
-**Vì sao phải proxy qua `apps/api` chứ không gọi Nominatim thẳng từ trình duyệt** — ba lý do, lý do đầu là chặn cứng:
+**Vì sao phải proxy qua `apps/api` chứ không gọi thẳng từ trình duyệt** — ba lý do, lý do đầu là chặn cứng:
 
 1. Điều khoản OSM bắt buộc mỗi request mang `User-Agent` định danh, mà **trình duyệt không cho JavaScript đặt header đó**.
 2. OSM giới hạn tuyệt đối **1 request/giây**. Chỉ ở server mới đặt được hàng đợi thật; debounce phía client là gợi ý, không phải bảo đảm.
@@ -136,6 +160,81 @@ File: `apps/api/src/routes/places.routes.ts` → `validators/place.validator.ts`
 FE phải **suy biến êm**: hiện cảnh báo nhưng vẫn liệt kê 5 địa chỉ gợi ý để luồng đi tiếp được. Cùng tinh thần với `trackEvent().catch(() => {})` — hạ tầng lỗi không được kẹt người dùng.
 
 Endpoint này **không chạm Firestore** và **không ghi event nào**: gõ phím không phải một bước funnel.
+
+### 3b-bis. Tìm quán ăn quanh một toạ độ
+```
+GET /api/restaurants?lat=21.0369&lon=105.7856&radius=2000&limit=20
+GET /api/restaurants?lat=21.0369&lon=105.7856&q=pho
+```
+File: **cùng** `apps/api/src/routes/places.routes.ts` → `validators/place.validator.ts` (`validateRestaurantQuery`) → **`services/overpass.service.ts`** (`searchRestaurants`).
+
+Nguồn: **[Overpass API](https://overpass-api.de/)**, truy vấn thẳng cơ sở dữ liệu OpenStreetMap. Miễn phí, không API key.
+
+> **Vì sao bỏ Nominatim ở đây — hai lý do, lý do thứ hai đúng cả khi mạng thông:**
+>
+> 1. `*.openstreetmap.org` không kết nối được từ máy chạy dự án (xem mục 3b).
+> 2. **Nominatim là một *geocoder*, không phải chỉ mục POI.** `amenity=restaurant` là truy vấn có cấu trúc xếp theo "importance", nên nó trả về rất thưa — **6-hoặc-0 quán ngay giữa Cầu Giấy**. Overpass truy vấn theo bán kính và trả về **80 quán** ở đúng toạ độ đó. Đây là khác biệt về *đúng công cụ*, không phải về *máy chủ nào còn sống*.
+
+**Response (200):** mảng `Restaurant` (`packages/shared/src/places.ts`) — `Place` cộng các tag OSM:
+```json
+[{ "id": "osm-N4510096889", "label": "Nhà Hàng Bò Đội Nón",
+   "address": "60 Trần Đăng Ninh, Dịch Vọng, Cầu Giấy, Hà Nội", "source": "search",
+   "lat": 21.0331, "lon": 105.7884,
+   "cuisine": ["Lẩu_-_nướng_&_các_món_nhậu"], "openingHours": "09:00 - 23:30" }]
+```
+
+| Param | Kiểu | Bắt buộc |
+|---|---|---|
+| `lat` | số, −90..90 | ✅ |
+| `lon` | số, −180..180 | ✅ |
+| `limit` | số nguyên 1–30, mặc định 6 | ❌ |
+| `radius` | số nguyên 200–5000 (mét), mặc định 1500 | ❌ |
+| `q` | string, 2–120 ký tự — lọc theo **tên quán** | ❌ |
+
+Truy vấn Overpass QL được dựng:
+```
+[out:json][timeout:25];
+(nwr["amenity"~"restaurant|fast_food|cafe"](around:<radius>,<lat>,<lon>););
+out center 80;
+```
+
+**Bốn quyết định, mỗi cái đều có lý do:**
+
+1. **`restaurant|fast_food|cafe`**, không chỉ `restaurant` — người Việt gọi quán bánh mì, quán cà phê đều là "quán ăn", và lọc cứng theo `restaurant` cắt mất phần lớn quán thật.
+2. **`nwr`** = node + way + relation. Quán lớn được vẽ là `way` (cả toà nhà) chứ không phải một điểm, nên chỉ lấy `node` sẽ bỏ sót đúng những quán dễ nhận ra nhất. `out center` cho mỗi phần tử một toạ độ tâm.
+3. **`q` được lọc ở JS, KHÔNG gửi lên Overpass.** Overpass **từ chối** (406 Not Acceptable) các truy vấn có lớp ký tự tiếng Việt trong regex — đây là bộ lọc của hạ tầng trước nó, không sửa được bằng cách viết regex khéo hơn. Lọc ở JS dùng `normalizeVi` (đã có sẵn trong `@gsm/shared`) nên **gõ "pho" ra "Phở", "ca phe" ra "Cà Phê"** — bộ lọc phía Overpass không làm được việc đó. Thêm nữa, **khoá cache không chứa `q`**, nên mỗi phím gõ thêm không sinh một lời gọi Overpass mới: cả màn tìm kiếm chạy trên một lần tải duy nhất.
+4. **Gate riêng, `minGapMs` 300ms.** Overpass không áp luật 1 request/giây của OSM; dùng chung gate với Photon/OSRM sẽ kéo cả tra địa chỉ lẫn tuyến đường chậm theo mà không có lý do gì.
+
+> **Độ phủ tag vẫn thưa.** Nhiều quán không có `cuisine`, `opening_hours` hay `addr:*`. Mọi trường thêm đều optional, `address` lui về `"Chưa có địa chỉ chi tiết"`, và FE **không được lọc bỏ** quán thiếu tag. Quán **không có `name`** là trường hợp duy nhất bị loại — không hiển thị được.
+
+**Lỗi (502)** khi Overpass rớt. FE hiện thông báo kèm nút "Thử lại" chứ **không** chặn màn menu — ba cách tìm món còn lại vẫn dùng được.
+
+### 3b-ter. Toạ độ → địa chỉ thật (reverse geocode)
+```
+GET /api/reverse?lat=21.0369&lon=105.7856
+```
+File: `apps/api/src/routes/places.routes.ts` → `validators/place.validator.ts` (`validateReverseQuery`) → `services/photon.service.ts` (`reversePlace`).
+
+**Response (200):** một `Place`, hoặc `null` khi Photon không biết chỗ đó là đâu.
+```json
+{ "id": "geo-current", "label": "Ngõ 1 Phố Phan Văn Trường",
+  "address": "Cầu Giấy, Hà Nội", "source": "preset",
+  "lat": 21.0369244, "lon": 105.7856271 }
+```
+
+| Param | Kiểu | Bắt buộc |
+|---|---|---|
+| `lat` | số, −90..90 | ✅ |
+| `lon` | số, −180..180 | ✅ |
+
+**Vì sao endpoint này tồn tại.** Không có nó, luồng food chỉ hiện được nhãn `"Vị trí hiện tại"` / `"Quanh vị trí của bạn"` — tức người dùng bấm **Đặt đơn mà không biết đơn giao tới đâu**. Một cái nhãn không phải là một địa chỉ.
+
+`id` trả về luôn là `geo-current` và `source` là `preset` chứ không phải `osm-*`/`search`: điểm này đến từ GPS, không phải từ một lượt người dùng tự gõ tìm, và `address_source` trong `place_order` phải phản ánh đúng điều đó.
+
+**FE dùng nó như một bước phụ, không chặn luồng:** toạ độ có trước và dùng được ngay (dải "Gần bạn" không phải chờ), nhãn địa chỉ đẹp hơn đến sau. Photon thất bại thì giữ nhãn mặc định và đi tiếp.
+
+Endpoint này **không chạm Firestore** và **không ghi event nào**.
+
 
 ### 3c. Tìm tuyến đường thật
 ```
@@ -162,6 +261,37 @@ Nguồn: [OSRM](https://project-osrm.org/) `router.project-osrm.org`, hồ sơ `
 ```
 
 > **`router.project-osrm.org` là máy chủ demo công cộng, không cam kết uptime.** Vì vậy FE **bắt buộc có đường lui**: gặp 502 thì gọi `straightRoute()` trong `@gsm/shared` — nối thẳng hai điểm, quãng đường theo công thức haversine — rồi ghi `route_source: "straight"` vào event. Luồng đặt xe **không bao giờ bị chặn** vì một dịch vụ bên ngoài, và dữ liệu vẫn nói thật về việc con số đến từ đâu.
+
+Endpoint này **không chạm Firestore** và **không ghi event nào**.
+
+### 3d. Dò nhà cung cấp tile bản đồ
+```
+GET /api/tiles
+```
+File: `apps/api/src/routes/tiles.routes.ts` → `services/tiles.service.ts`. Không nhận tham số nào nên không có validator.
+
+**Response (200):** tên các nhà cung cấp còn dùng được, **giữ nguyên thứ tự ưu tiên** trong `TILE_PROVIDERS` (`packages/shared/src/tiles.ts`)
+```json
+{ "providers": ["stadia", "osmfr"] }
+```
+
+**Vì sao endpoint này tồn tại.** `MapCanvas.tsx` từ đầu đã có cơ chế đếm tile hỏng rồi nhảy sang nhà cung cấp dự phòng — nhưng nó dựa vào sự kiện `onError` của thẻ `<img>`, mà `onError` chỉ bắt được *"không tải được"*, không bắt được *"tải được nhưng sai"*.
+
+Đó đúng là sự cố đã xảy ra: CARTO chuyển sang bắt buộc API key và bắt đầu in chữ **"API KEY REQUIRED"** chéo lên mọi tile — nhưng vẫn trả HTTP 200 kèm một file PNG hợp lệ. `onError` không bao giờ bắn, bộ đếm mãi bằng 0, và bản đồ hỏng ở cả hai luồng suốt nhiều ngày mà app không hề biết.
+
+**Cách dò.** Tải một tile ở toạ độ `z13/6707/3740` — **giữa Biển Đông, không có một nét bản đồ nào**. Một tile biển sâu sạch gần như là một ô màu phẳng, nén xuống còn vài trăm byte; nhà cung cấp nào in chữ lên đó sẽ phình lên hơn một bậc độ lớn:
+
+| Nhà cung cấp | Kích thước tile biển | Kết luận |
+|---|---|---|
+| `tile.openstreetmap.de`, `osmfr` | 103 B | sạch |
+| Stadia (`osm_bright`) | 495 B | sạch |
+| CARTO | **1718 B** | có watermark |
+
+Ngưỡng `PROBE_MAX_BYTES = 800` nằm giữa khe hở 495 → 1718. **Đổi tone bản đồ thì phải đo lại con số này** — tone có màu nặng hơn tone xám ngay cả ở giữa biển (`alidade_smooth` 156 B → `osm_bright` 495 B). Một nhà cung cấp bị loại khi **đã trả lời** mà tile quá lớn, sai `content-type`, hoặc trả mã lỗi.
+
+> **Lỗi mạng KHÔNG phải là bằng chứng hỏng.** Không kết nối được thì nhà cung cấp đó vẫn được **giữ lại** trong danh sách. Việc của phép dò là *loại thứ đã chứng minh là hỏng*, không phải *chỉ nhận thứ đã chứng minh là tốt* — kết quả được cache 6 giờ, nên nếu một cú chớp mạng cũng đủ loại một nhà cung cấp thì danh sách dự phòng sẽ bị đầu độc cả buổi. Trường hợp nhà cung cấp chết thật thì `onError` ở FE vẫn bắt được.
+
+**Lỗi (502)** khi bản thân phép dò thất bại. FE coi đây là *"không biết gì"* và lui về dùng nguyên cả bảng `TILE_PROVIDERS` — khác hẳn với `{"providers":[]}`, vốn có nghĩa *"đã dò, không nhà nào dùng được"*.
 
 Endpoint này **không chạm Firestore** và **không ghi event nào**.
 

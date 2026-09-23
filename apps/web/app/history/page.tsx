@@ -6,10 +6,10 @@
  * KHONG NAM TRONG FUNNEL: khong co trong `SCREENS`, khong goi `useScreenView`,
  * khong goi `trackEvent`. Man nay CHI DOC.
  *
- * Khong co collection `orders` — moi chuyen duoc dung lai tu chinh event ket
- * thuc funnel: `confirm_ride` (mot chuyen xe) va `place_order` (mot don do an).
- * Vi vay hai event do phai TU MO TA du (`address_label`, `pickup_label`...),
- * xem event-taxonomy.md muc `ride_confirm`.
+ * Khong co collection `orders` — moi chuyen duoc dung lai tu chinh event cuoi
+ * cung cua mot luot: `confirm_ride` / `cancel_ride` (mot chuyen xe) va
+ * `place_order` (mot don do an). Vi vay ba event do phai TU MO TA du
+ * (`address_label`, `pickup_label`...), xem event-taxonomy.md muc `ride_confirm`.
  *
  * Loc theo `user_id` chu khong phai `session_id`: `user_id` song o localStorage
  * nen bang nay ben qua nhieu phien, nhieu ngay — dung nghia "lich su nguoi dung".
@@ -29,10 +29,15 @@ import { getUserId } from '@/lib/session';
 type Status = 'loading' | 'ready' | 'error';
 type Tab = 'ride' | 'food';
 
-/** Mot dong trong bang — da gap tu mot event ket thuc funnel. */
+/** Mot dong trong bang — da gap tu mot event ket thuc mot luot dat. */
 interface Trip {
   code: string;
   at: string;
+  /**
+   * true = chuyen da huy (dung tu `cancel_ride`). Luong food khong co trang
+   * thai nay — khong co event huy don do an.
+   */
+  cancelled: boolean;
   /** ride */
   pickup?: string;
   destination?: string;
@@ -46,10 +51,22 @@ interface Trip {
   total: number;
 }
 
-const RIDE_COLUMNS = ['MÃ ĐƠN', 'ĐIỂM ĐÓN', 'ĐIỂM ĐẾN', 'LOẠI XE', 'QUÃNG ĐƯỜNG', 'CƯỚC PHÍ', 'THANH TOÁN', 'THỜI GIAN'];
+const RIDE_COLUMNS = ['MÃ ĐƠN', 'TRẠNG THÁI', 'ĐIỂM ĐÓN', 'ĐIỂM ĐẾN', 'LOẠI XE', 'QUÃNG ĐƯỜNG', 'CƯỚC PHÍ', 'THANH TOÁN', 'THỜI GIAN'];
 const FOOD_COLUMNS = ['MÃ ĐƠN', 'SỐ MÓN', 'ƯU ĐÃI', 'TỔNG TIỀN', 'THỜI GIAN'];
 
 const PAYMENT_LABEL: Record<string, string> = { cash: 'Tiền mặt', qr: 'QR' };
+
+/**
+ * Nhan trang thai chuyen di — MOT nguon duy nhat cho ca huy hieu lan o tim,
+ * de go "huy" vao o tim luon loc dung nhung dong dang hien "Đã huỷ".
+ *
+ * KHONG CO MAU DO o day hay o `StatusPill`: DESIGN.md muc "Colour" chot he mau
+ * nay co y khong co bang error/success/warning — "validation cues come from the
+ * signature cyan primary". Phan biet bang DO DAM cua cyan (CLAUDE.md quy tac 4).
+ */
+function statusLabel(cancelled: boolean): string {
+  return cancelled ? 'Đã huỷ' : 'Hoàn thành';
+}
 
 const TIME_FORMAT = new Intl.DateTimeFormat('vi-VN', {
   hour: '2-digit',
@@ -73,16 +90,17 @@ function num(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }
 
-/** Event ket thuc funnel -> mot dong lich su. */
+/** Event ket thuc mot luot dat -> mot dong lich su. */
 function toTrip(event: EventDoc & { id?: string }): Trip {
   const p = event.properties ?? {};
   // 8 ky tu dau cua document id — du de phan biet, ngan de doc nhu ma don that.
   const code = (event.id ?? '').slice(0, 8).toUpperCase() || '—';
 
-  if (event.event_name === 'confirm_ride') {
+  if (event.event_name === 'confirm_ride' || event.event_name === 'cancel_ride') {
     return {
       code,
       at: formatTime(event.created_at),
+      cancelled: event.event_name === 'cancel_ride',
       pickup: str(p.pickup_label) ?? '—',
       destination: str(p.address_label) ?? '—',
       // `vehicle_id` tra duoc ra ten vi VEHICLES la bang dong (khac dia chi).
@@ -98,10 +116,38 @@ function toTrip(event: EventDoc & { id?: string }): Trip {
   return {
     code,
     at: formatTime(event.created_at),
+    cancelled: false,
     itemCount: num(p.item_count),
     offer: offerId ? (getOffer(offerId)?.title ?? offerId) : 'Không áp dụng',
     total: num(p.final_total),
   };
+}
+
+/**
+ * Chon cac event dung lam DONG cho tab "Di chuyen".
+ *
+ * MOT DONG = MOT SESSION, khong phai mot event. Chuyen bi huy sinh HAI event:
+ * `confirm_ride` o man xac nhan, roi `cancel_ride` o man tim tai xe. Loc thang
+ * theo ten event se cho ra HAI dong cho cung mot chuyen, va dong `confirm_ride`
+ * se hien nhu mot chuyen hoan thanh — dung cai ma bang nay can phan biet.
+ *
+ * Vi vay gom theo `session_id` truoc: session nao co `cancel_ride` thi lay
+ * chinh event do lam dong (no mirror du field cua `confirm_ride`, xem
+ * event-taxonomy.md muc `finding_driver`) va bo dong `confirm_ride` di.
+ *
+ * Mot session khong the co hai `confirm_ride`: nut Back bi vo hieu hoa o man
+ * `finding_driver`, va `resetAll()` sau khi huy da cap session_id moi.
+ */
+function rideEvents(events: (EventDoc & { id?: string })[]) {
+  const cancelledSessions = new Set(
+    events.filter((e) => e.event_name === 'cancel_ride').map((e) => e.session_id),
+  );
+
+  return events.filter(
+    (e) =>
+      e.event_name === 'cancel_ride' ||
+      (e.event_name === 'confirm_ride' && !cancelledSessions.has(e.session_id)),
+  );
 }
 
 export default function HistoryPage() {
@@ -147,21 +193,29 @@ export default function HistoryPage() {
   }, []);
 
   const trips = useMemo(() => {
-    const wanted = tab === 'ride' ? 'confirm_ride' : 'place_order';
-    const rows = events.filter((e) => e.event_name === wanted).map(toTrip);
+    const rows = (
+      tab === 'ride' ? rideEvents(events) : events.filter((e) => e.event_name === 'place_order')
+    ).map(toTrip);
     // Moi nhat len dau — nguoc voi thu tu tang dan cua API.
     rows.reverse();
 
     const keyword = query.trim().toLowerCase();
     if (!keyword) return rows;
     return rows.filter((t) =>
-      [t.code, t.pickup, t.destination, t.vehicle].some((v) =>
+      // Nhan trang thai nam trong danh sach tim duoc: cot TRANG THAI vua them thi
+      // go "huy" phai loc ra duoc, khong thi no chi de nhin.
+      [t.code, t.pickup, t.destination, t.vehicle, statusLabel(t.cancelled)].some((v) =>
         v?.toLowerCase().includes(keyword),
       ),
     );
   }, [events, tab, query]);
 
-  const totalSpent = trips.reduce((sum, t) => sum + t.total, 0);
+  // Chuyen da huy KHONG duoc cong vao "Tong chi tieu": `final_price` cua no la
+  // so tien LE RA phai tra, khong phai so tien da tra. Cong vao la bang nay noi
+  // doi ve so tien nguoi dung tieu. The "Da huy" ben canh giai thich vi sao tong
+  // tien thap hon so dong goi y.
+  const totalSpent = trips.reduce((sum, t) => (t.cancelled ? sum : sum + t.total), 0);
+  const cancelledCount = trips.filter((t) => t.cancelled).length;
   const columns = tab === 'ride' ? RIDE_COLUMNS : FOOD_COLUMNS;
 
   return (
@@ -209,12 +263,18 @@ export default function HistoryPage() {
           </div>
         </div>
 
-        {/* Hai the tong ket — dung nhu history.png. */}
-        <div className="grid gap-lg sm:grid-cols-2">
+        {/* The tong ket — dung nhu history.png, them mot the "Da huy" o tab ride. */}
+        <div className={`grid gap-lg ${tab === 'ride' ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
           <StatCard
             label={tab === 'ride' ? 'Tổng số chuyến' : 'Tổng số đơn'}
             value={status === 'ready' ? String(trips.length) : '--'}
           />
+          {tab === 'ride' ? (
+            <StatCard
+              label="Đã huỷ"
+              value={status === 'ready' ? String(cancelledCount) : '--'}
+            />
+          ) : null}
           <StatCard
             label="Tổng chi tiêu"
             value={status === 'ready' && trips.length > 0 ? formatVnd(totalSpent) : '--'}
@@ -223,7 +283,8 @@ export default function HistoryPage() {
 
         <div className="overflow-hidden rounded-xl bg-canvas">
           <div className="scroll-thin overflow-x-auto">
-            <table className="w-full min-w-[840px] border-collapse text-left">
+            {/* 960 chu khong phai 840: tab ride da co them cot TRANG THAI. */}
+            <table className="w-full min-w-[960px] border-collapse text-left">
               <thead>
                 <tr className="border-b border-surface-pressed bg-canvas-soft">
                   {columns.map((column) => (
@@ -274,6 +335,9 @@ export default function HistoryPage() {
                       <td className="t-body-sm-strong px-lg py-md">{trip.code}</td>
                       {tab === 'ride' ? (
                         <>
+                          <td className="px-lg py-md">
+                            <StatusPill cancelled={trip.cancelled} />
+                          </td>
                           <td className="t-body-sm max-w-[220px] truncate px-lg py-md text-body">
                             {trip.pickup}
                           </td>
@@ -289,7 +353,16 @@ export default function HistoryPage() {
                           <td className="t-body-sm px-lg py-md text-body">{trip.offer}</td>
                         </>
                       )}
-                      <td className="t-body-md-strong px-lg py-md">{formatVnd(trip.total)}</td>
+                      {/* Chuyen da huy: gach ngang + lam mo. So tien nay la cuoc
+                          LE RA phai tra — de nguyen dinh dang binh thuong thi doc
+                          nhu tien da tieu. */}
+                      <td
+                        className={`t-body-md-strong px-lg py-md ${
+                          trip.cancelled ? 'text-mute line-through' : ''
+                        }`}
+                      >
+                        {formatVnd(trip.total)}
+                      </td>
                       {tab === 'ride' ? (
                         <td className="t-body-sm px-lg py-md text-body">{trip.payment}</td>
                       ) : null}
@@ -303,6 +376,18 @@ export default function HistoryPage() {
         </div>
       </div>
     </AppShell>
+  );
+}
+
+function StatusPill({ cancelled }: { cancelled: boolean }) {
+  return (
+    <span
+      className={`t-caption inline-block rounded-pill px-md py-xxs ${
+        cancelled ? 'bg-canvas-soft text-mute' : 'bg-surface-pressed text-primary-dark'
+      }`}
+    >
+      {statusLabel(cancelled)}
+    </span>
   );
 }
 

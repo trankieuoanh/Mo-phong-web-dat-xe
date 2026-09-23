@@ -32,8 +32,9 @@ apps/api/
    ├─ server.ts                     express + cors + json + listen + xử lý EADDRINUSE
    ├─ routes/
    │  ├─ events.routes.ts           POST và GET /api/events
-   │  ├─ places.routes.ts           GET /api/places — tìm địa chỉ thật
+   │  ├─ places.routes.ts           GET /api/places, /api/reverse, /api/restaurants
    │  ├─ route.routes.ts            GET /api/route  — tìm tuyến đường thật
+   │  ├─ tiles.routes.ts            GET /api/tiles  — nhà cung cấp tile nào còn dùng được
    │  └─ health.routes.ts           GET /api/health — không chạm Firestore
    ├─ validators/
    │  ├─ event.validator.ts         whitelist 8 field + validate query
@@ -41,9 +42,11 @@ apps/api/
    │  └─ route.validator.ts         from/to dạng "lat,lon" 
    ├─ services/
    │  ├─ event.service.ts           createEvent · listEvents
-   │  ├─ place.service.ts           Nominatim: User-Agent + chuẩn hoá kết quả
+   │  ├─ photon.service.ts          Photon: tìm địa chỉ + reverse geocode
+   │  ├─ overpass.service.ts        Overpass: quán ăn thật theo bán kính
    │  ├─ route.service.ts           OSRM: gọi + chuẩn hoá geometry sang [lat,lon]
-   │  └─ upstream.ts                hàng đợi + cache, DÙNG CHUNG cho hai cái trên
+   │  ├─ tiles.service.ts           dò tile biển sâu để phát hiện watermark API key
+   │  └─ upstream.ts                hàng đợi + cache, DÙNG CHUNG cho các cái trên
    └─ db/
       └─ firebase-admin.ts          getDb() — khởi tạo trễ
 ```
@@ -54,7 +57,9 @@ apps/api/
 
 Nominatim và OSRM đều là hạ tầng cộng đồng miễn phí với cùng một ràng buộc: đừng gọi dồn dập, và đừng hỏi lại thứ vừa hỏi. Chép logic đó hai lần nghĩa là sửa một bên quên bên kia — mà triệu chứng của nó là **bị chặn IP giữa lúc demo**, không phải một test đỏ.
 
-`createUpstreamGate({ minGapMs, ttlMs, maxEntries })` trả về `run(key, work)`: đọc cache trước, xếp hàng, chờ đủ khoảng cách, gọi, ghi cache. `place.service.ts` dùng `minGapMs: 1100` (OSM giới hạn tuyệt đối 1 req/giây), `route.service.ts` dùng `600`.
+`createUpstreamGate({ minGapMs, ttlMs, maxEntries })` trả về `run(key, work)`: đọc cache trước, xếp hàng, chờ đủ khoảng cách, gọi, ghi cache. `photon.service.ts` dùng `minGapMs: 600`, `overpass.service.ts` dùng `300` (Overpass không áp luật 1 req/giây của OSM, và dùng chung gate sẽ kéo cả tra địa chỉ lẫn tuyến đường chậm theo), `route.service.ts` dùng `600`, `tiles.service.ts` dùng `300` với `ttlMs` **6 giờ** (một nhà cung cấp không khoá API key giữa buổi demo).
+
+**Kết quả RỖNG không được cache** (`shouldCache` trong `upstream.ts`). Trước đây `[]` được cache như mọi giá trị khác, nên một lần "không tìm thấy quán nào" đóng băng dải "Gần bạn" suốt cả TTL và nút "Thử lại" trả về đúng mảng rỗng đó tức thì — bấm bao nhiêu lần cũng vô ích.
 
 ### `places.*` và `route.*` — vì sao BE phải làm trung gian
 

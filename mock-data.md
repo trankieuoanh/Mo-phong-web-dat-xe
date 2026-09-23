@@ -36,7 +36,7 @@ export interface Address {
 | `addr-school` | Trường | VinUniversity, Ocean Park, Gia Lâm, Hà Nội | `school` | 20.9886 | 105.9460 |
 | `addr-airport` | Sân bay | Sân bay Quốc tế Nội Bài, Sóc Sơn, Hà Nội | `plane` | 21.2189 | 105.8045 |
 
-Toạ độ tra từ chính Nominatim — cùng nguồn với địa chỉ người dùng tự tìm, nên hai nhánh `preset` và `search` nằm trên cùng một hệ quy chiếu.
+Toạ độ tra từ chính Nominatim — cùng nguồn với địa chỉ người dùng tự tìm, nên ba nhánh `preset`, `search` và `map` (bấm trên bản đồ) nằm trên cùng một hệ quy chiếu.
 
 > **`distanceKm` đã bị xoá.** Nó là khoảng cách hardcode tới điểm đón **cũ** (`1.3`, `3.8`, … `27.5`). Từ khi điểm đón đổi được và tuyến đường tính thật, để lại trường đó là bảo đảm có lúc màn hình hiện "15.2 km" ngay cạnh một tuyến đường 31 km. Khoảng cách gợi ý giờ tính tại chỗ bằng `haversineKm()` từ điểm đón hiện tại — đúng cho cả địa chỉ gợi ý lẫn địa chỉ tự tìm, và không bao giờ lệch khỏi bản đồ.
 
@@ -128,7 +128,7 @@ export function calcFare(vehicle: Vehicle, distanceKm: number): number {
 ## 3. Khuyến mãi (luồng Ride — `promo_selection`)
 
 ```ts
-export interface Promo {
+export interface DiscountRule {
   id: string;
   code: string;
   title: string;
@@ -137,69 +137,140 @@ export interface Promo {
   value: number;          // fixed: số tiền VNĐ | percent: phần trăm
   maxDiscount?: number;   // chỉ với type 'percent'
   minOrder: number;       // giá trị tối thiểu để áp dụng
+
+  // ── Bốn điều kiện linh hoạt, tất cả optional ──
+  vehicleTypes?: VehicleType[];              // chỉ áp cho hạng xe này (Ride)
+  minDistanceKm?: number;                    // quãng đường tối thiểu (Ride)
+  activeHours?: { from: number; to: number };// giờ vàng [from, to), from > to = vắt qua nửa đêm
+  appliesTo?: 'subtotal' | 'shipping';       // mặc định 'subtotal'
 }
 ```
 
-| `id` | `code` | `title` | `type` | `value` | `maxDiscount` | `minOrder` |
-|---|---|---|---|---|---|---|
-| `promo-10k` | `GSM10K` | Giảm 10.000đ | `fixed` | 10000 | — | 0 |
-| `promo-20` | `GSM20` | Giảm 20%, tối đa 30.000đ | `percent` | 20 | 30000 | 50000 |
-| `promo-new` | `NEWGSM` | Giảm 50% chuyến đầu, tối đa 40.000đ | `percent` | 50 | 40000 | 0 |
+Bốn trường cuối đều **optional**, nên ba mã viết trước khi có chúng vẫn giữ nguyên nghĩa: vắng hết = một luật chỉ phụ thuộc `minOrder`.
+
+| `id` | `code` | `title` | `type` | `value` | `maxDiscount` | `minOrder` | điều kiện thêm |
+|---|---|---|---|---|---|---|---|
+| `promo-10k` | `GSM10K` | Giảm 10.000đ | `fixed` | 10000 | — | 0 | — |
+| `promo-20` | `GSM20` | Giảm 20%, tối đa 30.000đ | `percent` | 20 | 30000 | 50000 | — |
+| `promo-new` | `NEWGSM` | Giảm 50% chuyến đầu, tối đa 40.000đ | `percent` | 50 | 40000 | 0 | — |
+| `promo-bike` | `GSMBIKE` | Giảm 15% xe máy, tối đa 20.000đ | `percent` | 15 | 20000 | 0 | `vehicleTypes: ['bike']` |
+| `promo-car` | `GSMCAR` | Giảm 30.000đ cho xe ô tô | `fixed` | 30000 | — | 80000 | `vehicleTypes: ['car']` |
+| `promo-lunch` | `GSMTRUA` | Giờ vàng trưa: giảm 25.000đ | `fixed` | 25000 | — | 40000 | `activeHours: 11→13` |
+| `promo-far` | `GSMFAR` | Chuyến xa: giảm 12%, tối đa 50.000đ | `percent` | 12 | 50000 | 0 | `minDistanceKm: 8` |
 
 **Quy tắc tính giảm giá** (dùng chung cho Promo và Offer):
 ```ts
-function calcDiscount(rule, subtotal: number): number {
-  if (subtotal < rule.minOrder) return 0;
-  if (rule.type === 'fixed') return Math.min(rule.value, subtotal);
-  const raw = Math.floor(subtotal * rule.value / 100);
+function calcDiscount(rule, subtotal: number, shippingFee = 0): number {
+  if (subtotal < rule.minOrder) return 0;                     // minOrder LUÔN xét trên subtotal
+  const base = rule.appliesTo === 'shipping' ? shippingFee : subtotal;
+  if (rule.type === 'fixed') return Math.min(rule.value, base);
+  const raw = Math.floor(base * rule.value / 100);
   return rule.maxDiscount ? Math.min(raw, rule.maxDiscount) : raw;
 }
 ```
-Khuyến mãi không đủ điều kiện (`subtotal < minOrder`) vẫn **hiển thị nhưng bị disable**, kèm dòng giải thích — người dùng thấy được lý do, và ta không ghi event cho lựa chọn bị disable.
+
+> **`calcDiscount` cố ý KHÔNG xét `vehicleTypes` / `minDistanceKm` / `activeHours`.** Hàm này chạy ở **ba** chỗ cho cùng một chuyến — màn chọn ưu đãi, màn xác nhận, và lúc ghi `confirm_ride` / `place_order` — và cả ba bắt buộc ra cùng một con số (xem §6). Nếu nó xét cả giờ vàng thì người chọn mã lúc 12:59 rồi bấm xác nhận lúc 13:01 sẽ thấy giá nhảy, và `discount_amount` trong event lệch hẳn số hiện trên màn hình. Bốn điều kiện đó gác **quyền dùng**, và chỉ được xét một lần — ở `ruleBlock()`, ngay trước khi người dùng chọn. **Chọn rồi thì ưu đãi thuộc về họ.**
+
+**Xét quyền dùng** — `ruleBlock(rule, subtotal, ctx)` trả `null` khi dùng được, ngược lại trả điều kiện **đầu tiên** chưa thoả, theo thứ tự `vehicle` → `distance` → `hours` → `min_order`. Cụ thể trước, chung chung sau: với người đang chọn ô tô mà nhìn mã `GSMBIKE`, "Chỉ áp dụng cho xe máy" nói đúng vấn đề, còn "Cần đơn tối thiểu" thì không nói gì cả.
+
+`ruleBlock` trả về **dữ liệu, không phải câu chữ** (`packages/shared` không được biết tới `formatVnd`); việc đổi sang tiếng Việt nằm ở `formatRuleBlock()` trong `apps/web/lib/format.ts` — một chỗ duy nhất cho cả hai màn.
+
+> **`activeHours` và bẫy hydration.** `ctx.hour` phải được đọc trong `useEffect`, **không** đọc lúc render: Next prerender client component ở server, mà giờ server (UTC) lệch giờ máy (UTC+7). Cùng quy ước đã ghi cho `mealOfHour()` ở §4. `hour === undefined` (lượt render đầu) được coi là **ngoài giờ**, nên server và lượt hydrate đầu cho ra cùng một HTML: cả hai đều vẽ mã giờ vàng ở trạng thái khoá.
+
+Khuyến mãi không đủ điều kiện vẫn **hiển thị nhưng bị disable**, kèm dòng giải thích — người dùng thấy được lý do, và ta không ghi event cho lựa chọn bị disable.
 
 ---
 
 ## 4. Menu món ăn (luồng Food — `food_menu`)
 
+> **Không còn trường `restaurant`.** Tên quán giờ đến từ **OpenStreetMap** chứ không từ file này — xem mục 4b. Món được gắn vào quán nào là do **tag `cuisine` THẬT** của quán đó quyết định.
+
 ```ts
+export type FoodCategory = 'main' | 'drink' | 'dessert';
+export type Meal = 'breakfast' | 'lunch' | 'dinner';
+
+export type Cuisine =
+  | 'vietnamese' | 'japanese' | 'korean' | 'grill'
+  | 'pizza' | 'american' | 'seafood' | 'cafe' | 'dessert';
+
 export interface FoodItem {
   id: string;
   name: string;
-  restaurant: string;
   price: number;
-  category: 'main' | 'drink' | 'dessert';
+  category: FoodCategory;
+  cuisine: Cuisine;      // nối món với tag `cuisine` thật của quán
+  meals: Meal[];         // bữa nào hợp ăn món này
   description: string;
+  image?: string;        // đường dẫn trong apps/web/public — ĐỂ TRỐNG ở cả 29 món
 }
 ```
 
-| `id` | `name` | `restaurant` | `price` | `category` |
-|---|---|---|---|---|
-| `banh-mi-01` | Bánh mì thịt nướng | Bánh Mì 25 | 35000 | `main` |
-| `pho-bo-02` | Phở bò tái | Phở Thìn Bờ Hồ | 55000 | `main` |
-| `bun-cha-03` | Bún chả Hà Nội | Bún Chả Hương Liên | 50000 | `main` |
-| `com-tam-04` | Cơm tấm sườn bì chả | Cơm Tấm Ba Ghiền | 60000 | `main` |
-| `banh-xeo-05` | Bánh xèo miền Tây | Bánh Xèo Ăn Là Ghiền | 65000 | `main` |
-| `tra-sua-06` | Trà sữa trân châu đường đen | Phúc Long | 45000 | `drink` |
-| `ca-phe-07` | Cà phê sữa đá | Highlands Coffee | 29000 | `drink` |
-| `che-08` | Chè khúc bạch | Chè Bốn Mùa | 32000 | `dessert` |
+**`image` vắng mặt ở toàn bộ 29 món, và đó là trạng thái đúng.** Lệnh cấm ảnh thật ở mục này không đổi; trường này tồn tại để hôm nào có ảnh thì thả file vào `apps/web/public/food/<id>.webp` rồi điền đường dẫn là xong, không phải sửa component nào. Khi vắng, `FoodThumb` vẽ khung có glyph theo `cuisine` (`tailwind-theme.md` mục 7). `image` **không đi vào event**.
 
-> `id` giữ đúng định dạng `<tên-món>-<số>` như ví dụ đã có sẵn trong `db-design.md`.
+**Ba trục phân loại, vuông góc với nhau:** `category` là *loại* món (chính / uống / tráng miệng), `meals` là *lúc* ăn, `cuisine` là *kiểu bếp*. Mỗi trục là một bộ lọc khác nhau ở màn menu.
 
-`description`: một câu ngắn, agent tự viết khi implement — trường này **không đi vào event** nên không cần chốt trước.
+**29 món, phủ 9 kiểu bếp.** Danh sách kiểu bếp được chọn từ **mẫu 120 quán ăn thật ở Hà Nội** (lấy qua Nominatim), theo tần suất giảm dần: `vietnamese` 28, `regional` 6, `japanese` 5, `korean` 3, `pizza` 3, `noodle` 3, `barbecue` 3, `dessert` 2, `french` 2, `phở` 2 — chứ không phải đoán.
 
-Ảnh món: không dùng ảnh thật. Mỗi món render một ô tỉ lệ 4:3 nền `canvas-soft` với ký tự đầu của tên món đặt ở giữa — tránh phụ thuộc file ảnh và vẫn đúng tinh thần "khung ảnh 4:3" trong `DESIGN.md`.
+| kiểu bếp | số món | `id` |
+|---|:--:|---|
+| `vietnamese` | 5 | `banh-mi-01`, `pho-bo-02`, `bun-cha-03`, `com-tam-04`, `banh-xeo-05` |
+| `cafe` | 3 | `tra-sua-06`, `ca-phe-07`, `nuoc-ep-27` |
+| `dessert` | 3 | `che-08`, `kem-28`, `banh-flan-29` |
+| `japanese` | 3 | `sushi-09`, `ramen-10`, `gyoza-11` |
+| `korean` | 3 | `kimbap-12`, `bibimbap-13`, `ga-ran-14` |
+| `grill` | 3 | `suon-nuong-15`, `ba-chi-nuong-16`, `bo-nuong-17` |
+| `pizza` | 3 | `pizza-margherita-18`, `pizza-hai-san-19`, `mi-y-20` |
+| `american` | 3 | `burger-21`, `khoai-tay-22`, `hot-dog-23` |
+| `seafood` | 3 | `tom-nuong-24`, `muc-chien-25`, `lau-hai-san-26` |
 
----
+> **Tám `id` đầu giữ nguyên** (`banh-mi-01` … `che-08`) — chúng đi thẳng vào `properties` của event, đổi là dữ liệu cũ và mới không ghép được (`CLAUDE.md` quy tắc 5). Món mới nối tiếp cùng định dạng `<tên-món>-<số>`.
+
+`description`: một câu ngắn, **không đi vào event**.
+
+**Ảnh món: DÙNG ẢNH THẬT.** (Quy tắc cũ — "không dùng ảnh thật, mỗi món là một ô 4:3 với ký tự đầu của tên món" — **đã bỏ**: 29 ô chữ cái gần như giống hệt nhau làm cả lưới trông như bản nháp, và đó là điều đầu tiên người dùng thử nhận xét.)
+
+Ảnh **tải sẵn về repo**, không gọi mạng lúc chạy:
+
+- `scripts/fetch-food-images.mjs` lấy ảnh từ **Wikimedia Commons** về `apps/web/public/food/<id>.jpg`.
+- Giấy phép và tác giả từng ảnh ghi ở **`apps/web/public/food/CREDITS.md`**. Ảnh Commons phần lớn là CC BY / CC BY-SA nên **ghi công là bắt buộc**, không phải phép lịch sự.
+- Trường `image` trên `FoodItem` vẫn **optional**: món nào không có ảnh đúng thì để trống, và `FoodThumb` lui về khung có glyph theo `cuisine`. Một ô glyph thì thật thà, còn một tấm ảnh sai món thì không.
+
+> **Tìm ảnh tự động là trò đoán, và nó đoán sai 8/29 lần ở vòng đầu** — một khoanh thịt quay cho "bánh mì", một nồi lá dứa cho "chè", một gói khoai tây **có logo thương hiệu** cho "khoai tây chiên". Vì vậy script cho phép **ghim cứng tên tệp** cho từng món, và danh sách ghim hiện tại chính là kết quả của việc đã xem từng ảnh một. Xem lại bằng mắt sau mỗi lần chạy lại.
+
+### 4b. Nhà hàng — dữ liệu THẬT, không có trong file này
+
+Dải "Gần bạn" lấy quán từ **`GET /api/restaurants`** (Nominatim, `amenity=restaurant` quanh `DEFAULT_PICKUP`). **Không có danh sách nhà hàng nào để chốt ở đây** — `restaurant_id` là id `osm-<T><osm_id>`, cùng khuôn với địa chỉ người dùng tự tìm.
+
+Mỗi quán mang thêm **dữ liệu thật** đọc từ `extratags` của OSM: `cuisine`, `openingHours`, `phone` (kiểu `Restaurant` trong `packages/shared/src/places.ts`).
+
+**Quán thật ↔ món nối với nhau bằng `menuOf(restaurant)`** (`packages/shared/src/food.ts`): quy đổi tag `cuisine` thô sang kiểu bếp qua `CUISINE_ALIASES`, lọc món theo kiểu bếp đó, rồi xoay danh sách theo một hàm băm FNV-1a của `restaurant.id`. Bốn tính chất bắt buộc:
+
+1. **Theo kiểu bếp thật** — quán `japanese` ra sushi/ramen, quán `barbecue` ra đồ nướng. Trước đây mọi quán đều bốc từ cùng một rổ món Việt, nên một quán Nhật vẫn hiện ra bánh mì.
+2. **Tất định** — cùng một quán luôn ra cùng thực đơn, ở mọi phiên và mọi máy. Nếu ngẫu nhiên thì `select_restaurant` và `add_to_cart` trong cùng một phiên sẽ kể hai câu chuyện khác nhau.
+3. **Có đường lùi** — **một nửa số quán thật không khai báo `cuisine`**, và có tag ta không nhận ra (`russian`, `french`, `indian`…). Khi đó lùi về món Việt thay vì trả thực đơn rỗng: một quán không có món nào là ngõ cụt trong luồng.
+4. **Không lưu sẵn khoảng cách** — `distance_km` tính tại chỗ bằng `haversineKm` từ điểm đón hiện tại, đúng bài học đã ghi ở mục 1.
+
+`CUISINE_ALIASES` phải chịu được **ba điều bất ngờ của dữ liệu thật**: một quán có nhiều giá trị ngăn bằng `;` (`asian;oriental;vietnamese`); có tag **tiếng Việt có dấu** (`phở`, `nướng`, `hàn_quốc`, `hải_sản`) nên phải `normalizeVi` trước khi tra bảng; và `regional` — giá trị phổ biến thứ hai — trong ngữ cảnh Việt Nam nghĩa là món địa phương nên quy về `vietnamese`.
+
+**Giá thì vẫn phải tự đặt**: không nguồn mở nào có giá món ăn thật.
 
 ## 5. Ưu đãi (luồng Food — `food_offer_selection`)
 
-Cùng interface với `Promo`, áp lên **tiền hàng** (`cart_total`), không áp lên phí giao — trừ `offer-freeship`.
+Cùng interface `DiscountRule` với Promo, áp lên **tiền hàng** (`cart_total`) — trừ những mã có `appliesTo: 'shipping'`, áp lên **phí giao**.
 
-| `id` | `code` | `title` | `type` | `value` | `maxDiscount` | `minOrder` |
-|---|---|---|---|---|---|---|
-| `offer-freeship` | `FREESHIP` | Miễn phí giao hàng | `fixed` | 15000 | — | 0 |
-| `offer-15` | `FOOD15` | Giảm 15%, tối đa 25.000đ | `percent` | 15 | 25000 | 100000 |
-| `offer-25k` | `FOOD25K` | Giảm 25.000đ cho đơn từ 150.000đ | `fixed` | 25000 | — | 150000 |
+| `id` | `code` | `title` | `type` | `value` | `maxDiscount` | `minOrder` | điều kiện thêm |
+|---|---|---|---|---|---|---|---|
+| `offer-freeship` | `FREESHIP` | Miễn phí giao hàng | `fixed` | 15000 | — | 0 | `appliesTo: 'shipping'` |
+| `offer-15` | `FOOD15` | Giảm 15%, tối đa 25.000đ | `percent` | 15 | 25000 | 100000 | — |
+| `offer-25k` | `FOOD25K` | Giảm 25.000đ cho đơn từ 150.000đ | `fixed` | 25000 | — | 150000 | — |
+| `offer-ship-half` | `SHIP50` | Giảm 50% phí giao | `percent` | 50 | — | 0 | `appliesTo: 'shipping'` |
+| `offer-breakfast` | `SANG20` | Bữa sáng: giảm 20%, tối đa 20.000đ | `percent` | 20 | 20000 | 0 | `activeHours: 5→10` |
+| `offer-latenight` | `DEM15K` | Ăn khuya: giảm 15.000đ | `fixed` | 15000 | — | 60000 | `activeHours: 21→2` |
+| `offer-big` | `FOOD50K` | Giảm 50.000đ cho đơn từ 300.000đ | `fixed` | 50000 | — | 300000 | — |
+
+> **`offer-freeship` đổi hành vi ở đơn nhỏ** (id và code **không đổi**). Trước đây base là `cart_total`, nên `Math.min(15_000, cart_total)` cắt mất phần giảm: đơn 10.000đ chỉ được giảm 10.000đ, tức **vẫn trả 5.000đ phí giao** — trái với chính `title` của nó. Với `appliesTo: 'shipping'`, base là `SHIPPING_FEE` nên luôn giảm trọn 15.000đ và `final_total` đúng bằng `cart_total`. Dữ liệu sinh trước thay đổi này có `discount_amount` thấp hơn ở các đơn dưới 15.000đ.
+>
+> `offer-latenight` là cửa sổ **duy nhất vắt qua nửa đêm** trong cả hai danh sách — đúng ca mà `isHourInWindow()` phải xử lý riêng (phép so sánh thẳng `from <= h && h < to` trả về false cho **mọi** giờ khi `from > to`).
 
 ---
 

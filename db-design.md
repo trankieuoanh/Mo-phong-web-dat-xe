@@ -128,6 +128,20 @@ const snapshot = await db.collection('events')
 const events = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 ```
 
+## Field thứ 10: `seed_batch` — chỉ có ở dữ liệu giả lập
+
+`scripts/seed-events.js` ghi thẳng vào collection `events` bằng `firebase-admin`, bỏ qua cả Next.js lẫn Express, để sinh hàng nghìn document trải theo ngày cho Power BI. Mỗi document nó sinh ra mang **thêm một field top-level**:
+
+```
+seed_batch: "seed-2026-09-22T07-41-12-345Z"   // chỉ có ở document do script sinh
+```
+
+Đây là lệch có chủ ý so với 9 field ở trên. Lý do: event do người thật click **không có** field này, nên tách dữ liệu giả khỏi dữ liệu thật chỉ là một điều kiện lọc, và dọn lại thì chính xác tuyệt đối — `node scripts/seed-events.js --clear` truy vấn bằng `.orderBy('seed_batch')`, mà Firestore **chỉ trả về document có field được orderBy**, nên event click tay nằm ngoài kết quả một cách tự nhiên, không cần điều kiện `!=` nào và không có cách nào xoá nhầm.
+
+Script cũng phải tự gán `platform: 'web'` và `created_at: Timestamp.fromDate(...)` (thay vì `serverTimestamp()`) — hai việc mà `event.service.ts` làm hộ khi đi qua API, và `serverTimestamp()` thì sẽ dồn toàn bộ event vào đúng thời điểm chạy script, mất sạch trục thời gian.
+
+Phân tích muốn **chỉ lấy dữ liệu thật** thì lọc `seed_batch` vắng mặt; muốn **chỉ lấy dữ liệu giả** thì lọc nó có mặt. `fetch_events.py` kéo hết cả hai và có `seed_batch` trong `TOP_LEVEL_FIELDS`, nên cột này ra thẳng `events.csv` — rỗng (`NaN`) ở mọi event do người thật click.
+
 ## Lưu ý về index
 Firestore tự tạo index đơn giản (theo 1 field), nhưng khi query kết hợp `where` + `orderBy` trên 2 field khác nhau (như ví dụ trên), hoặc nhiều `where` cùng lúc (lọc theo `flow` và khoảng `created_at`), Firestore sẽ **yêu cầu tạo composite index** — lần đầu chạy sẽ báo lỗi kèm link để tạo index đó ngay trên console, không cần tự đoán trước.
 

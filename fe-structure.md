@@ -39,19 +39,25 @@ apps/web/
 │  │  ├─ confirm/page.tsx     tóm tắt + phương thức thanh toán + nút đặt cuối
 │  │  └─ success/page.tsx     màn kết thúc luồng ride
 │  ├─ food/
-│     ├─ page.tsx             menu 8 món + chip lọc
+│     ├─ page.tsx             menu 8 món — 4 cách tìm: ô tìm, bữa, quán gần, loại
 │     ├─ item/[itemId]/page.tsx  chi tiết món + chọn số lượng
 │     ├─ cart/page.tsx        giỏ hàng: sửa số lượng, xoá dòng
 │     ├─ offer/page.tsx       chọn hoặc bỏ qua ưu đãi
 │     ├─ confirm/page.tsx     tóm tắt đơn + nút đặt cuối
 │     └─ success/page.tsx     màn kết thúc luồng food
-│  └─ history/page.tsx      NGOÀI FUNNEL — lịch sử chuyến đi, không bắn event
+│  ├─ history/page.tsx      NGOÀI FUNNEL — lịch sử chuyến đi, không bắn event
+│  ├─ account/page.tsx      NGOÀI FUNNEL — Tài khoản phụ, trạng thái rỗng
+│  ├─ support/page.tsx      NGOÀI FUNNEL — Trung tâm hỗ trợ, 4 thẻ tĩnh
+│  └─ terms/page.tsx        NGOÀI FUNNEL — Điều khoản & Chính sách, 4 thẻ tĩnh
 │
 ├─ lib/
 │  ├─ track.ts             trackEvent · trackAddToCart · trackSelectFlow · useScreenView
 │  ├─ use-place-search.ts  hook gọi GET /api/places (debounce + abort)
 │  ├─ use-route.ts         hook gọi GET /api/route + routeOrFallback()
-│  ├─ app-context.tsx      AppProvider · useApp — state ride + cart
+│  ├─ use-restaurants.ts   hook gọi GET /api/restaurants — quán gần + tìm theo tên
+│  ├─ use-current-place.ts hook GPS, lui về DEFAULT_PICKUP khi bị từ chối
+│  ├─ use-tile-providers.ts hook gọi GET /api/tiles — lọc nhà cung cấp tile đã hỏng
+│  ├─ app-context.tsx      AppProvider · useApp — state ride + cart + food
 │  ├─ session.ts           session_id / user_id / resetSession
 │  └─ format.ts            formatVnd — số nguyên VNĐ → "35.000đ"
 │
@@ -63,12 +69,21 @@ apps/web/
    ├─ FlowGuard.tsx        chặn vào thẳng URL giữa luồng
    ├─ MapCanvas.tsx        tile OSM thật + tuyến thật, không thư viện
    ├─ PlacePicker.tsx      ô tìm địa chỉ thật + danh sách kết quả
-   ├─ Icon.tsx             ~35 icon SVG viết tay, thay toàn bộ emoji
+   ├─ Icon.tsx             ~40 icon SVG viết tay, thay toàn bộ emoji
    ├─ GsmLogo.tsx          logo cánh chim + wordmark, một tông cyan
+   ├─ FoodThumb.tsx        khung ảnh món — glyph theo cuisine khi không có ảnh
+   ├─ QuantityStepper.tsx  nút +/− số lượng, disabled thật ở chặn dưới
+   ├─ SummaryRow.tsx       một dòng "nhãn — giá trị" trong thẻ tổng kết
+   ├─ RestaurantCard.tsx   một quán thật từ OSM — dùng ở dải gần bạn & kết quả tìm
+   ├─ EmptyState.tsx       trạng thái rỗng/lỗi có hành động đi kèm
+   ├─ Skeleton.tsx         ô xám nhấp nháy trong lúc chờ dữ liệu
+   ├─ Toast.tsx            ToastProvider + useToast — báo ngắn khi thêm món
    └─ shell/
       ├─ AppShell.tsx      rail trái + top bar + vùng nội dung
       ├─ SideRail.tsx      6 mục icon dọc — 2 mục đầu là tab chuyển luồng
-      ├─ TopBar.tsx        tên mục + tab trang trí + UserMenu
+      ├─ TopBar.tsx        tên mục + tab trang trí + tab luồng (dưới lg) + UserMenu
+      ├─ flow-nav.ts       FLOW_ENTRY + FLOW_TABS — luật đổi luồng dùng chung
+      ├─ CartButton.tsx    icon giỏ + badge số lượng, chỉ hiện ở luồng food
       └─ UserMenu.tsx      chip người dùng — trang trí, hiện user_id đang dùng
 ```
 
@@ -102,7 +117,7 @@ flowchart LR
 | `/ride/promo` | `promo_selection` | 4 | ✓ | `select_promo`, `skip_promo` | 190 |
 | `/ride/confirm` | `ride_confirm` | 5 | ✓ | `confirm_ride` | 135 |
 | `/ride/success` | `ride_success` | 6 | — | `back_to_home` | 89 |
-| `/food` | `food_menu` | 1 | — | `select_item`, `add_to_cart` | 147 |
+| `/food` | `food_menu` | 1 | — | `search_item`, `filter_category`, `select_meal`, `select_restaurant`, `select_item`, `add_to_cart` | 410 |
 | `/food/item/[itemId]` | `food_item_detail` | 2 | ✓ | `change_quantity`, `add_to_cart` | 129 |
 | `/food/cart` | `food_cart` | 4 | ✓ | `change_quantity`, `remove_from_cart`, `proceed_to_offer` | 164 |
 | `/food/offer` | `food_offer_selection` | 5 | ✓ | `select_offer`, `skip_offer` | 92 |
@@ -113,6 +128,8 @@ flowchart LR
 
 > **Event `back` không có trong bảng** vì nó không nằm trong file page nào cả — xem mục 6.
 
+> **Bốn bộ lọc ở màn menu, loại trừ nhau, và cái nào cũng bắn event.** Ô tìm tên món (`search_item`, debounce 600ms để **gộp event** chứ không phải giảm tải mạng — việc lọc chạy client-side trên 8 món), chip bữa sáng/trưa/tối (`select_meal`, mặc định theo giờ đọc trong `useEffect` để tránh bẫy hydration), dải "Gần bạn" lấy quán thật từ `GET /api/restaurants` kèm cuisine/giờ mở cửa thật (`select_restaurant`); bấm một quán thì thực đơn được suy từ **tag `cuisine` thật** của quán đó, và chip loại món (`filter_category` — **trước đây chip này im lặng**). Bộ lọc đang bật đi vào `select_item`/`add_to_cart` qua khoá `discovery_source`; đó là khoá trả lời câu hỏi *lối tìm món nào dẫn tới thêm giỏ nhiều nhất*. Toàn bộ nằm trên `food_menu` nên **`step_index` luồng food không đổi**.
+
 > **Hai màn không bắn event khi bấm nút chính.** Ở `/ride/vehicle`, `select_vehicle` bắn khi bấm *hạng xe*, còn nút "Tiếp tục" chỉ điều hướng. Ở `/ride/promo`, bấm promo chỉ tick chọn, `select_promo` bắn khi bấm "Áp dụng mã". Hệ quả: một session có thể có **nhiều** `select_vehicle` (đo được sự phân vân) nhưng đúng **một** `select_promo`. Chi tiết ở `ride-flow-design.md` mục 7.
 
 > **`select_flow` bắn từ hai chỗ, và không phải lúc nào cũng ở `/`.** Màn `/` không còn hai card: nó **là** màn đặt xe, và ô tìm kiếm giữa panel bắn `select_flow(ride)`. Lối vào luồng food — và mọi lần đổi luồng — nằm ở hai tab của `SideRail`, bấm được ở **ba màn đầu luồng** `/`, `/ride/address`, `/food`. Cả hai chỗ dùng chung helper `trackSelectFlow`, nên event luôn mang `step_index: 0` và `flow` = luồng được chọn. Muốn biết người dùng nhảy luồng từ đâu thì đọc `screen_name` của event, **không phải** `previous_screen`.
@@ -121,7 +138,13 @@ flowchart LR
 
 | Route | Bắn event | Làm gì |
 |---|:--:|---|
-| `/history` | **không** | `fetch('/api/events?user_id=...')` qua proxy same-origin. Gấp `confirm_ride` → một chuyến xe, `place_order` → một đơn đồ ăn; hai thẻ "Tổng số chuyến" / "Tổng chi tiêu"; tab Di chuyển/Đặt đồ ăn bấm được thật. Ba trạng thái: skeleton / rỗng / lỗi (in nguyên văn thông báo Firestore vì nó chứa link tạo index) |
+| `/history` | **không** | `fetch('/api/events?user_id=...')` qua proxy same-origin. Gấp `confirm_ride` / `cancel_ride` → một chuyến xe, `place_order` → một đơn đồ ăn; tab Di chuyển có ba thẻ "Tổng số chuyến" / "Đã huỷ" / "Tổng chi tiêu", tab Đặt đồ ăn có hai. Tab bấm được thật. Ba trạng thái: skeleton / rỗng / lỗi (in nguyên văn thông báo Firestore vì nó chứa link tạo index) |
+
+> **Một dòng ở tab Di chuyển = một SESSION, không phải một event.** Chuyến bị huỷ sinh **hai** event trong cùng session: `confirm_ride` ở màn xác nhận, rồi `cancel_ride` ở màn tìm tài xế. Lọc thẳng theo tên event sẽ cho ra hai dòng cho cùng một chuyến, và dòng `confirm_ride` hiện như một chuyến hoàn thành — đúng cái bảng này cần phân biệt. `rideEvents()` vì vậy gom theo `session_id` trước: session nào có `cancel_ride` thì lấy chính event đó làm dòng (nó mirror đủ field của `confirm_ride`) và bỏ dòng `confirm_ride` đi.
+>
+> **Chuyến đã huỷ không cộng vào "Tổng chi tiêu"** và cước phí của nó hiện gạch ngang: `final_price` ở đó là số tiền *lẽ ra* phải trả, không phải số đã trả.
+>
+> Nhãn trạng thái **không dùng màu đỏ** — `DESIGN.md` mục "Colour" chốt hệ màu này cố ý không có bảng error/success/warning. Phân biệt bằng độ đậm của cyan: hoàn thành = `surface-pressed` + `primary-dark`, đã huỷ = `canvas-soft` + `mute`.
 
 **Không có trong `SCREENS`**, nên `screens.ts` và union `ScreenName` không phải sửa gì. Thêm `useScreenView` vào đây sẽ không compile — `ScreenName` không có giá trị tương ứng.
 
@@ -192,8 +215,9 @@ Tiền **luôn** là số nguyên trong dữ liệu, chỉ format khi hiển th�
 | `BackButton` | `from`, `to`, `href`, `icon` | 10 page | **Bắn event `back`** rồi mới `router.push`. `icon` mặc định `'back'`; `/ride/promo` truyền `'close'` cho giống overlay — hình khác nhưng event y hệt |
 | `FlowGuard` | `ready`, `fallback`, `children` | 8 page | Đợi `hydrated` trước khi redirect |
 | `PlacePicker` | `placeholder`, `presetHeading`, `selectedId?`, `onPick`, `leading?` | 2 page | Ô tìm + kết quả. Dùng chung cho điểm đến và điểm đón nên hai chỗ không thể lệch nhau. **Không bắn event** — cha quyết định |
-| `MapCanvas` | `pickup`, `destination?`, `route?`, `label?`, `fill?` | 4 page | Tile OpenStreetMap thật (`<img>`) + tuyến OSRM vẽ bằng SVG phủ lên. **Không thư viện bản đồ** (`CLAUDE.md` quy tắc 8). Bắt buộc có dòng ghi công `© OpenStreetMap` |
-| `Icon` | `name`, `size?`, `className?` | khắp nơi | ~35 icon SVG viết tay. `stroke="currentColor"` nên **không bao giờ phải gõ hex ở chỗ gọi** |
+| `MapCanvas` | `pickup`, `destination?`, `route?`, `label?`, `fill?`, `onPick?` | 4 page | Tile OpenStreetMap thật (`<img>`) + tuyến OSRM vẽ bằng SVG phủ lên. Kéo được ở mọi màn; có `onPick` thì bấm lên bản đồ để chọn vị trí. **Không thư viện bản đồ** (`CLAUDE.md` quy tắc 8). Bắt buộc có dòng ghi công `© OpenStreetMap` |
+| `InfoCardGrid` | `items` (`{icon, label}[]`) | `/support`, `/terms` | Lưới 2 cột thẻ huy hiệu-icon + nhãn. Thẻ **không bấm được** — không có trang đích thật, và một nút bấm vào im lặng là khoảng mù trong dữ liệu |
+| `Icon` | `name`, `size?`, `className?` | khắp nơi | ~45 icon SVG viết tay. `stroke="currentColor"` nên **không bao giờ phải gõ hex ở chỗ gọi** |
 | `GsmLogo` | `variant`, `size?` | `SideRail` | Một tông cyan — `DESIGN.md` cấm màu accent thứ hai, nên không có vàng như logo thật |
 
 ### `MapCanvas` — bản đồ thật, không thư viện
@@ -202,7 +226,18 @@ Bản trước vẽ lưới phố **bịa** với tuyến hằng số, nên hai 
 
 Cụm `+`/`−` và nút re-center **giờ làm thật** (đổi zoom, đưa khung về vừa khít). Chúng không bắn event vì không đổi lựa chọn nào của người dùng.
 
-Dòng **`© OpenStreetMap` là bắt buộc** theo điều khoản dùng tile.
+**Kéo và bấm chọn vị trí.** Kéo bật ở mọi bản đồ; cuộn-để-zoom **chỉ** bật khi `fill` (bố cục `split`) — khung 4:3 ở `/food/confirm` nằm giữa một cột đang cuộn, chặn `wheel` ở đó sẽ khoá cuộn trang. Có `onPick` thì bấm lên bản đồ trả về toạ độ; **ngưỡng 5px phân biệt bấm với kéo**, không có nó thì kéo bản đồ xong thả tay sẽ bị hiểu là chọn một điểm. Các nút điều khiển nằm trong khung bản đồ được lọc bằng `closest('button, a')` ở `pointerdown`, nếu không thì bấm "+" vừa phóng to vừa thả một cái ghim.
+
+Dòng **`© OpenStreetMap` là bắt buộc** theo điều khoản dùng tile. Bảng nhà cung cấp tile nằm ở `packages/shared/src/tiles.ts` chứ không phải trong component — BE phải dò đúng cái danh sách mà màn hình này sẽ hiện.
+
+**Hai lớp phòng vệ, bắt hai thứ khác nhau** — đừng bỏ lớp nào tưởng là thừa:
+
+| Lớp | Ở đâu | Bắt được | Không bắt được |
+|---|---|---|---|
+| `useTileProviders()` | BE dò trước | "200 **nhưng tile sai**" | mạng của người dùng chặn một tên miền |
+| `handleTileError` | `onError` của `<img>` | "trình duyệt không tải được" | tile tải được nhưng bị in chữ lên |
+
+Lớp 2 từng là lớp duy nhất, và nó **đã không cứu được sự cố thật**: CARTO chuyển sang bắt buộc API key, in chữ "API KEY REQUIRED" chéo lên mọi tile, nhưng vẫn trả HTTP 200 kèm PNG hợp lệ. `onError` không bao giờ bắn, bộ đếm mãi bằng 0, bản đồ hỏng ở cả hai luồng mà app không hề biết. Chi tiết cách dò ở `api-endpoints.md` mục 3d.
 
 ### `BackButton` — chỗ dễ nhầm khi đọc code
 

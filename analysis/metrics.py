@@ -34,7 +34,11 @@ COMPLETION_EVENT = {"ride": "confirm_ride", "food": "place_order"}
 
 # Nhan cho tung step_index. Doi chieu bang o event-taxonomy.md muc 2
 # (ban goc la SCREENS trong packages/shared/src/screens.ts).
-# Sua bang do thi phai sua ca day — day la ban sao duy nhat ngoai TypeScript.
+#
+# THEM MOT MAN THI PHAI SUA HAI BAN SAO NGOAI TYPESCRIPT: bang duoi day, va bang
+# SCREENS chep trong scripts/seed-events.js. Quen mot trong hai khong lam gi do
+# vo — man `finding_driver` da tung bi quen o day, va hau qua chi la funnel in
+# sai TEN hai buoc cuoi, khong co dong bao loi nao.
 STEP_LABELS: dict[str, dict[int, str]] = {
     "ride": {
         # Buoc 0 la EVENT `select_flow`, khong phai mot man hinh: no ban o
@@ -45,7 +49,8 @@ STEP_LABELS: dict[str, dict[int, str]] = {
         3: "vehicle_selection",
         4: "promo_selection",
         5: "ride_confirm",
-        6: "ride_success",
+        6: "finding_driver",
+        7: "ride_success",
     },
     "food": {
         0: "select_flow",

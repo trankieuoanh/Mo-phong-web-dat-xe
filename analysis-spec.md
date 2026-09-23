@@ -87,8 +87,9 @@ Chỉ số này trả lời câu hỏi UX cụ thể: **màn nào khiến ngư�
 | Chỉ số | Nguồn |
 |---|---|
 | `vehicle_split` | `prop_vehicle_type` trong `select_vehicle` — gom theo `vehicle_type` (2 nhóm) chứ không theo `vehicle_id` (6 hạng xe); lấy event **cuối cùng** của mỗi session vì người dùng có thể đổi ý nhiều lần |
-| `address_popularity` | `prop_address_id` trong `select_address` — đây là **điểm đến** phổ biến. Chỉ gom nhóm được trong phạm vi `address_source == 'preset'` (5 giá trị `addr-*`); nhánh `'search'` có tập id mở nên xếp hạng theo `prop_address_label` thay vì id |
+| `address_popularity` | `prop_address_id` trong `select_address` — đây là **điểm đến** phổ biến. Chỉ gom nhóm được trong phạm vi `address_source == 'preset'` (5 giá trị `addr-*`); hai nhánh `'search'` và `'map'` đều có tập id mở nên xếp hạng theo `prop_address_label` thay vì id |
 | `search_usage_rate` | tỉ lệ `select_address` có `prop_address_source == 'search'` — **người dùng có thực sự cần ô tìm không**, hay 5 gợi ý đã đủ |
+| `map_pick_rate` | tỉ lệ `select_address` có `prop_address_source == 'map'` — **người dùng có thích tự bấm trên bản đồ không**. Ba nhánh `preset` / `search` / `map` cộng lại bằng 100%, nên đọc ba con số cùng lúc mới ra bức tranh "người ta chọn địa chỉ bằng cách nào" |
 | `pickup_change_rate` | tỉ lệ `confirm_pickup` có `prop_pickup_id != 'pickup-current'` — tỉ lệ người đổi khỏi điểm đón do GPS đề xuất |
 | `avg_distance_km` | trung bình `prop_distance_km` trong `confirm_ride`. **Lọc `prop_route_source == 'osrm'` trước** — xem cảnh báo bên dưới |
 | `abandon_rate_by_distance` | chia `prop_distance_km` của `select_vehicle` thành khoảng (0–5, 5–15, >15 km) rồi tính tỉ lệ session **không** có `confirm_ride` trong từng khoảng. Trả lời: *chuyến càng xa (càng đắt) thì càng dễ bỏ dở?* |

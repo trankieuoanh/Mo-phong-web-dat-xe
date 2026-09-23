@@ -174,18 +174,27 @@ Nút "Tiếp tục" **disabled** khi chưa chọn xe.
 |---|---|---|---|
 | Nav-bar | nút `X` + tiêu đề "Ưu đãi" | `nav-bar` | `back` → `vehicle_selection` |
 | Tab | "Mã ưu đãi" *(active)* · "VPoint" | `category-button` | — *(VPoint trang trí)* |
-| Ô nhập mã | input + nút "Áp dụng" | `text-input` + `button-subtle` | — *(chỉ tick chọn)* |
+| Ô nhập mã | `<DiscountCodeInput />` | `text-input` + `button-subtle` | — *(chỉ tick chọn)* |
 | Banner | gói hội viên | `card-soft-tinted` | — *(trang trí)* |
-| Danh sách | 3 promo từ `PROMOS` + checkbox | `request-form-input-row` | — *(chỉ tick chọn)* |
+| Danh sách | 7 promo từ `PROMOS` + checkbox | `request-form-input-row` | — *(chỉ tick chọn)* |
 | Footer | "Bỏ qua ưu đãi và tiếp tục" / "Áp dụng mã" | `button-subtle` / `button-primary` | `skip_promo` / `select_promo` |
 
 Nút `X` vẫn là `BackButton from="promo_selection" to="vehicle_selection"` — hình chữ X nhưng hành vi và event y hệt nút Back, để `to_screen` khớp `event-taxonomy.md`.
 
 **Nút footer đổi theo trạng thái:** chưa tick promo nào → "Bỏ qua ưu đãi và tiếp tục" (`skip_promo`, `promoId = null`). Đã tick → "Áp dụng mã" (`select_promo`, `promoId = id`). Cả hai đều `router.push('/ride/confirm')`.
 
-**Ô nhập mã:** gõ đúng `code` (`GSM10K`, `GSM20`, `NEWGSM`, không phân biệt hoa thường) rồi bấm "Áp dụng" → tick promo tương ứng, **chưa bắn event**. Gõ sai → dòng lỗi `.t-caption text-mute` "Mã không hợp lệ", không bắn event vì chưa có lựa chọn nào được thực hiện.
+**Ô nhập mã** là component `DiscountCodeInput`, **dùng chung với `/food/offer`** — chép khối này thành hai bản là đúng loại trùng lặp mà `PlacePicker` đã cảnh báo ở đầu file của nó. Gõ đúng `code` (không phân biệt hoa thường) rồi bấm "Áp dụng" → tick promo tương ứng, **chưa bắn event**. Gõ sai → `Mã không hợp lệ`. Gõ đúng nhưng chưa đủ điều kiện → nói rõ **điều kiện nào** chưa thoả, chứ không báo chung chung: nhập `GSMBIKE` trong lúc đang chọn ô tô mà chỉ nhận được "Mã không hợp lệ" thì người dùng sẽ gõ lại thêm vài lần vô ích.
 
-**Promo không đủ điều kiện** (`subtotal < minOrder`) vẫn hiển thị nhưng `disabled`, kèm dòng "Cần đơn tối thiểu X" — giữ nguyên quy tắc `mock-data.md` §3. Với thang giá mới (thấp nhất 58.000đ) thì `promo-20` (`minOrder` 50.000) luôn đủ điều kiện; chỉ còn ý nghĩa khi chọn Green Bike ở các thang giá thấp hơn trong tương lai.
+**Promo không đủ điều kiện** vẫn hiển thị nhưng `disabled`, kèm dòng giải thích `.t-caption text-mute` — giữ nguyên quy tắc `mock-data.md` §3. Câu giải thích không còn gắn cứng "Cần đơn tối thiểu X" mà đến từ `formatRuleBlock(ruleBlock(...))`, nên nói đúng điều kiện đang chặn:
+
+| Điều kiện | Mã ví dụ | Dòng hiện ra |
+|---|---|---|
+| `vehicleTypes` | `GSMBIKE`, `GSMCAR` | Chỉ áp dụng cho xe máy |
+| `minDistanceKm` | `GSMFAR` | Cho chuyến từ 8 km |
+| `activeHours` | `GSMTRUA` | Chỉ áp dụng 11:00–13:00 |
+| `minOrder` | `GSM20` | Cần đơn tối thiểu 50.000đ |
+
+`ctx` truyền vào `ruleBlock` ở màn này là `{ vehicleType, distanceKm, hour }` — hạng xe và quãng đường đã có sẵn từ `getVehicle` + `routeOrFallback`, còn `hour` **phải đọc trong `useEffect`** (bẫy hydration, `mock-data.md` §3). Các điều kiện này chỉ gác **quyền dùng**; `calcDiscount` không xét chúng, để số tiền ở màn này, màn xác nhận và trong `confirm_ride` luôn bằng nhau.
 
 `FlowGuard`: `ready={Boolean(ride.addressId && ride.vehicleId)}`, `fallback="/ride/address"`.
 

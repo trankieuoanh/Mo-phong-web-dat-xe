@@ -185,10 +185,20 @@ Chỉ áp cho **lớp nổi lên trên nội dung khác**: dropdown của `UserM
 
 ## 7. Khung ảnh món ăn
 
-`mock-data.md` quy định không dùng ảnh thật. Khung giữ đúng tỉ lệ 4:3 mà `DESIGN.md` yêu cầu:
+**Dùng ảnh thật** (`mock-data.md` mục 4 — quy tắc cấm ảnh thật đã bỏ). Khung giữ đúng tỉ lệ 4:3 mà `DESIGN.md` yêu cầu; `FoodThumb` render `<img>` khi món có `image`, và lui về khung glyph bên dưới khi không có.
+
+Dựng sẵn thành `apps/web/components/FoodThumb.tsx` — **không viết lại markup này ở page**, vì trước đây nó được chép tay ở 4 chỗ và 29 món cho ra 29 ô gần như giống hệt nhau, đủ để cả lưới trông như bản nháp.
 
 ```html
-<div class="aspect-[4/3] bg-canvas-soft rounded-xl grid place-items-center">
-  <span class="t-display-md text-primary-dark">B</span>
-</div>
+<!-- Nền chuyển sắc giữa HAI token đã có — không sinh giá trị mới (quy tắc 4) -->
+<span class="aspect-[4/3] w-full rounded-xl bg-gradient-to-br from-canvas-soft to-surface-pressed
+             grid place-items-center relative overflow-hidden">
+  <span class="absolute text-[64px] leading-none font-bold text-canvas">B</span>
+  <!-- glyph theo `cuisine`: bowl / cup / cake / fish / pizza / grill -->
+  <svg class="relative text-primary-dark">…</svg>
+</span>
 ```
+
+Hai biến thể: `cover` (4:3, trên thẻ món và màn chi tiết) và `tile` (`size-14`, trong hàng giỏ hàng và màn xác nhận).
+
+`FoodItem` có trường `image?: string` **để trống ở cả 29 món**. Khi có ảnh thật, thả file vào `apps/web/public/food/<id>.webp` rồi điền đường dẫn — `FoodThumb` tự đổi sang thẻ `<img>`, không phải sửa component nào.

@@ -1,0 +1,35 @@
+# File nao KHONG can di len Vercel.
+#
+# BAT BUOC, khong phai toi uu: `vercel deploy` upload theo thu muc hien tai, ma
+# analysis/.venv mot minh da 314 MB. Repo tru cac thu muc duoi day chi 16 MB.
+
+# Phan tich Python — khong lien quan gi toi build web
+analysis/
+
+# Script chay tay mot lan, khong phai code cua app
+scripts/
+
+# Anh chup web Green SM that, dung de THAM CHIEU khi dung UI.
+# Khong phai asset cua app: khong page nao import chung.
+apps/web/sample_ui/
+
+# Ket qua build cua may local — Vercel tu build lai
+.next/
+apps/web/.next/
+apps/web/out/
+node_modules/
+
+# Bi mat. .gitignore da chan roi, chan them o day vi `vercel deploy` doc
+# thu muc that chu khong doc git index.
+.env
+.env*.local
+apps/api/.env
+apps/web/.env.local
+serviceAccount*.json
+*.json.key
+
+# He dieu hanh / editor
+.DS_Store
+Thumbs.db
+*.log
+*.tsbuildinfo

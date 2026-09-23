@@ -14,8 +14,16 @@ import { useRouter } from 'next/navigation';
 import { Icon } from '@/components/Icon';
 import { ScreenShell } from '@/components/ScreenShell';
 import { useApp } from '@/lib/app-context';
+import { routeOrFallback } from '@/lib/use-route';
 import { trackEvent, useScreenView } from '@/lib/track';
-import { getRandomDriver } from '@gsm/shared';
+import {
+  DEFAULT_PICKUP,
+  calcFare,
+  calcRideTotals,
+  getPromo,
+  getRandomDriver,
+  getVehicle,
+} from '@gsm/shared';
 
 export default function FindingDriverPage() {
   useScreenView('finding_driver');
@@ -85,10 +93,24 @@ export default function FindingDriverPage() {
   }
 
   function handleCancel() {
-    // Mirror confirm_ride properties + cancel_reason + cancel_stage
-    const pickup = ride.pickup!;
+    // `canEnter` o tren da bao dam `destination` va `vehicleId`; `pickup` luon
+    // co nho newRideDraft(). Khoi `if (!canEnter) return null` nam TRUOC ham nay.
     const destination = ride.destination!;
-    const vehicle = ride.vehicleId ? { id: ride.vehicleId } : null;
+    const pickup = ride.pickup ?? DEFAULT_PICKUP;
+    const vehicle = getVehicle(ride.vehicleId!);
+    const promo = ride.promoId ? (getPromo(ride.promoId) ?? null) : null;
+
+    // DUNG LAI y nguyen chuoi suy dien cua app/ride/confirm/page.tsx. `cancel_ride`
+    // mirror toan bo field cua `confirm_ride` (event-taxonomy.md muc finding_driver),
+    // nen hai su kien cua CUNG MOT chuyen bat buoc ra cung nhung con so — do la ly do
+    // calcFare/calcRideTotals duoc tach ra khoi tung man.
+    //
+    // Truoc day cho nay ghi cung 0 cho ca ba so tien, va suy `vehicle_type` tu mot
+    // object chi co `id` nen luon ra 'car' ke ca voi xe may. Khong man nao doc
+    // `cancel_ride` nen loi khong co trieu chung — no chi lam moi chuyen huy dong gop
+    // doanh thu 0d va noi 100% chuyen huy la o to.
+    const route = routeOrFallback(pickup, destination, ride.route);
+    const totals = calcRideTotals(vehicle ? calcFare(vehicle, route.distanceKm) : 0, promo);
 
     trackEvent({
       eventName: 'cancel_ride',
@@ -101,15 +123,15 @@ export default function FindingDriverPage() {
         address_source: destination.source,
         pickup_id: pickup.id,
         pickup_label: pickup.label,
-        distance_km: ride.route?.distanceKm ?? 0,
-        duration_min: ride.route?.durationMin ?? 0,
-        route_source: ride.route?.source ?? 'straight',
+        distance_km: route.distanceKm,
+        duration_min: route.durationMin,
+        route_source: route.source,
         vehicle_id: ride.vehicleId ?? null,
-        vehicle_type: vehicle ? 'car' : null,
+        vehicle_type: vehicle?.type ?? null,
         promo_id: ride.promoId ?? null,
-        base_price: 0,
-        discount_amount: 0,
-        final_price: 0,
+        base_price: totals.basePrice,
+        discount_amount: totals.discountAmount,
+        final_price: totals.finalPrice,
         payment_method: ride.paymentMethod ?? 'cash',
       },
     });
@@ -128,7 +150,11 @@ export default function FindingDriverPage() {
         <button
           type="button"
           onClick={handleCancel}
-          className="t-body-md-strong text-center text-error hover:underline w-full"
+          // `text-error` cu la CLASS CHET: khong co token --color-error nen Tailwind
+          // khong sinh ra gi, nut thua huong mau cua cha. DESIGN.md muc "Colour" noi
+          // ro he mau nay co y khong co bang error/success/warning, nen dung
+          // `text-body` — mot hanh dong phu, mau truy duoc ve token (CLAUDE.md qt 4).
+          className="t-body-md-strong w-full text-center text-body hover:underline"
         >
           Hủy đơn
         </button>

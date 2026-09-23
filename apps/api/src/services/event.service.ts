@@ -49,6 +49,17 @@ export async function listEvents(query: EventQuery): Promise<Record<string, unkn
     ref = query.sessionId ? ref.orderBy('step_index') : ref.orderBy('created_at');
   }
 
+  /**
+   * `limit` di vao query Firestore chu khong cat sau khi lay ve: moi document
+   * doc len la MOT LUOT DOC tinh vao han muc (free tier 50.000/ngay), nen cat o
+   * client thi tra tien cho ca nhung dong da vut di.
+   *
+   * Ngoai le: khi dang sap trong bo nho thi khong the limit o Firestore — 200
+   * document dau theo thu tu tuy y khong phai 200 document dau theo thoi gian.
+   * Truong hop do cat sau khi sap, xem duoi.
+   */
+  if (query.limit !== undefined && !sortInMemory) ref = ref.limit(query.limit);
+
   const snapshot = await ref.get();
 
   const events = snapshot.docs.map((doc) => {
@@ -69,5 +80,38 @@ export async function listEvents(query: EventQuery): Promise<Record<string, unkn
     events.sort((a, b) => String(a.created_at ?? '￿').localeCompare(String(b.created_at ?? '￿')));
   }
 
-  return events;
+  // Chi nhanh sap-trong-bo-nho moi phai cat o day — xem ghi chu o cho dat limit.
+  const limited =
+    query.limit !== undefined && sortInMemory ? events.slice(0, query.limit) : events;
+
+  return query.flat ? flatten(limited) : limited;
+}
+
+/**
+ * Trai `properties` thanh cot `prop_<ten>` — cho cong cu BI doc JSON truc tiep.
+ *
+ * MOI DONG CO CUNG TAP KHOA, khoa thieu la `null`. Day moi la phan quan trong:
+ * neu de moi dong chi mang khoa cua rieng no thi Power BI suy kieu bang cach doc
+ * vai dong dau, va `prop_final_price` — chi xuat hien o `confirm_ride`, mot event
+ * hiem trong dong su kien — co the khong lot vao mau, luc do cot do BIEN MAT khoi
+ * bang ma khong bao gi.
+ *
+ * Tien to `prop_` khop analysis/fetch_events.py (dong 63-65) de hai duong doc du
+ * lieu cho ra cung ten cot.
+ */
+function flatten(events: Record<string, unknown>[]): Record<string, unknown>[] {
+  const keys = new Set<string>();
+  for (const event of events) {
+    for (const key of Object.keys((event.properties as Record<string, unknown>) ?? {})) {
+      keys.add(key);
+    }
+  }
+
+  return events.map((event) => {
+    const { properties, ...rest } = event;
+    const props = (properties as Record<string, unknown>) ?? {};
+    const flat: Record<string, unknown> = { ...rest };
+    for (const key of keys) flat[`prop_${key}`] = props[key] ?? null;
+    return flat;
+  });
 }
