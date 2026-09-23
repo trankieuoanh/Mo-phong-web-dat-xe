@@ -21,10 +21,11 @@
 | Package manager | **npm workspaces** | Có sẵn khi cài Node.js. Không cần Turborepo/Nx — 3 workspace thì cấu hình thêm chỉ tốn thời gian |
 | Chạy TypeScript ở BE | **tsx** | Chạy thẳng `.ts`, không cần bước build khi dev |
 | Chạy 2 process cùng lúc | **concurrently** | devDependency ở root, để `npm run dev` vẫn là một lệnh |
-| Hosting (nếu cần deploy) | **Firebase Hosting** | Next.js được Firebase hỗ trợ hosting trực tiếp — gộp chung 1 platform với Firestore, đỡ phải quản lý 2 nơi. Lưu ý: giờ có 2 app nên phải deploy 2 chỗ (hoặc Cloud Run cho `apps/api`) — cân nhắc lại khi thực sự cần deploy |
+| Hosting `apps/web` (nếu cần deploy) | **Vercel** | Preset `nextjs` sẵn, không phải cấu hình build. Đã thay cho lựa chọn Firebase Hosting ban đầu: dù sao cũng phải deploy 2 nơi (2 app = 2 process), nên "gộp chung 1 platform với Firestore" không còn là lợi thế |
+| Hosting `apps/api` (nếu cần deploy) | **Render / Railway** — một process Node chạy dài | **Không dùng serverless.** `services/upstream.ts` là hàng đợi + cache trong bộ nhớ của MỘT tiến trình: `minGapMs` giãn các lần gọi Photon/OSRM ra ≥600ms để không bị chặn IP. Nhiều instance serverless chạy song song làm hàng đợi đó thành vô nghĩa — mỗi instance tưởng mình là người duy nhất — và cache cũng mất theo |
 | Testing framework | **Không cần** | Quy mô 6 tuần, tự test bằng cách click tay qua từng luồng là đủ, không cần viết test tự động |
 
-Lưu ý: không bắt buộc phải deploy public trong 6 tuần này — chạy local (`next dev`) để demo cho mentor là đủ. Firebase Hosting chỉ cần khi muốn có link truy cập từ xa.
+Lưu ý: không bắt buộc phải deploy public trong 6 tuần này — chạy local (`next dev`) để demo cho mentor là đủ. Chỉ cần deploy khi muốn có link truy cập từ xa; các bước và biến môi trường ở `setup.md` mục "Deploy".
 
 ## Kiến trúc monorepo — đảo lại quyết định gộp
 

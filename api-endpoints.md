@@ -74,6 +74,13 @@ Route dùng **whitelist**: chỉ lấy đúng 8 field ở bảng trên từ body
 { "error": "Invalid value for flow: expected \"ride\" | \"food\"" }
 ```
 
+**Response lỗi (401)** — chỉ xuất hiện khi biến `EVENTS_WRITE_KEY` được đặt ở BE:
+```json
+{ "error": "Thiếu hoặc sai khoá ghi event" }
+```
+
+Xem mục "Khoá `x-gsm-key`" ở cuối tài liệu này.
+
 ### 2. Lấy toàn bộ event của 1 session
 ```
 GET /api/events?session_id=abc-123
@@ -272,8 +279,10 @@ File: `apps/api/src/routes/tiles.routes.ts` → `services/tiles.service.ts`. Kh�
 
 **Response (200):** tên các nhà cung cấp còn dùng được, **giữ nguyên thứ tự ưu tiên** trong `TILE_PROVIDERS` (`packages/shared/src/tiles.ts`)
 ```json
-{ "providers": ["stadia", "osmfr"] }
+{ "providers": ["stadia", "osmfr", "osmde"] }
 ```
+
+> **Kết quả phụ thuộc `WEB_ORIGIN`, và đó là chủ ý.** Phép dò gửi `Referer: <phần tử đầu của WEB_ORIGIN>` vì Stadia phân quyền theo header đó. Chạy local thì danh sách còn cả ba như trên; trên bản deploy (với `WEB_ORIGIN` trỏ domain thật) thì Stadia trả 401 và kết quả rút còn `["osmfr", "osmde"]`. Cùng một đoạn code, hai kết luận khác nhau — vì sự thật ở hai nơi vốn khác nhau. Xem mục "Deploy" ở `setup.md`.
 
 **Vì sao endpoint này tồn tại.** `MapCanvas.tsx` từ đầu đã có cơ chế đếm tile hỏng rồi nhảy sang nhà cung cấp dự phòng — nhưng nó dựa vào sự kiện `onError` của thẻ `<img>`, mà `onError` chỉ bắt được *"không tải được"*, không bắt được *"tải được nhưng sai"*.
 
@@ -283,9 +292,10 @@ File: `apps/api/src/routes/tiles.routes.ts` → `services/tiles.service.ts`. Kh�
 
 | Nhà cung cấp | Kích thước tile biển | Kết luận |
 |---|---|---|
-| `tile.openstreetmap.de`, `osmfr` | 103 B | sạch |
+| `osmfr`, `osmde` | 103 B | sạch |
 | Stadia (`osm_bright`) | 495 B | sạch |
 | CARTO | **1718 B** | có watermark |
+| Stadia, referer bản deploy | 14.885 B | 401 — loại ở bước mã trạng thái |
 
 Ngưỡng `PROBE_MAX_BYTES = 800` nằm giữa khe hở 495 → 1718. **Đổi tone bản đồ thì phải đo lại con số này** — tone có màu nặng hơn tone xám ngay cả ở giữa biển (`alidade_smooth` 156 B → `osm_bright` 495 B). Một nhà cung cấp bị loại khi **đã trả lời** mà tile quá lớn, sai `content-type`, hoặc trả mã lỗi.
 
@@ -309,7 +319,26 @@ File: `apps/api/src/routes/health.routes.ts`. Response: `{ "status": "ok" }`. **
 ### Về việc không có authentication
 Đây là **quyết định có chủ ý**, không phải thiếu sót: trong phạm vi 6 tuần, app chạy local (`next dev`) để demo, `user_id` là giá trị mock, dữ liệu không có gì nhạy cảm.
 
-Hệ quả cần biết: nếu về sau deploy công khai lên Firebase Hosting, `POST /api/events` trở thành endpoint mở — bất kỳ ai cũng ghi được document rác vào collection `events` và làm hỏng số liệu phân tích. Khi đó cần bổ sung tối thiểu một trong các biện pháp: App Check, rate limit theo IP, hoặc một shared secret trong header. **Chỉ deploy công khai sau khi đã sinh xong dữ liệu phân tích**, hoặc không deploy công khai.
+Hệ quả cần biết: khi deploy công khai, `POST /api/events` trở thành endpoint mở — bất kỳ ai cũng ghi được document rác vào collection `events` và làm hỏng số liệu phân tích.
+
+Biện pháp đã chọn là **shared secret trong header** (mục ngay dưới). Hai lựa chọn còn lại từng cân nhắc: App Check gắn chặt vào Firebase SDK phía client mà dự án cố tình không có; rate limit theo IP thì chặt hơn nhưng cần thêm state, và `upstream.ts` đã cho thấy state trong bộ nhớ tiến trình là thứ phải tính kỹ. Shared secret là mức vừa đủ cho một app demo.
+
+### Khoá `x-gsm-key`
+
+Chỉ bật khi biến `EVENTS_WRITE_KEY` được đặt ở BE. **Không đặt = không kiểm tra**, và đó là mặc định khi chạy local — không ai phải cấu hình thêm để chạy dự án, `analysis/fetch_events.py` cũng không đổi gì.
+
+| | |
+|---|---|
+| Áp cho | **cả `POST` lẫn `GET /api/events`** (`/history` đọc lại event qua cùng đường proxy) |
+| Header | `x-gsm-key` |
+| Sai hoặc thiếu | `401 { "error": "Thiếu hoặc sai khoá ghi event" }` |
+| Ai gắn header | `apps/web/middleware.ts`, **ở tầng máy chủ** |
+
+**Trình duyệt không bao giờ biết giá trị khoá.** Đây là điểm chính: `lib/track.ts` vẫn gọi `fetch('/api/events')` same-origin y như cũ, rồi máy chủ của `apps/web` mới gắn header trước khi chuyển tiếp sang `apps/api`. Mở DevTools cũng không thấy, đọc bundle cũng không có. Nếu gắn header trong `track.ts` thì khoá nằm trong JS tải về máy người dùng và hoàn toàn vô nghĩa — **đừng chuyển nó sang FE cho gọn**.
+
+Các endpoint còn lại (`/api/places`, `/api/reverse`, `/api/restaurants`, `/api/route`, `/api/tiles`, `/api/health`) **không bị chặn**: chúng chỉ đọc dữ liệu công khai, không ghi gì, nên đóng lại không được lợi gì mà mất khả năng gọi thẳng để debug.
+
+Vẫn nên giữ nguyên tắc **sinh xong dữ liệu phân tích rồi hãy deploy công khai**. Khoá chặn được bot và người tò mò, không chặn được người quyết tâm — họ vẫn mở được web và click thật.
 
 ## Lưu ý riêng cho Firestore
 Credential Firebase Admin SDK (service account key) chỉ sống trong `apps/api` (`apps/api/.env`, đã gitignore). `apps/web` **không có `firebase-admin` trong `dependencies`** nên không import nổi — xem `CLAUDE.md` quy tắc 1.

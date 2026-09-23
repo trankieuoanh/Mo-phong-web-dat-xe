@@ -110,7 +110,7 @@ service cloud.firestore {
 
 ## Biến môi trường
 
-Chỉ **`apps/api`** cần biến môi trường. `apps/web` không có biến nào bí mật — nó không biết Firebase tồn tại.
+Khi **chạy local**, chỉ `apps/api` cần biến môi trường. `apps/web` không có biến nào bí mật — nó không biết Firebase tồn tại. (Lúc **deploy** thì `apps/web` có thêm hai biến, cả hai đều là biến server-side, không bí mật theo nghĩa Firebase — xem mục "Deploy" bên dưới.)
 
 `apps/api/.env` (đã có trong `.gitignore` — kiểm tra lại cho chắc):
 
@@ -124,9 +124,15 @@ WEB_ORIGIN=http://localhost:3000
 # Tuỳ chọn — địa chỉ liên hệ gắn vào User-Agent khi gọi Nominatim.
 # Có giá trị mặc định nên bỏ trống vẫn chạy được.
 NOMINATIM_CONTACT=ban@example.com
+
+# Tuỳ chọn — khoá chia sẻ cho /api/events. ĐỂ TRỐNG khi chạy local.
+# Trống = không kiểm tra gì. Chỉ đặt khi deploy công khai (xem mục "Deploy").
+EVENTS_WRITE_KEY=
 ```
 
 File `apps/api/.env.example` đã commit sẵn với giá trị trống, để người khác clone repo biết cần những biến gì.
+
+**`WEB_ORIGIN` nhận nhiều origin**, phân tách bằng dấu phẩy. Chạy local thì một giá trị là đủ; khi deploy thì đặt domain thật **trước** `http://localhost:3000`. Thứ tự có ý nghĩa: `services/tiles.service.ts` lấy **phần tử đầu** làm `Referer` khi dò tile, và Stadia trả 401 hay 200 là tuỳ referer.
 
 **`NOMINATIM_CONTACT`** phục vụ endpoint `GET /api/places` (tìm địa chỉ thật). [Điều khoản dùng Nominatim](https://operations.osmfoundation.org/policies/nominatim/) bắt buộc mỗi request mang `User-Agent` định danh ứng dụng kèm cách liên hệ; thiếu nó thì OSM có quyền chặn IP. Đây cũng là lý do endpoint này phải nằm ở `apps/api` chứ không gọi thẳng từ trình duyệt — **trình duyệt không cho JavaScript đặt header `User-Agent`**.
 
@@ -139,11 +145,20 @@ Không cần API key: Nominatim miễn phí. Đổi lại nó giới hạn **1 r
 | **Photon** (`photon.komoot.io`) | `GET /api/places`, `GET /api/reverse` — địa chỉ | không | Panel hiện cảnh báo, vẫn liệt kê 5 địa chỉ gợi ý; nhãn địa chỉ lùi về mặc định |
 | **Overpass** (`overpass-api.de`) | `GET /api/restaurants` — quán ăn | không | Dải "Gần bạn" hiện lỗi kèm nút Thử lại; ba cách tìm món còn lại vẫn chạy |
 | **OSRM** (`router.project-osrm.org`) | `GET /api/route` — tuyến đường | không | Dùng đường nối thẳng, ghi `route_source: "straight"` |
-| **Tile Stadia** (`tiles.stadiamaps.com`) | Nền bản đồ trong `MapCanvas` | không, khi chạy localhost | Tự chuyển sang `tile.openstreetmap.fr`; hết đường thì hiện "Không tải được nền bản đồ" |
+| **Tile Stadia** (`tiles.stadiamaps.com`) | Nền bản đồ trong `MapCanvas` | không — nhưng **chỉ ở localhost** | Tự chuyển sang `tile.openstreetmap.fr`, rồi `tile.openstreetmap.de`; hết đường thì hiện "Không tải được nền bản đồ" |
 
 Cả bốn là **hạ tầng cộng đồng miễn phí**, chỉ hợp cho demo cục bộ.
 
-> **Stadia chặn theo `Referer`.** Gọi không kèm header đó sẽ nhận `401` — nên `curl` trần sẽ báo tile chết trong khi trình duyệt vẫn tải được bình thường. Thêm `-e http://localhost:3000/` khi tự kiểm tra. Nếu sau này đem deploy lên hosting thật thì phải đăng ký một tài khoản Stadia miễn phí; dự án này chỉ chạy localhost nên chưa cần.
+> **Stadia chặn theo `Referer`, và chỉ miễn phí cho `localhost`.** Gọi không kèm header đó sẽ nhận `401` — nên `curl` trần sẽ báo tile chết trong khi trình duyệt vẫn tải được bình thường. Thêm `-e http://localhost:3000/` khi tự kiểm tra.
+>
+> Trên **bản deploy** thì referer là domain thật, và Stadia trả `401` cho mọi tile. Đo thật trên cùng một URL tile:
+>
+> | Referer | Kết quả |
+> |---|---|
+> | `http://localhost:3000/` | 200, 495 B |
+> | `https://<app>.vercel.app/` | **401**, 14.885 B |
+>
+> Dự án **không đi đăng ký API key** để giải quyết chuyện này — cách xử lý là để phép dò `GET /api/tiles` tự loại Stadia ra ở môi trường deploy, rồi rơi về `osmfr`/`osmde` (đều không cần key). Điều kiện duy nhất: `WEB_ORIGIN` của BE phải có domain thật ở **vị trí đầu**, nếu không phép dò sẽ hỏi Stadia bằng referer localhost và kết luận sai. Xem mục "Deploy".
 
 > ## ⚠️ `*.openstreetmap.org` có thể bị chặn — và đó là lỗi khó đoán nhất của dự án này
 >
@@ -189,6 +204,83 @@ Bản trước dùng `import 'server-only'` để chặn rò credential. Không 
 ## Composite index
 
 Query kết hợp nhiều điều kiện (ví dụ `where('flow')` + `where('created_at' >=)` + `orderBy`) sẽ bị Firestore từ chối kèm **một link tạo index sẵn trong thông báo lỗi**. Bấm link đó, đợi index build xong (~1 phút), chạy lại. Không cần đoán trước index nào — cứ chạy, lỗi sẽ chỉ đường (xem `db-design.md`).
+
+---
+
+## Deploy
+
+Không bắt buộc — `techstack.md` đã chốt chạy local là đủ để demo. Mục này dành cho khi thực sự cần một link truy cập từ xa.
+
+**Phải deploy HAI nơi.** Đây là điều dễ quên nhất, và triệu chứng của việc quên rất dễ đọc nhầm thành lỗi giao diện: web lên được, trang mở được, nhưng ô tìm địa chỉ không ra gì và bản đồ trắng. Lý do là `apps/web` và `apps/api` là hai process riêng (xem `ARCHITECTURE.md`), nên deploy mỗi `apps/web` thì `rewrites` trong `next.config.ts` vẫn trỏ về `http://localhost:4000` — một địa chỉ không tồn tại trên máy chủ. Vercel trả `404 DNS_HOSTNAME_RESOLVED_PRIVATE` cho **mọi** `/api/*`, kể cả `POST /api/events`, và vì `lib/track.ts` cố tình nuốt lỗi (quy tắc "mất event còn hơn kẹt UI") nên **không một event nào được ghi mà app không hề báo gì**.
+
+| | `apps/web` | `apps/api` |
+|---|---|---|
+| Nơi chạy | Vercel | **Render / Railway** |
+| Kiểu | build tĩnh + serverless | **một process Node chạy dài** |
+| Lệnh build | `npm run build` | không có |
+| Lệnh chạy | (Vercel tự lo) | `npm run start -w apps/api` |
+| Root directory | gốc repo | **gốc repo**, không phải `apps/api` |
+
+**Vì sao `apps/api` phải là process chạy dài chứ không phải serverless.** `src/services/upstream.ts` là hàng đợi + cache **trong bộ nhớ của một tiến trình**: `minGapMs` giãn cách các lần gọi Photon/OSRM ra ≥ 600ms để không bị chặn IP. Nhiều instance serverless chạy song song làm hàng đợi đó thành vô nghĩa — mỗi instance tưởng mình là người duy nhất, và Photon/Overpass nhìn thấy một chùm request dồn dập từ cùng một nguồn. Cache cũng mất luôn, nên mỗi lần đổi màn là một lần gọi upstream thật.
+
+**Root directory phải là gốc repo** ở cả hai nơi: đây là npm workspaces, `npm install` phải chạy ở gốc thì `@gsm/shared` mới được symlink vào `node_modules`. Trỏ thẳng vào `apps/api` sẽ lỗi không tìm thấy package.
+
+### Biến môi trường khi deploy
+
+Trên host của **`apps/api`**:
+
+| Biến | Giá trị | Ghi chú |
+|---|---|---|
+| `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL` | copy từ `.env` local | |
+| `FIREBASE_PRIVATE_KEY` | dán dạng có `\n` **literal** | `db/firebase-admin.ts` đã `.replace(/\\n/g, '\n')` |
+| `WEB_ORIGIN` | `https://<app>.vercel.app,http://localhost:3000` | **domain thật đứng đầu** — xem cảnh báo Stadia ở trên |
+| `NOMINATIM_CONTACT` | email liên hệ | điều khoản OSM |
+| `EVENTS_WRITE_KEY` | `openssl rand -hex 32` | xem mục dưới |
+| `PORT` | **đừng đặt** | Render tự đặt; `server.ts` đã đọc `process.env.PORT` |
+
+Trên **Vercel**:
+
+| Biến | Giá trị |
+|---|---|
+| `API_ORIGIN` | `https://<app>.onrender.com` |
+| `EVENTS_WRITE_KEY` | **giống hệt** giá trị bên `apps/api` |
+
+Cả hai đều là biến server-side. **Tuyệt đối không thêm tiền tố `NEXT_PUBLIC_`** (quy tắc 2) — tiền tố đó nhúng giá trị vào bundle trình duyệt, và với `EVENTS_WRITE_KEY` thì làm vậy là phá huỷ đúng cái lý do khoá tồn tại.
+
+`API_ORIGIN` được đọc **lúc build** (`next.config.ts` dòng đầu), nên đặt biến xong phải **redeploy** thì mới ăn.
+
+### Khoá cho `/api/events`
+
+Deploy công khai biến `POST /api/events` thành endpoint mở: ai cũng ghi document rác vào collection `events` được, và số liệu funnel hỏng theo. `EVENTS_WRITE_KEY` là hàng rào tối thiểu.
+
+Cách nó chạy: `apps/web/middleware.ts` bơm header `x-gsm-key` vào mọi `/api/*` **ở tầng máy chủ Vercel**, sau khi request đã rời khỏi máy người dùng; `apps/api/src/routes/events.routes.ts` kiểm tra header đó. Trình duyệt không bao giờ biết giá trị khoá — mở DevTools cũng không thấy, đọc bundle cũng không có.
+
+Không đặt biến = không kiểm tra gì. Đó là mặc định đúng cho máy mình, và là lý do chạy local không phải cấu hình thêm.
+
+Lệch giá trị giữa hai nơi thì mọi event bị trả 401 và `track.ts` nuốt lỗi — **hỏng im lặng**. Kiểm tra ngay sau khi deploy bằng lệnh ở mục dưới.
+
+### Kiểm tra sau khi deploy
+
+```bash
+WEB=https://<app>.vercel.app
+
+curl -s -o /dev/null -w '%{http_code}\n' $WEB/api/health      # 200
+curl -s "$WEB/api/places?q=Ho%20Guom" | jq 'length'           # > 0
+curl -s $WEB/api/tiles                                        # {"providers":["osmfr","osmde"]}
+
+# Gọi THẲNG vào apps/api, không có khoá — phải bị chặn
+curl -s -o /dev/null -w '%{http_code}\n' -X POST \
+  https://<app>.onrender.com/api/events \
+  -H 'Content-Type: application/json' -d '{}'                 # 401
+```
+
+`/api/tiles` **không được còn `stadia` và `carto`**. Còn `stadia` nghĩa là `WEB_ORIGIN` sai thứ tự hoặc thiếu domain thật; còn `carto` nghĩa là CARTO đã mở lại raster miễn phí (chuyện tốt, không phải lỗi).
+
+Rồi đi hết một luồng trên web thật và đếm event như mục cuối `CLAUDE.md`. Nếu ra mảng rỗng thì gần như chắc chắn là `EVENTS_WRITE_KEY` lệch nhau giữa hai nơi.
+
+### Gói free của Render ngủ sau 15 phút
+
+Request đầu tiên sau đó mất ~50 giây để đánh thức tiến trình. `lib/use-place-search.ts` đặt timeout 6 giây, nên **lần gõ địa chỉ đầu tiên sẽ báo lỗi tìm kiếm** — gõ lại là được. Biết trước điều này để lúc demo không tưởng là deploy hỏng. Muốn tránh hẳn thì mở web trước giờ demo một phút, hoặc trả phí.
 
 ---
 
@@ -356,6 +448,27 @@ Tự kiểm tra một nhà cung cấp mới trước khi thêm, bằng đúng ti
 curl -so /dev/null -w '%{size_download}\n' <URL tile z=13 x=6707 y=3740>
 ```
 Dưới 800 byte là sạch. Trên ngưỡng đó nghĩa là giữa Biển Đông đang có chữ.
+
+### Trên bản deploy: bản đồ báo 401 và ô tìm địa chỉ không ra gì
+
+Hai triệu chứng trông như hai lỗi riêng, nhưng thường là **một nguyên nhân**: `apps/api` chưa được deploy, hoặc `API_ORIGIN` trên Vercel chưa trỏ đúng nó.
+
+Kiểm tra một lệnh là biết:
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' https://<app>.vercel.app/api/health
+```
+
+`404` kèm body `DNS_HOSTNAME_RESOLVED_PRIVATE` nghĩa là `rewrites` vẫn đang trỏ về `http://localhost:4000` — tức là thiếu biến `API_ORIGIN`, hoặc đã đặt biến nhưng **chưa redeploy** (biến đó đọc lúc build). Khi đó `/api/tiles` cũng chết, `lib/use-tile-providers.ts` lùi về nguyên cả bảng và bắt đầu từ Stadia, mà Stadia trả 401 với referer không phải localhost → chính là con số 401 nhìn thấy trong console.
+
+Nếu `/api/health` trả `200` mà bản đồ vẫn 401, thì lỗi nằm ở `WEB_ORIGIN` của BE: nó phải có domain thật ở **vị trí đầu** thì phép dò mới hỏi Stadia bằng đúng referer trình duyệt sẽ gửi. Sửa biến xong nhớ **restart service** — kết quả dò được cache 6 tiếng trong bộ nhớ tiến trình.
+
+### Event trên bản deploy không vào Firestore, app vẫn click bình thường
+
+Đúng thiết kế của `lib/track.ts`: lỗi mạng bị nuốt để không bao giờ kẹt UI. Nên mọi hỏng hóc ở đường ghi event đều **im lặng**, và phải đi tìm bằng tay.
+
+Hai nguyên nhân, theo thứ tự hay gặp:
+1. `EVENTS_WRITE_KEY` trên Vercel và trên host của `apps/api` **lệch nhau** → API trả 401 cho mọi event. Kiểm tra: gọi thẳng API kèm khoá, body rác — nếu ra `400` (báo thiếu `session_id`) là khoá đúng, ra `401` là khoá sai.
+2. `apps/api` chưa deploy → xem mục ngay trên.
 
 ### Số `screen_view` nhiều gấp đôi số màn đã đi qua
 `useRef` chưa chặn được lần chạy thứ hai của React Strict Mode trong `next dev`. Nếu không sửa thì **mọi tỉ lệ funnel đều sai gấp đôi** — xem `screen-map.md` mục 4.

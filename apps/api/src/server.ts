@@ -15,12 +15,28 @@ import { placesRouter } from './routes/places.routes.js';
 import { routeRouter } from './routes/route.routes.js';
 import { tilesRouter } from './routes/tiles.routes.js';
 
+// Render/Railway tu dat PORT cho tien trinh; local thi roi ve 4000.
 const PORT = Number(process.env.PORT ?? 4000);
-const WEB_ORIGIN = process.env.WEB_ORIGIN ?? 'http://localhost:3000';
+
+/**
+ * `WEB_ORIGIN` nhan DANH SACH phan tach bang dau phay, vi tu luc co ban deploy
+ * thi co hai origin hop le cung luc: domain that va `http://localhost:3000` khi
+ * ngoi debug. Mot chuoi don van chay binh thuong — "a,b" chi la truong hop nhieu
+ * hon mot phan tu.
+ *
+ * Chu y: gia tri nay con duoc `services/tiles.service.ts` dung lam `Referer` khi
+ * do tile, va o do no lay PHAN TU DAU. Nen tren ban deploy hay de domain that
+ * dung truoc localhost, neu khong phep do se hoi Stadia bang referer localhost
+ * va ket luan Stadia con song trong khi trinh duyet that van an 401.
+ */
+const WEB_ORIGINS = (process.env.WEB_ORIGIN ?? 'http://localhost:3000')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
 const app = express();
 
-app.use(cors({ origin: WEB_ORIGIN }));
+app.use(cors({ origin: WEB_ORIGINS }));
 app.use(express.json({ limit: '64kb' }));
 
 app.use('/api', healthRouter);

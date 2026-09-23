@@ -23,8 +23,17 @@ import { createUpstreamGate } from './upstream.js';
 /** Qua moc nay thi coi nhu nha cung cap do khong tra loi. */
 const UPSTREAM_TIMEOUT_MS = 8000;
 
-/** Cung mac dinh voi server.ts — trinh duyet that se tai tile tu day. */
-const WEB_ORIGIN = process.env.WEB_ORIGIN ?? 'http://localhost:3000';
+/**
+ * Cung mac dinh voi server.ts — trinh duyet that se tai tile tu day.
+ *
+ * `WEB_ORIGIN` co the la danh sach phan tach bang dau phay (server.ts cho phep
+ * nhieu origin qua cua CORS). O DAY CHI LAY PHAN TU DAU, vi mot header `Referer`
+ * chi mang duoc mot gia tri — dan ca chuoi "a,b" vao se thanh mot referer rac va
+ * Stadia se tu choi. Tren ban deploy, phan tu dau phai la domain THAT: phep do
+ * chi dung bang nguoi dung that neu no hoi upstream bang dung cai referer ma
+ * trinh duyet se gui.
+ */
+const WEB_ORIGIN = (process.env.WEB_ORIGIN ?? 'http://localhost:3000').split(',')[0]!.trim();
 
 const gate = createUpstreamGate({
   // Ca phep do chi chiem MOT muc cache, nen minGapMs gan nhu khong bao gio cham

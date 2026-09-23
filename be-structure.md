@@ -113,6 +113,8 @@ app.use(/* 404 fallback */);
 
 `PORT` và `WEB_ORIGIN` đọc từ env, có giá trị mặc định (`4000`, `http://localhost:3000`) nên chạy được ngay khi chưa có `.env`.
 
+`WEB_ORIGIN` nhận **danh sách phân tách bằng dấu phẩy**, vì khi có bản deploy thì có hai origin hợp lệ cùng lúc: domain thật và `localhost:3000` lúc ngồi debug. Một chuỗi đơn vẫn chạy bình thường. Thứ tự **có ý nghĩa**: `services/tiles.service.ts` lấy phần tử đầu làm `Referer` khi dò tile, nên trên bản deploy phải để domain thật đứng trước (xem `setup.md` mục "Deploy").
+
 Có `server.on('error')` bắt `EADDRINUSE` và thoát với thông báo rõ. Thiếu handler này thì lỗi mở cổng bị nuốt và **tiến trình treo im lặng, không in gì ra cả stdout lẫn stderr** — người dùng tưởng BE vẫn sống và đi tìm nhầm chỗ.
 
 ### `routes/health.routes.ts` (14 dòng)
@@ -121,11 +123,32 @@ GET /api/health → { "status": "ok" }
 ```
 **Không chạm Firestore.** Nhờ vậy nó trả lời được ngay cả khi chưa có credential — đúng mục đích: xác nhận Express chạy đúng *trước khi* Firebase vào cuộc, để hai loại lỗi không trộn vào nhau.
 
-### `routes/events.routes.ts` (50 dòng)
+### `routes/events.routes.ts` (87 dòng)
 ```ts
 export const eventsRouter: Router
 ```
 Hai handler, mỗi handler cùng một khuôn: validate → sai thì 400 → đúng thì gọi service trong `try/catch` → lỗi thì log đầy đủ phía server và trả JSON gọn cho client.
+
+Trước cả hai handler có **một guard khoá chia sẻ**, áp cho cả `POST` lẫn `GET /events`:
+
+```ts
+eventsRouter.use('/events', (req, res, next) => {
+  if (!EVENTS_WRITE_KEY) return next();               // không đặt = không kiểm tra
+  if (req.get('x-gsm-key') !== EVENTS_WRITE_KEY) {
+    res.status(401).json({ error: 'Thiếu hoặc sai khoá ghi event' });
+    return;
+  }
+  next();
+});
+```
+
+Ba điều cần biết trước khi sửa chỗ này:
+
+- **Không đặt `EVENTS_WRITE_KEY` thì không kiểm tra gì** — là chủ ý, không phải sơ sót. Chạy local không ai phải cấu hình thêm, `analysis/fetch_events.py` cũng không đổi. Khoá chỉ bật ở nơi thật sự cần: bản deploy công khai.
+- **Khoá không do trình duyệt gắn.** `apps/web/middleware.ts` bơm header ở tầng máy chủ, sau khi request đã rời máy người dùng. Chuyển việc đó sang `lib/track.ts` là đưa khoá vào bundle và làm nó vô dụng.
+- **Chặn cả GET**, vì `/history` đọc lại event qua đúng đường proxy đó nên middleware đã bơm header sẵn cho mọi `/api/*`.
+
+Các router khác không có guard: chúng chỉ đọc dữ liệu công khai và không ghi gì.
 
 ### `validators/event.validator.ts` (162 dòng) — file lớn nhất BE
 ```ts

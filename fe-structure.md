@@ -8,13 +8,15 @@ Mô tả **code hiện có** trong `apps/web`: file nào làm gì, phụ thuộc
 
 ## 1. Vai trò
 
-Next.js 15 (App Router), cổng **3000**. Chỉ frontend — **không có một dòng server-side logic nào**.
+Next.js 15 (App Router), cổng **3000**. Chỉ frontend — **không có logic nghiệp vụ nào chạy ở server**.
 
 Ba điều quyết định hình dạng của toàn bộ thư mục này:
 
 - **Mọi page đều `'use client'`.** Vì page nào cũng cần đọc state (giỏ hàng, lựa chọn) và bắn event, không có page nào render được ở server.
 - **Không có `firebase-admin` trong `dependencies`.** Credential nằm ở `apps/api`, một module graph khác — FE muốn chạm Firestore cũng không import nổi. Xem `CLAUDE.md` quy tắc 1.
 - **Không có `app/api/`.** API là process riêng ở cổng 4000; `next.config.ts` proxy `/api/*` sang đó.
+
+Ngoại lệ duy nhất chạy ở server là `middleware.ts` — nó **không xử lý nghiệp vụ gì**, chỉ gắn một header vào request trên đường đi (xem mục 5).
 
 ---
 
@@ -23,6 +25,7 @@ Ba điều quyết định hình dạng của toàn bộ thư mục này:
 ```
 apps/web/
 ├─ next.config.ts          transpilePackages + rewrites proxy → :4000
+├─ middleware.ts           bơm header x-gsm-key vào /api/* (chỉ khi deploy)
 ├─ postcss.config.mjs      plugin @tailwindcss/postcss
 ├─ eslint.config.mjs
 ├─ tsconfig.json           paths: @/* và @gsm/shared
@@ -170,6 +173,21 @@ Ba thứ file này giữ mà không chỗ nào khác giữ:
 3. **`useRef` chặn React Strict Mode** trong `useScreenView`. Thiếu nó thì mọi `screen_view` nhân đôi và funnel sai gấp đôi.
 
 `trackEvent` trả `void` có chủ ý — không ai `await` được nên không thể vô tình chặn điều hướng. Kèm `keepalive: true` và `.catch(() => {})`.
+
+### `middleware.ts` (không nằm trong `lib/`, nhưng đọc cùng `track.ts`)
+
+File duy nhất của `apps/web` chạy ở phía máy chủ. Việc của nó gọn trong một câu: **gắn header `x-gsm-key` vào mọi request `/api/*`**, rồi rewrite thẳng sang `API_ORIGIN`.
+
+```ts
+export const config = { matcher: '/api/:path*' };
+// không đặt EVENTS_WRITE_KEY → NextResponse.next(), rewrites của next.config.ts lo nốt
+```
+
+Vì sao không gắn header trong `track.ts` cho gọn: khoá đặt ở FE sẽ nằm trong bundle JS tải về máy người dùng, mở DevTools là thấy, và như vậy thì nó không còn chặn được ai. Đặt ở đây thì khoá chỉ tồn tại trên máy chủ — trình duyệt vẫn gọi `/api/events` same-origin y như cũ và không biết gì về nó.
+
+Tự rewrite thay vì `NextResponse.next()` rồi để `rewrites` của `next.config.ts` làm nốt: header sửa trong middleware chỉ chắc chắn đi theo request khi chính middleware quyết định đích đến. Cái giá khi đoán sai là `confirm_ride` và `place_order` âm thầm ăn 401 — đúng kiểu mất event cuối funnel mà `next.config.ts` đã phải viết hẳn một đoạn dài để tránh.
+
+Không đặt `EVENTS_WRITE_KEY` thì middleware thả request đi tiếp, tức là **chạy local không đổi gì**. Xem `setup.md` mục "Deploy".
 
 ### `app-context.tsx` (209 dòng)
 ```ts

@@ -68,6 +68,8 @@ tsconfig.base.json        strict, paths → @gsm/shared
 
 apps/web/                 Next.js 15 — CHỈ FE, cổng 3000
   next.config.ts          transpilePackages + rewrites /api/* → :4000
+  middleware.ts           bơm header x-gsm-key vào /api/* — CHỈ chạy khi deploy
+                          (không đặt EVENTS_WRITE_KEY thì nó thả request đi tiếp)
   app/
     layout.tsx            AppProvider + font Inter (subset vietnamese)
     page.tsx              Home — man dat xe mac dinh (screen_name `home`)
