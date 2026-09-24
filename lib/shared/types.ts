@@ -90,7 +90,7 @@ export interface ApiErrorResponse {
   error: string;
 }
 
-/** Runtime list — dung de validate o apps/api. Giu dong bo voi union EventName. */
+/** Runtime list — dung de validate o lib/server. Giu dong bo voi union EventName. */
 export const EVENT_NAMES = [
   'screen_view',
   'back',
@@ -124,7 +124,7 @@ export const FLOW_VALUES = ['ride', 'food', 'none'] as const satisfies readonly 
 
 /**
  * Chan viec them gia tri vao union EventName ma quen them vao EVENT_NAMES.
- * `satisfies` chi kiem tra chieu nguoc lai, nen thieu dong nay validator o apps/api
+ * `satisfies` chi kiem tra chieu nguoc lai, nen thieu dong nay validator o lib/server
  * se lang le tu choi mot event name hoan toan hop le.
  */
 type MissingEventNames = Exclude<EventName, (typeof EVENT_NAMES)[number]>;

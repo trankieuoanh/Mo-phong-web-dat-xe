@@ -33,7 +33,7 @@ const readline = require('node:readline');
 
 const ROOT = path.resolve(__dirname, '..');
 const KEY_PATH = path.join(ROOT, 'serviceAccountKey.json');
-const MOCK_DATA_PATH = path.join(ROOT, 'packages/shared/src/mock-data.ts');
+const MOCK_DATA_PATH = path.join(ROOT, 'lib/shared/mock-data.ts');
 
 const EVENTS_COLLECTION = 'events';
 
@@ -198,7 +198,7 @@ function seededUuid() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Bang du lieu — BAN SAO cua packages/shared/src/mock-data.ts
+// Bang du lieu — BAN SAO cua lib/shared/mock-data.ts
 //
 // Vi sao phai chep: mock-data.ts la ESM TypeScript va import noi bo khong ghi
 // duoi `.js` (CLAUDE.md muc "Quy uoc code"), nen `node` tran khong require duoc.
@@ -460,7 +460,7 @@ function assertIdsStillExist() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Bang man hinh — ban sao cua packages/shared/src/screens.ts
+// Bang man hinh — ban sao cua lib/shared/screens.ts
 // ─────────────────────────────────────────────────────────────
 
 const SCREENS = {
@@ -483,7 +483,7 @@ const SCREENS = {
 const ADD_TO_CART_STEP_INDEX = 3;
 const SELECT_FLOW_STEP_INDEX = 0;
 
-/** 26 gia tri — ban sao cua EVENT_NAMES trong packages/shared/src/types.ts. */
+/** 26 gia tri — ban sao cua EVENT_NAMES trong lib/shared/types.ts. */
 const EVENT_NAMES = new Set([
   'screen_view', 'back', 'back_to_home', 'select_flow',
   'select_address', 'confirm_pickup', 'change_address', 'select_vehicle',
@@ -495,7 +495,7 @@ const EVENT_NAMES = new Set([
 ]);
 
 // ─────────────────────────────────────────────────────────────
-// Tinh tien — ban sao cua packages/shared/src/pricing.ts
+// Tinh tien — ban sao cua lib/shared/pricing.ts
 // ─────────────────────────────────────────────────────────────
 
 const INCLUDED_KM = 2;
@@ -536,7 +536,7 @@ function isRuleAvailable(rule, subtotal, ctx = {}) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Dia ly — ban sao cua packages/shared/src/route.ts
+// Dia ly — ban sao cua lib/shared/route.ts
 // ─────────────────────────────────────────────────────────────
 
 const EARTH_RADIUS_KM = 6371;
@@ -1470,7 +1470,7 @@ function printTimeline(session, title) {
  * Credential Firestore — thu HAI duong, theo thu tu.
  *
  *   1. serviceAccountKey.json o goc repo.
- *   2. Ba bien FIREBASE_* trong apps/api/.env — DUNG NGUON MA apps/api DANG DUNG.
+ *   2. Ba bien FIREBASE_* trong .env.local — DUNG NGUON MA app DANG DUNG.
  *
  * Duong 2 ton tai vi mot ly do rat cu the: ai chay duoc `npm run dev` thi da co
  * credential roi. Bat ho tai them mot service account key nua chi de chay script
@@ -1487,13 +1487,13 @@ function readCredential() {
     return { credential: cert(require(KEY_PATH)), source: path.relative(ROOT, KEY_PATH) };
   }
 
-  const envPath = path.join(ROOT, 'apps/api/.env');
+  const envPath = path.join(ROOT, '.env.local');
   if (!fs.existsSync(envPath)) {
     fail(
       'Không tìm thấy credential Firebase ở cả hai nơi:\n' +
         `  1. ${path.relative(ROOT, KEY_PATH)}  (service account key JSON)\n` +
         `  2. ${path.relative(ROOT, envPath)}  (3 biến FIREBASE_*)\n\n` +
-        'Cách nhanh nhất: chép apps/api/.env.example thành apps/api/.env rồi điền giá trị\n' +
+        'Cách nhanh nhất: chép .env.example thành .env.local rồi điền giá trị\n' +
         '(setup.md Phase 1) — cùng file mà `npm run dev` đang dùng.\n' +
         'Muốn xem trước dữ liệu mà chưa cần credential thì chạy với --dry-run.',
     );
@@ -1530,7 +1530,7 @@ function readCredential() {
     credential: cert({
       projectId,
       clientEmail,
-      // Giu dong replace nay giong apps/api/src/db/firebase-admin.ts: file .env
+      // Giu dong replace nay giong lib/server/db/firebase-admin.ts: file .env
       // cua may nay luu newline that, nhung may khac co the luu dang literal `\n`.
       // Thieu no se loi: error:1E08010C:DECODER routines::unsupported
       privateKey: privateKey.replace(/\\n/g, '\n'),
@@ -1540,7 +1540,7 @@ function readCredential() {
 }
 
 function connect() {
-  // `firebase-admin` la dependency cua apps/api, duoc npm workspaces hoist len
+  // `firebase-admin` la dependency cua chinh du an, nam o node_modules o
   // node_modules/ o goc — script khong them dependency nao (CLAUDE.md quy tac 8).
   let appModule;
   let firestoreModule;
@@ -1557,7 +1557,7 @@ function connect() {
   const { credential, source } = readCredential();
   console.log(`Credential Firebase lấy từ: ${source}`);
 
-  // getApps() truoc initializeApp — cung ly do voi apps/api/src/db/firebase-admin.ts.
+  // getApps() truoc initializeApp — cung ly do voi lib/server/db/firebase-admin.ts.
   const app = getApps()[0] ?? initializeApp({ credential });
 
   return { db: getFirestore(app), Timestamp };

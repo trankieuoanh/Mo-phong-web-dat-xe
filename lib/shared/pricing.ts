@@ -75,9 +75,9 @@ export interface RuleContext {
 /**
  * Ly do mot luat bi khoa — DU LIEU, khong phai cau chu.
  *
- * `packages/shared` khong duoc biet toi `formatVnd` (no song o apps/web), va
+ * `lib/shared` khong duoc biet toi `formatVnd` (no song o lib/format.ts), va
  * de moi man tu dung cau giai thich thi hai luong se lech nhau. Viec doi sang
- * tieng Viet nam o `formatRuleBlock()` trong apps/web/lib/format.ts.
+ * tieng Viet nam o `formatRuleBlock()` trong lib/format.ts.
  */
 export type RuleBlock =
   | { kind: 'vehicle'; vehicleTypes: VehicleType[] }

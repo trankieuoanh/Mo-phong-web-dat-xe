@@ -1,5 +1,5 @@
 /**
- * Tai anh mon an that tu Wikimedia Commons ve apps/web/public/food/.
+ * Tai anh mon an that tu Wikimedia Commons ve public/food/.
  *
  * CHAY MOT LAN, khong phai luc build: anh nam trong repo, app khong bao gio goi
  * mang de lay anh. Chay lai chi khi muon doi anh.
@@ -8,7 +8,7 @@
  *
  * GIAY PHEP LA PHAN BAT BUOC, KHONG PHAI TUY CHON. Anh tren Commons phan lon la
  * CC BY / CC BY-SA — duoc dung lai thoai mai NHUNG phai ghi cong tac gia. Script
- * vi vay ghi luon apps/web/public/food/CREDITS.md; thieu file do la dung anh sai
+ * vi vay ghi luon public/food/CREDITS.md; thieu file do la dung anh sai
  * giay phep.
  *
  * Mon nao khong tim duoc anh hop le thi BO QUA, khong bia: `FoodThumb` tu lui ve
@@ -20,13 +20,13 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const OUT_DIR = resolve(HERE, '../apps/web/public/food');
+const OUT_DIR = resolve(HERE, '../public/food');
 
 const USER_AGENT = 'gsm-simulation/0.1 (https://github.com/gsm-simulation) image-fetch';
 const API = 'https://commons.wikimedia.org/w/api.php';
 
 /**
- * `id` phai khop id trong packages/shared/src/mock-data.ts (CLAUDE.md quy tac 5).
+ * `id` phai khop id trong lib/shared/mock-data.ts (CLAUDE.md quy tac 5).
  * `q` la tu khoa TIM tren Commons; `file` la ten tep CHI DINH SAN.
  *
  * Mac dinh tim theo tu khoa vi ten tep tren Commons rat kho doan. NHUNG tim

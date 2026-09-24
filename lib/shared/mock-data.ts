@@ -458,12 +458,12 @@ export interface FoodItem {
   /** Khong di vao event — chi de hien thi. */
   description: string;
   /**
-   * Duong dan anh trong apps/web/public, vi du `/food/banh-mi-01.jpg`.
+   * Duong dan anh trong public/, vi du `/food/banh-mi-01.jpg`.
    *
    * ANH THAT, tai san ve repo bang scripts/fetch-food-images.mjs tu Wikimedia
    * Commons. App KHONG goi mang de lay anh — tep nam san trong `public`.
    *
-   * Giay phep va tac gia tung anh ghi o `apps/web/public/food/CREDITS.md`. Anh
+   * Giay phep va tac gia tung anh ghi o `public/food/CREDITS.md`. Anh
    * Commons phan lon la CC BY/CC BY-SA nen viec ghi cong la BAT BUOC, khong phai
    * phep lich su.
    *

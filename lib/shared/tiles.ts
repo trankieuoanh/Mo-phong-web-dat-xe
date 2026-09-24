@@ -1,7 +1,8 @@
 /**
  * Nha cung cap tile ban do + phep do suc khoe cua ho.
  *
- * VI SAO NAM O @gsm/shared: BE phai do dung cai danh sach ma FE se hien thi.
+ * VI SAO NAM O lib/shared: phep do o server phai do dung cai danh sach ma
+ * giao dien se hien thi.
  * Chep tay hai ban thi mot hom nao do BE bao "carto dung duoc" trong khi FE da
  * doi sang URL khac — cung ly do `EventName` va `SCREENS` nam o day.
  *
@@ -35,10 +36,13 @@ export interface TileProvider {
  * STADIA CHAN THEO `Referer`, va dieu do chi mien phi tren localhost. Do that:
  * cung mot tile tra 200 voi referer `http://localhost:3000/` nhung tra 401 voi
  * referer `https://<app>.vercel.app/`. Nen o ban deploy, phep do trong
- * `apps/api/src/services/tiles.service.ts` se loai Stadia ra — MIEN LA bien moi
- * truong `WEB_ORIGIN` cua BE tro dung domain that, vi phep do muon referer that
- * thi moi ra ket luan that. Stadia van dung dau bang vi no dep nhat khi chay
- * localhost, va viec loai no la viec cua phep do chu khong phai cua bang nay.
+ * `lib/server/services/tiles.service.ts` se tu loai Stadia ra: no gui referer
+ * lay tu CHINH request cua trinh duyet (`app/api/tiles/route.ts`), nen ket luan
+ * cua no luon khop voi thu nguoi dung that se nhan.
+ *
+ * Stadia van dung dau bang vi no dep nhat khi chay localhost. Viec loai no o
+ * moi truong khac la viec cua phep do, KHONG phai cua bang nay — dung xoa no
+ * khoi day chi vi ban deploy khong dung duoc.
  *
  * CARTO VAN NAM TRONG BANG du hien tai no doi API key — neu CARTO mo lai raster
  * mien phi thi no tu song lai ma khong ai phai sua code. Nhung no bi DAY XUONG

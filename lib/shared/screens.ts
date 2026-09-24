@@ -8,7 +8,7 @@
 import type { FlowValue, ScreenName } from './types';
 
 export interface ScreenSpec {
-  /** Route trong apps/web. */
+  /** Route trong app/. */
   route: string;
   /** Vi tri buoc trong funnel — SO CO DINH cho tung man, khong phai bo dem. */
   stepIndex: number;
