@@ -8,7 +8,7 @@
 
 ## 1. Mục đích & phạm vi
 
-Luồng ride đã được nâng qua `ride-flow-design.md`; luồng food thì chưa từng có tài liệu nào — chính file đó ghi ở §1: *"Ngoài phạm vi: luồng Food (không đổi)"*. Hệ quả là sáu màn food vẫn ở mức wireframe: danh sách phẳng, không ảnh, không trạng thái tải/lỗi, không focus ring, và bề ngang panel nhảy 1120→880→760→600 qua từng bước.
+Luồng ride đã được nâng qua `ride-flow-design.md`; tài liệu này giữ các bước funnel food ổn định và bổ sung lớp giao diện cùng dữ liệu vị trí thật. Sáu màn food có bố cục wide, nhưng vẫn thuộc phạm vi mobile; bề ngang panel được giữ theo từng nhóm nội dung, không phải theo một cột desktop duy nhất.
 
 Đồng thời, dữ liệu thật mới đi được nửa đường: `GET /api/restaurants` đã trả quán ăn thật, nhưng màn menu gọi nó bằng `DEFAULT_PICKUP` hardcode, và `status`/`error` của hook bị vứt đi.
 
@@ -16,7 +16,7 @@ Luồng ride đã được nâng qua `ride-flow-design.md`; luồng food thì ch
 
 **Việc của tài liệu này:** nâng lớp giao diện lên ngang luồng ride và cắm nó vào dữ liệu vị trí thật, **giữ nguyên hợp đồng dữ liệu** để dữ liệu sinh trước và sau khi nâng cấp ghép được vào cùng một funnel.
 
-**Ngoài phạm vi:** luồng ride (không đổi), `screens.ts` (không đổi một dòng — thêm màn là đánh số lại `step_index` của cả luồng), authentication (`CLAUDE.md` quy tắc 11).
+**Ngoài phạm vi:** thay đổi nghiệp vụ riêng của luồng ride, `screens.ts` (không đổi một dòng — thêm màn là đánh số lại `step_index` của cả luồng), authentication (`CLAUDE.md` quy tắc 11). Quy tắc shell/responsive chung và lựa chọn `/` áp dụng cho toàn bộ màn food.
 
 ---
 
@@ -33,6 +33,8 @@ Luồng ride đã được nâng qua `ride-flow-design.md`; luồng food thì ch
 | 5 — Chọn ưu đãi | `food_offer_selection` | `/food/offer` | 5 |
 | 6 — Xác nhận đơn | `food_confirm` | `/food/confirm` | 6 |
 | 7 — Đặt thành công | `food_success` | `/food/success` | 7 |
+
+**Direct URL vào `/food` vẫn giữ funnel đúng.** Trước `screen_view` của `food_menu`, app bắn `select_flow` với `step_index: 0` và properties `{ flow_chosen: "food", entry_source: "direct_url" }`; không thêm `EventName` mới. Lần chọn `Đặt đồ ăn` từ chooser `/` dùng cùng event nhưng không có `entry_source`.
 
 **Việc đổi địa chỉ giao KHÔNG được thành một route mới.** Thêm một màn là đánh số lại toàn bộ `step_index` của luồng food và làm dữ liệu cũ không ghép được với dữ liệu mới. Thay vào đó dùng **Pattern J** của `/ride/pickup` — hoán đổi thân panel ngay tại `food_menu` giữa nội dung menu và `<PlacePicker>`, kèm nút "Huỷ". Người dùng thấy một bước; funnel không thấy gì cả.
 
@@ -55,7 +57,7 @@ Mọi event còn lại giữ nguyên tên và nguyên khoá, kể cả sự bấ
 
 Class viết theo bảng ánh xạ ở `tailwind-theme.md` §4. Không giá trị nào nằm ngoài token (`CLAUDE.md` quy tắc 4).
 
-**Bố cục:** `screen-map.md` §6 chốt **cả sáu màn food đều là `variant="wide"`**. Muốn có bản đồ thì dùng `<MapCanvas fill={false} />` (chế độ `aspect-[4/3]`) **bên trong** panel, không đổi sang `split`.
+**Bố cục:** `screen-map.md` §6 chốt **cả sáu màn food đều là `variant="wide"`**. Muốn có bản đồ thì dùng `<MapCanvas fill={false} />` (chế độ `aspect-[4/3]`) **bên trong** panel, không đổi sang `split`. Mọi màn food vẫn nằm trong phạm vi mobile: dưới 1120px dùng `TopBar` hai hàng và gutter ngang 16px; `split` không liên quan đến food.
 
 **Bề ngang thống nhất:** `/food` giữ `max-w-[1120px]` vì lưới món cần chỗ; **năm màn còn lại dùng `max-w-[760px]`**. Hiện panel co giãn thấy rõ khi đi qua funnel — đó là dấu hiệu wireframe rõ nhất còn lại.
 
@@ -63,7 +65,7 @@ Class viết theo bảng ánh xạ ở `tailwind-theme.md` §4. Không giá tr�
 
 | Khối | Thành phần | Class | Event |
 |---|---|---|---|
-| Header | `BackButton` + "Đặt đồ ăn" | `nav-bar` | `back` → `home` |
+| Header | `BackButton` + "Đặt đồ ăn" | `nav-bar` | `back` → `home` (về chooser) |
 | Giao tới | nhãn + địa chỉ + pill "Đổi" | `t-caption text-mute` / `t-body-md-strong` / `bg-canvas text-primary-dark rounded-pill` | `change_address` khi chốt |
 | Ô tìm | `Icon search` + input + nút xoá | `bg-canvas-soft rounded-md p-lg` | `search_item` (debounce 600ms) |
 | Gợi ý bữa | 3 chip, chip trùng giờ có "· bây giờ" | `category-button` | `select_meal` |
@@ -193,7 +195,7 @@ Nguyên tắc `ride-flow-design.md` §8: *một nút bấm được mà không b
 - ETA và mã đơn ở `food_confirm` / `food_success`.
 - `UserMenu` (`CLAUDE.md` quy tắc 11).
 
-Ngoại lệ có chủ đích: cặp tab luồng thêm vào `TopBar` cho màn hẹp **có** bắn `select_flow` qua `trackSelectFlow`, và chỉ bấm được trên 3 route entry — đúng bảng `FLOW_ENTRY` của `SideRail`.
+Điều hướng không phải component trang trí: sau khi chọn, desktop dùng `SideRail`; mobile dùng `TopBar` hai hàng với control `Đặt xe` / `Đặt đồ ăn` chiếm toàn bộ chiều ngang và menu `More` cho `/history`, `/account`, `/support`, `/terms`. Ở `/food` (entry) hoặc màn ngoài funnel, luồng còn lại có thể đổi và bắn `select_flow`; từ `/food/item/...` trở đi control đổi luồng bị disabled. `/` là chooser shell-free với đúng hai lựa chọn, không phải một tab luồng. Chuyển qua lại các vị trí được phép không xoá draft food.
 
 ---
 
@@ -217,6 +219,7 @@ curl -s "localhost:3000/api/events?session_id=<id>" | jq '.[] | {event_name, scr
 Phải đúng:
 - **6 `screen_view`**, không hơn (Strict Mode nhân đôi là bẫy đã biết).
 - `step_index`: `food_menu` 1 · `food_item_detail` 2 · `add_to_cart` 3 · `food_cart` 4 · `food_offer_selection` 5 · `food_confirm` 6 · `food_success` 7.
+- Mở trực tiếp `/food` phải thấy `select_flow` step 0 với `entry_source: "direct_url"` trước `screen_view` entry.
 - Đúng **một** `select_offer` mỗi phiên.
 - `place_order` đủ 6 khoá.
 
@@ -227,4 +230,4 @@ grep -rn "trackEvent(\|useScreenView(" app/history         # rỗng
 grep -n "OpenStreetMap" components/MapCanvas.tsx          # còn dòng ghi công
 ```
 
-Kiểm tra bằng mắt: tắt `lib/server` → `/food` vẫn dùng được, dải "Gần bạn" hiện lỗi kèm nút thử lại chứ không biến mất · từ chối quyền vị trí → lui về `DEFAULT_PICKUP` kèm caption · thu nhỏ xuống 375px → vẫn đổi được luồng · đi bằng phím Tab qua từng màn → mọi control đều thấy focus ring.
+Kiểm tra bằng mắt: tắt `lib/server` → `/food` vẫn dùng được, dải "Gần bạn" hiện lỗi kèm nút thử lại chứ không biến mất · từ chối quyền vị trí → lui về `DEFAULT_PICKUP` kèm caption · thu nhỏ xuống 375px → mọi màn food dùng `TopBar` hai hàng, gutter 16px; ở `/food` vẫn đổi được luồng, còn từ `/food/item/...` trở đi control đổi luồng disabled, `More` mở được bốn route ngoài funnel · đi bằng phím Tab qua từng màn → mọi control đều thấy focus ring và vùng chạm 44-48px.
