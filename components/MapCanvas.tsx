@@ -457,7 +457,7 @@ export function MapCanvas({
           phan biet duoc voi "ban do dang tai" hay "loi bo cuc". */}
       {tilesDead ? (
         <div className="absolute inset-0 grid place-items-center px-lg">
-          <p className="t-body-sm max-w-[280px] text-center text-body">
+          <p className="t-body-sm max-w-[280px] min-w-0 break-words text-center text-body">
             Không tải được nền bản đồ. Ghim và tuyến đường vẫn đúng vị trí.
           </p>
         </div>
@@ -516,7 +516,7 @@ export function MapCanvas({
           type="button"
           aria-label="Phóng to"
           onClick={() => setZoomOffset((v) => Math.min(v + 1, 4))}
-          className="grid size-9 place-items-center border-b border-surface-pressed hover:bg-canvas-soft"
+          className="grid size-11 place-items-center border-b border-surface-pressed hover:bg-canvas-soft"
         >
           <Icon name="plus" size={18} />
         </button>
@@ -524,7 +524,7 @@ export function MapCanvas({
           type="button"
           aria-label="Thu nhỏ"
           onClick={() => setZoomOffset((v) => Math.max(v - 1, -4))}
-          className="grid size-9 place-items-center hover:bg-canvas-soft"
+          className="grid size-11 place-items-center hover:bg-canvas-soft"
         >
           <Icon name="minus" size={18} />
         </button>
@@ -537,26 +537,30 @@ export function MapCanvas({
           setZoomOffset(0);
           setPan({ x: 0, y: 0 });
         }}
-        className="shadow-level-2 absolute right-lg bottom-lg grid size-11 place-items-center rounded-full bg-canvas text-ink hover:bg-canvas-soft"
+        className="shadow-level-2 absolute right-lg bottom-3xl grid size-11 place-items-center rounded-full bg-canvas text-ink hover:bg-canvas-soft sm:bottom-lg"
       >
         <Icon name="target" size={20} />
       </button>
 
-      {label ? (
-        <div className="t-body-sm-strong shadow-level-2 absolute top-lg left-1/2 flex max-w-[70%] -translate-x-1/2 items-center gap-sm rounded-pill bg-canvas px-lg py-sm text-ink">
-          <span className="truncate">{label}</span>
-        </div>
-      ) : null}
+      {label || route ? (
+        <div className="pointer-events-none absolute top-3xl left-16 right-lg z-10 flex min-w-0 flex-col items-center gap-sm sm:top-lg sm:right-0 sm:left-0 sm:block">
+          {label ? (
+            <div className="t-body-sm-strong shadow-level-2 flex w-full min-w-0 max-w-full items-center gap-sm rounded-pill bg-canvas px-lg py-sm text-ink sm:absolute sm:left-1/2 sm:top-0 sm:w-auto sm:max-w-[70%] sm:-translate-x-1/2">
+              <span className="min-w-0 truncate">{label}</span>
+            </div>
+          ) : null}
 
-      {route ? (
-        <div className="shadow-level-2 absolute right-lg top-lg rounded-pill bg-canvas px-lg py-sm text-ink">
-          <span className="t-body-sm-strong">
-            {route.durationMin} phút • {route.distanceKm} km
-          </span>
-          {route.source === 'straight' ? (
-            // Noi that voi nguoi dung khi con so la duong chim bay — cung thong
-            // tin ma `route_source` ghi vao event.
-            <span className="t-caption block text-mute">ước lượng — đường chim bay</span>
+          {route ? (
+            <div className="shadow-level-2 flex w-full min-w-0 max-w-full flex-col rounded-pill bg-canvas px-lg py-sm text-ink sm:absolute sm:right-lg sm:top-0 sm:w-auto">
+              <span className="t-body-sm-strong min-w-0 truncate">
+                {route.durationMin} phút • {route.distanceKm} km
+              </span>
+              {route.source === 'straight' ? (
+                // Noi that voi nguoi dung khi con so la duong chim bay — cung thong
+                // tin ma `route_source` ghi vao event.
+                <span className="t-caption block truncate text-mute">ước lượng — đường chim bay</span>
+              ) : null}
+            </div>
           ) : null}
         </div>
       ) : null}

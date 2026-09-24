@@ -52,14 +52,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       <div
         role="status"
         aria-live="polite"
-        className="pointer-events-none fixed inset-x-0 bottom-3xl z-50 flex justify-center px-lg"
+        className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex w-full justify-center px-lg pb-[max(var(--spacing-3xl),env(safe-area-inset-bottom,0px))]"
       >
         {message ? (
-          <div className="shadow-level-2 flex items-center gap-md rounded-pill bg-ink px-2xl py-md text-on-dark">
+          <div className="shadow-level-2 flex min-w-0 max-w-[calc(100vw-var(--spacing-3xl))] items-center gap-md rounded-pill bg-ink px-2xl py-md text-on-dark">
             <span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary-dark">
               <Icon name="check" size={14} />
             </span>
-            <span className="t-body-sm-strong">{message}</span>
+            <span className="t-body-sm-strong min-w-0 break-words">{message}</span>
           </div>
         ) : null}
       </div>

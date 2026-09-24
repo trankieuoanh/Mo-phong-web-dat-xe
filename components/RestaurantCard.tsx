@@ -49,15 +49,15 @@ export function RestaurantCard({
 
   const shape =
     variant === 'strip'
-      ? 'w-[240px] shrink-0 snap-start flex-col'
-      : 'w-full flex-row items-center';
+      ? 'w-[calc(100vw-4rem)] max-w-[240px] shrink-0 snap-start flex-col sm:w-[240px]'
+      : 'w-full min-w-0 flex-row items-center';
 
   return (
     <button
       type="button"
       onClick={onSelect}
       aria-pressed={selected}
-      className={`flex gap-lg rounded-xl bg-canvas-soft p-lg text-left text-ink transition-colors hover:bg-surface-pressed active:bg-surface-pressed ${shape} ${
+      className={`flex min-w-0 gap-lg rounded-xl bg-canvas-soft p-lg text-left text-ink transition-colors hover:bg-surface-pressed active:bg-surface-pressed ${shape} ${
         selected ? 'ring-2 ring-primary' : ''
       }`}
     >

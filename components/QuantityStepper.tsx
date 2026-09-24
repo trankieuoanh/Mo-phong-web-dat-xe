@@ -33,7 +33,7 @@ export function QuantityStepper({
   label,
 }: QuantityStepperProps) {
   return (
-    <div className="flex items-center gap-md">
+    <div className="flex shrink-0 items-center gap-md">
       <Button
         icon="minus"
         ariaLabel={`Giảm số lượng ${label}`}
@@ -42,7 +42,7 @@ export function QuantityStepper({
       />
       {/* aria-live: so luong doi ma khong co dieu huong nao, nen neu khong bao
           thi nguoi dung trinh doc man hinh bam nut xong khong biet ket qua. */}
-      <span className="t-body-md-strong w-6 text-center" aria-live="polite">
+      <span className="t-body-md-strong w-6 shrink-0 text-center" aria-live="polite">
         {quantity}
       </span>
       <Button
@@ -72,7 +72,7 @@ function Button({
       aria-label={ariaLabel}
       disabled={disabled}
       onClick={onClick}
-      className="grid size-9 place-items-center rounded-full bg-canvas-soft text-ink transition-colors enabled:hover:bg-surface-pressed enabled:active:bg-surface-pressed disabled:cursor-not-allowed disabled:opacity-50"
+      className="grid size-11 shrink-0 place-items-center rounded-full bg-canvas-soft text-ink transition-colors enabled:hover:bg-surface-pressed enabled:active:bg-surface-pressed disabled:cursor-not-allowed disabled:opacity-50"
     >
       <Icon name={icon} size={18} />
     </button>

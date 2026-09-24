@@ -5,6 +5,8 @@
  * KHONG tu sinh gia tri mau/spacing/radius moi — xem CLAUDE.md quy tac 4.
  */
 @theme {
+  --breakpoint-desktop: 70rem;
+
   /* ── colors ── */
   --color-primary: #00b4b8;
   --color-primary-dark: #048589;

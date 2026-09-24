@@ -189,17 +189,34 @@ def completed_sessions(df: pd.DataFrame, flow: str) -> set[str]:
     return set(flow_df.loc[flow_df["event_name"] == COMPLETION_EVENT[flow], "session_id"])
 
 
+def is_flow_switch(row: pd.Series) -> bool:
+    if row["event_name"] != "select_flow" or row["screen_name"] == "home":
+        return False
+    entry_source = row.get("prop_entry_source")
+    if pd.isna(entry_source) and isinstance(row.get("properties"), dict):
+        entry_source = row["properties"].get("entry_source")
+    return pd.isna(entry_source) or entry_source != "direct_url"
+
+
+def flow_switch_sessions(df: pd.DataFrame, flow: str) -> set[str]:
+    rows = df[(df["flow"] == flow) & (df["event_name"] == "select_flow")]
+    if rows.empty:
+        return set()
+    return set(rows.loc[rows.apply(is_flow_switch, axis=1), "session_id"])
+
+
 def completion_rate(df: pd.DataFrame, flow: str) -> tuple[int, int, float]:
     """Mau so = moi session CO CHAM toi luong nay, ke ca cham mot cai roi ra.
 
-    Tu khi sidebar thanh tab, doi luong chi ton mot click, nen mot phien ride
-    ghe tab "Dat do an" mot cai van nam trong mau so cua food va tinh la bo do.
-    Muon loai chung ra thi loc session co `select_flow` voi `screen_name` khac
-    'home' — do chinh la dau hieu nhay luong (analysis-spec.md Nhom 2).
+    Session co `select_flow` o man khac `home` la flow switch cu, tru truong hop
+    `prop_entry_source == 'direct_url'`. Event cu khong co property nay dung
+    quy tac man hinh cu; entry truc tiep van la step 0 hop le.
     """
     flow_df = df[df["flow"] == flow]
+    switch_sessions = flow_switch_sessions(df, flow)
+    flow_df = flow_df[~flow_df["session_id"].isin(switch_sessions)]
     total = flow_df["session_id"].nunique()
-    done = len(completed_sessions(df, flow))
+    done = len(completed_sessions(flow_df, flow))
     return done, total, (done / total if total else 0.0)
 
 
