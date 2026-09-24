@@ -13,7 +13,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { DEFAULT_PICKUP, isPickupChanged, type LatLon, type Place } from '@gsm/shared';
+import { DEFAULT_PICKUP, isPickupChanged, type LatLon, type Place } from '@/lib/shared';
 import { reversePlace } from '@/lib/reverse-place';
 import { BackButton } from '@/components/BackButton';
 import { FlowGuard } from '@/components/FlowGuard';

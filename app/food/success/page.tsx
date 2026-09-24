@@ -7,7 +7,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { calcFoodTotals, getFoodItem, getOffer } from '@gsm/shared';
+import { calcFoodTotals, getFoodItem, getOffer } from '@/lib/shared';
 import { Icon } from '@/components/Icon';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { ScreenShell } from '@/components/ScreenShell';

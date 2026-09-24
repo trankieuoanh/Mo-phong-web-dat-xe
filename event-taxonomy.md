@@ -54,7 +54,7 @@ Không có event riêng. Một session được coi là bỏ dở khi **không t
 
 ## 2. Bảng màn hình
 
-Bảng này được mã hoá **một lần duy nhất** thành `SCREENS` trong `packages/shared/src/screens.ts`. `trackEvent` tra bảng đó — không page nào gõ tay `step_index`.
+Bảng này được mã hoá **một lần duy nhất** thành `SCREENS` trong `lib/shared/screens.ts`. `trackEvent` tra bảng đó — không page nào gõ tay `step_index`.
 
 | Luồng | `screen_name` | Route | `step_index` |
 |---|---|---|---|
@@ -250,7 +250,7 @@ Bảng này được mã hoá **một lần duy nhất** thành `SCREENS` trong 
 > **`cuisine` là mảng tag THẬT của OpenStreetMap, ghi nguyên văn** — `["vietnamese"]`,
 > `["thịt_nướng","grill","yakiniku","barbecue"]`, hoặc **`[]`**. Ghi nguyên văn chứ
 > không quy đổi sẵn về nhãn của app: bảng quy đổi (`CUISINE_ALIASES` trong
-> `packages/shared/src/food.ts`) là thứ sẽ còn sửa, còn tag thô thì không đổi —
+> `lib/shared/food.ts`) là thứ sẽ còn sửa, còn tag thô thì không đổi —
 > lưu tag thô nên dữ liệu cũ vẫn đọc lại được sau mỗi lần ta sửa bảng.
 >
 > **`cuisine == []` là một con số đáng đo, không phải lỗi.** Trong mẫu 120 quán
@@ -351,7 +351,7 @@ select_item, change_quantity, add_to_cart,
 remove_from_cart, proceed_to_offer, select_offer, skip_offer, place_order
 ```
 
-Khai báo trong `packages/shared/src/types.ts`: union type `EventName` (để TypeScript bắt lỗi gõ sai) **và** mảng `EVENT_NAMES` (để validator ở `apps/api` kiểm tra lúc chạy). Hai thứ này được một type assertion buộc phải khớp nhau — thêm giá trị vào union mà quên thêm vào mảng sẽ lỗi build, nếu không validator sẽ lặng lẽ từ chối một event hoàn toàn hợp lệ.
+Khai báo trong `lib/shared/types.ts`: union type `EventName` (để TypeScript bắt lỗi gõ sai) **và** mảng `EVENT_NAMES` (để validator ở `lib/server` kiểm tra lúc chạy). Hai thứ này được một type assertion buộc phải khớp nhau — thêm giá trị vào union mà quên thêm vào mảng sẽ lỗi build, nếu không validator sẽ lặng lẽ từ chối một event hoàn toàn hợp lệ.
 
 ---
 
@@ -361,5 +361,5 @@ Schema hiện tại có **9 field top-level** (`session_id`, `user_id`, `flow`, 
 
 1. Field dùng để **lọc/sắp xếp thường xuyên** → thêm vào top-level document.
 2. Field **đặc thù theo loại event** → thêm vào `properties`.
-3. Cập nhật bảng ở mục 3–4 của file này, rồi `packages/shared/src/types.ts` (union `EventName` + mảng `EVENT_NAMES`, và `EventPayload` nếu là field top-level), `packages/shared/src/screens.ts` nếu là màn mới, và `apps/api/src/validators/event.validator.ts` nếu cần luật kiểm tra riêng.
+3. Cập nhật bảng ở mục 3–4 của file này, rồi `lib/shared/types.ts` (union `EventName` + mảng `EVENT_NAMES`, và `EventPayload` nếu là field top-level), `lib/shared/screens.ts` nếu là màn mới, và `lib/server/validators/event.validator.ts` nếu cần luật kiểm tra riêng.
 4. Firestore **không cần migrate** — document cũ thiếu field mới vẫn đọc được, script pandas xử lý bằng `.fillna()`.

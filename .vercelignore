@@ -11,20 +11,17 @@ scripts/
 
 # Anh chup web Green SM that, dung de THAM CHIEU khi dung UI.
 # Khong phai asset cua app: khong page nao import chung.
-apps/web/sample_ui/
+sample_ui/
 
 # Ket qua build cua may local — Vercel tu build lai
 .next/
-apps/web/.next/
-apps/web/out/
+out/
 node_modules/
 
 # Bi mat. .gitignore da chan roi, chan them o day vi `vercel deploy` doc
 # thu muc that chu khong doc git index.
 .env
 .env*.local
-apps/api/.env
-apps/web/.env.local
 serviceAccount*.json
 *.json.key
 

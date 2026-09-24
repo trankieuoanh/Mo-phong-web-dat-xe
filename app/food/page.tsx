@@ -44,7 +44,7 @@ import {
   type Meal,
   type Place,
   type Restaurant,
-} from '@gsm/shared';
+} from '@/lib/shared';
 import { BackButton } from '@/components/BackButton';
 import { EmptyState } from '@/components/EmptyState';
 import { FoodThumb } from '@/components/FoodThumb';

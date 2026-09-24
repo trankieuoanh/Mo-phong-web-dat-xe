@@ -16,7 +16,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { DEFAULT_PICKUP, type LatLon, type Place } from '@gsm/shared';
+import { DEFAULT_PICKUP, type LatLon, type Place } from '@/lib/shared';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { reversePlace } from '@/lib/reverse-place';
 import { BackButton } from '@/components/BackButton';

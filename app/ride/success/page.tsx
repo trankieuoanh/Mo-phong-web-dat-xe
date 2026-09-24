@@ -11,7 +11,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { DEFAULT_PICKUP, calcFare, calcRideTotals, getPromo, getVehicle } from '@gsm/shared';
+import { DEFAULT_PICKUP, calcFare, calcRideTotals, getPromo, getVehicle } from '@/lib/shared';
 import { Icon } from '@/components/Icon';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { ScreenShell } from '@/components/ScreenShell';

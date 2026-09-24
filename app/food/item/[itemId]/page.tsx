@@ -11,7 +11,7 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { CUISINE_LABELS, calcFoodTotals, getFoodItem } from '@gsm/shared';
+import { CUISINE_LABELS, calcFoodTotals, getFoodItem } from '@/lib/shared';
 import { BackButton } from '@/components/BackButton';
 import { FlowGuard } from '@/components/FlowGuard';
 import { FoodThumb } from '@/components/FoodThumb';

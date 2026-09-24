@@ -2,15 +2,14 @@
 node_modules/
 
 # Next.js
-apps/web/.next/
-apps/web/out/
-apps/web/next-env.d.ts
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
 
 # bien moi truong - KHONG BAO GIO commit
 .env
 .env*.local
-apps/api/.env
-apps/web/.env.local
 
 # service account key Firebase - KHONG BAO GIO commit
 serviceAccount*.json

@@ -4,7 +4,7 @@ Kế hoạch 6 tuần. Mỗi tuần có **Definition of Done kiểm chứng đư
 
 | Tuần | Trọng tâm | Definition of Done |
 |---|---|---|
-| **1** | Phase 0 + nền UI | `npm run dev` lên cả 2 process; `curl localhost:4000/api/health` **và** `curl localhost:3000/api/health` đều trả `{"status":"ok"}`; màn Home render panel đặt xe + bản đồ đúng token |
+| **1** | Phase 0 + nền UI | `npm run dev` lên; `curl localhost:3000/api/health` trả `{"status":"ok"}`; màn Home render panel đặt xe + bản đồ đúng token |
 | **2** | Firestore + luồng Ride | Click hết 5 bước ride → mở Firebase console thấy đủ document, `step_index` 0→6 đúng `event-taxonomy.md` |
 | **3** | Luồng Food + giỏ hàng | Thêm/xoá/sửa số lượng, đặt đơn xong → `place_order` có `final_total` khớp với số hiển thị trên màn |
 | **4** | `GET /api/events` + hoàn thiện UI | `curl "localhost:3000/api/events?session_id=..."` trả đúng thứ tự bước; app dùng tốt ở khổ 390px |
@@ -15,17 +15,17 @@ Kế hoạch 6 tuần. Mỗi tuần có **Definition of Done kiểm chứng đư
 
 ## Tuần 1 — Nền
 
-**Khung monorepo đã dựng sẵn** (`apps/web`, `apps/api`, `packages/shared`, `analysis`), gồm cả `globals.css` với `@theme` + typography, `types.ts`, `screens.ts`, `mock-data.ts`, `pricing.ts`, `/api/health`, và 13 page stub đã nối đúng tracking. Việc còn lại của tuần 1:
+**Khung đã dựng sẵn** (`app/`, `components/`, `lib/shared/`, `lib/server/`, `analysis/`), gồm cả `globals.css` với `@theme` + typography, `types.ts`, `screens.ts`, `mock-data.ts`, `pricing.ts`, `/api/health`, và 13 page stub đã nối đúng tracking. Việc còn lại của tuần 1:
 
 1. `npm install && npm run dev` — kiểm tra theo `setup.md` Phase 0.
 2. Hoàn thiện giao diện màn Home theo `DESIGN.md`.
-3. Rà `packages/shared/src/mock-data.ts` xem đã khớp `mock-data.md` chưa.
+3. Rà `lib/shared/mock-data.ts` xem đã khớp `mock-data.md` chưa.
 
 > **Chốt `event-taxonomy.md` với mentor trong tuần này.** Sửa taxonomy sau khi đã sinh dữ liệu đồng nghĩa với vứt dữ liệu cũ. Nhớ hỏi mentor về `flow: "none"` ở màn Home (mục 1 của taxonomy).
 
 ## Tuần 2 — Firestore + Ride
 
-1. Firebase project + `apps/api/.env` (theo `setup.md` Phase 1).
+1. Firebase project + `.env.local` (theo `setup.md` Phase 1).
 2. Kiểm tra `POST /api/events` ghi được document thật.
 3. Hoàn thiện UI 6 màn luồng ride — **phần tracking đã nối sẵn, không sửa khi làm UI**.
 4. Kiểm tra guard: mở thẳng `/ride/confirm` ở tab mới phải bị đá về `/ride/address` và không sinh event nào.
@@ -35,7 +35,7 @@ Kế hoạch 6 tuần. Mỗi tuần có **Definition of Done kiểm chứng đư
 ## Tuần 3 — Food
 
 1. Hoàn thiện UI 6 màn luồng food, kể cả `/food/item/[itemId]`.
-2. Kiểm tra `calcDiscount` trong `packages/shared/src/pricing.ts` cho đủ 3 offer, nhất là `offer-freeship`.
+2. Kiểm tra `calcDiscount` trong `lib/shared/pricing.ts` cho đủ 3 offer, nhất là `offer-freeship`.
 3. Hai màn success — xác nhận session được reset (mở DevTools xem `gsm_session_id` đổi).
 
 ## Tuần 4 — Đọc dữ liệu + hoàn thiện

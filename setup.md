@@ -25,7 +25,7 @@ Mở **http://localhost:3000** → thấy màn Home: panel đặt xe bên trái,
 >
 > Nói cách khác: từ lúc clone tới lúc thấy app chạy là **2 lệnh**, không phải cả quy trình Firebase.
 
-Luôn vào cổng **3000**. Cổng 4000 là BE, Next.js tự proxy `/api/*` sang đó — đừng mở thẳng 4000 bằng trình duyệt.
+Luôn vào cổng **3000**. `/api/*` là route handler của chính app này — một process, không có cổng thứ hai.
 
 ### ⚠️ Đừng trộn WSL và Windows trên cùng một thư mục
 
@@ -45,41 +45,39 @@ Cần đổi môi trường thì xoá và cài lại:
 
 ```bash
 # WSL / macOS
-rm -rf node_modules apps/*/node_modules packages/*/node_modules && npm install
+rm -rf node_modules .next && npm install
 ```
 ```powershell
 # Windows PowerShell — `rmdir /s /q` là lệnh của cmd.exe, không chạy ở đây
-Remove-Item -Recurse -Force node_modules, apps\*\node_modules, packages\*\node_modules -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force node_modules, .next -ErrorAction SilentlyContinue
 npm install
 ```
 
 ---
 
-## Phase 0 — Monorepo chạy được, chưa có Firebase
+## Phase 0 — App chạy được, chưa có Firebase
 
 Khung đã có sẵn trong repo. Chỉ cần:
 
 ```bash
-npm install     # ở thư mục GỐC — npm workspaces cài cho cả 3 workspace
-npm run dev     # chạy song song apps/api (:4000) + apps/web (:3000)
+npm install     # ở thư mục GỐC
+npm run dev     # MỘT process: giao diện + /api/* cùng ở :3000
 ```
 
-Kiểm tra **theo đúng thứ tự này** — hai lệnh, không phải một:
+Kiểm tra:
 
 ```bash
 # WSL / macOS
-curl localhost:4000/api/health      # 1. BE sống      → {"status":"ok"}
-curl localhost:3000/api/health      # 2. proxy thông  → {"status":"ok"}
+curl localhost:3000/api/health      # → {"status":"ok"}
 ```
 ```powershell
 # Windows PowerShell — xem mục "Lệnh tương đương trên Windows" bên dưới
-curl.exe localhost:4000/api/health
 curl.exe localhost:3000/api/health
 ```
 
-Route `/api/health` **không chạm Firestore** (xem `api-endpoints.md`), nên nó xác nhận Express chạy đúng trước khi credential vào cuộc. Đừng bỏ qua — nếu bỏ, lỗi Firebase và lỗi Express sẽ trộn vào nhau và rất khó tách.
+Route `/api/health` **không chạm Firestore** và không import gì từ `lib/server/db` (xem `api-endpoints.md`), nên nó xác nhận app chạy đúng trước khi credential vào cuộc. Đừng bỏ qua — nếu bỏ, lỗi Firebase và lỗi khởi động sẽ trộn vào nhau và rất khó tách.
 
-**Bước 2 hỏng mà bước 1 chạy** → sai `rewrites` trong `apps/web/next.config.ts`, không phải sai Express. Hai lỗi này trông giống hệt nhau từ phía trình duyệt nên phải tách bằng hai lệnh curl.
+> Bản trước tách làm hai process và mục này từng bắt chạy **hai** lệnh curl (`:4000` rồi `:3000`) để tách lỗi Express khỏi lỗi proxy. Giờ không còn proxy nên chỉ còn một lệnh.
 
 Mở `http://localhost:3000` → thấy màn Home: panel đặt xe bên trái, bản đồ bên phải, tab "Đặt xe" sáng ở sidebar.
 
@@ -90,7 +88,7 @@ Mở `http://localhost:3000` → thấy màn Home: panel đặt xe bên trái, b
 1. [console.firebase.google.com](https://console.firebase.google.com) → **Add project** → đặt tên (ví dụ `gsm-simulation`) → tắt Google Analytics (không cần).
 2. **Build → Firestore Database → Create database** → chọn **Production mode** → region `asia-southeast1` (Singapore, gần Việt Nam nhất).
 3. **Project settings → Service accounts → Generate new private key** → tải file JSON về.
-4. Mở file JSON, lấy 3 giá trị `project_id`, `client_email`, `private_key` đưa vào **`apps/api/.env`** (copy từ `apps/api/.env.example`).
+4. Mở file JSON, lấy 3 giá trị `project_id`, `client_email`, `private_key` đưa vào **`.env.local`** ở gốc repo (copy từ `.env.example`).
 
 > **Không lưu file JSON trong repo**, kể cả ngoài thư mục `app/`. Chỉ copy 3 giá trị vào biến môi trường.
 
@@ -110,33 +108,27 @@ service cloud.firestore {
 
 ## Biến môi trường
 
-Khi **chạy local**, chỉ `apps/api` cần biến môi trường. `apps/web` không có biến nào bí mật — nó không biết Firebase tồn tại. (Lúc **deploy** thì `apps/web` có thêm hai biến, cả hai đều là biến server-side, không bí mật theo nghĩa Firebase — xem mục "Deploy" bên dưới.)
-
-`apps/api/.env` (đã có trong `.gitignore` — kiểm tra lại cho chắc):
+**Chỉ còn bốn biến, tất cả ở một file duy nhất.** `.env.local` ở gốc repo (đã có trong `.gitignore` — kiểm tra lại cho chắc):
 
 ```bash
 FIREBASE_PROJECT_ID=gsm-simulation
 FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@gsm-simulation.iam.gserviceaccount.com
 FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIEv...\n-----END PRIVATE KEY-----\n"
-PORT=4000
-WEB_ORIGIN=http://localhost:3000
 
-# Tuỳ chọn — địa chỉ liên hệ gắn vào User-Agent khi gọi Nominatim.
+# Tuỳ chọn — địa chỉ liên hệ gắn vào User-Agent khi gọi Photon/Overpass.
 # Có giá trị mặc định nên bỏ trống vẫn chạy được.
 NOMINATIM_CONTACT=ban@example.com
-
-# Tuỳ chọn — khoá chia sẻ cho /api/events. ĐỂ TRỐNG khi chạy local.
-# Trống = không kiểm tra gì. Chỉ đặt khi deploy công khai (xem mục "Deploy").
-EVENTS_WRITE_KEY=
 ```
 
-File `apps/api/.env.example` đã commit sẵn với giá trị trống, để người khác clone repo biết cần những biến gì.
+Next.js **tự nạp `.env.local`** cho cả `npm run dev` lẫn `npm run build` — không cần cờ, không cần `dotenv`. `scripts/seed-events.js` và `analysis/` cũng đọc đúng file này.
 
-**`WEB_ORIGIN` nhận nhiều origin**, phân tách bằng dấu phẩy. Chạy local thì một giá trị là đủ; khi deploy thì đặt domain thật **trước** `http://localhost:3000`. Thứ tự có ý nghĩa: `services/tiles.service.ts` lấy **phần tử đầu** làm `Referer` khi dò tile, và Stadia trả 401 hay 200 là tuỳ referer.
+File `.env.example` đã commit sẵn với giá trị trống, để người khác clone repo biết cần những biến gì.
 
-**`NOMINATIM_CONTACT`** phục vụ endpoint `GET /api/places` (tìm địa chỉ thật). [Điều khoản dùng Nominatim](https://operations.osmfoundation.org/policies/nominatim/) bắt buộc mỗi request mang `User-Agent` định danh ứng dụng kèm cách liên hệ; thiếu nó thì OSM có quyền chặn IP. Đây cũng là lý do endpoint này phải nằm ở `apps/api` chứ không gọi thẳng từ trình duyệt — **trình duyệt không cho JavaScript đặt header `User-Agent`**.
+> **Ba biến đã biến mất khi gộp một project**, ghi ra đây để không ai đi tìm: `PORT` (chỉ còn một process), `API_ORIGIN` (không còn proxy), và `WEB_ORIGIN` — phép dò tile giờ lấy origin từ **chính request** (`app/api/tiles/route.ts`), nên không còn biến nào để đặt sai. Bản trước đặt sai đúng biến đó chính là thứ đã làm bản đồ trả 401 trên bản deploy.
 
-Không cần API key: Nominatim miễn phí. Đổi lại nó giới hạn **1 request/giây**, nên hàng đợi và cache nằm ở `apps/api/src/services/upstream.ts`; xem `api-endpoints.md` mục 3b.
+**`NOMINATIM_CONTACT`** phục vụ endpoint `GET /api/places` (tìm địa chỉ thật). [Điều khoản dùng Nominatim](https://operations.osmfoundation.org/policies/nominatim/) bắt buộc mỗi request mang `User-Agent` định danh ứng dụng kèm cách liên hệ; thiếu nó thì OSM có quyền chặn IP. Đây cũng là lý do endpoint này phải nằm ở server chứ không gọi thẳng từ trình duyệt — **trình duyệt không cho JavaScript đặt header `User-Agent`**.
+
+Không cần API key: Nominatim miễn phí. Đổi lại nó giới hạn **1 request/giây**, nên hàng đợi và cache nằm ở `lib/server/services/upstream.ts`; xem `api-endpoints.md` mục 3b.
 
 ### Bốn dịch vụ ngoài mà app gọi
 
@@ -158,7 +150,7 @@ Cả bốn là **hạ tầng cộng đồng miễn phí**, chỉ hợp cho demo 
 > | `http://localhost:3000/` | 200, 495 B |
 > | `https://<app>.vercel.app/` | **401**, 14.885 B |
 >
-> Dự án **không đi đăng ký API key** để giải quyết chuyện này — cách xử lý là để phép dò `GET /api/tiles` tự loại Stadia ra ở môi trường deploy, rồi rơi về `osmfr`/`osmde` (đều không cần key). Điều kiện duy nhất: `WEB_ORIGIN` của BE phải có domain thật ở **vị trí đầu**, nếu không phép dò sẽ hỏi Stadia bằng referer localhost và kết luận sai. Xem mục "Deploy".
+> Dự án **không đi đăng ký API key** để giải quyết chuyện này — cách xử lý là để phép dò `GET /api/tiles` tự loại Stadia ra ở môi trường deploy, rồi rơi về `osmfr`/`osmde` (đều không cần key). Và nó **tự làm đúng mà không cần cấu hình gì**: route handler lấy referer từ chính request của trình duyệt, nên local ra `["stadia","osmfr","osmde"]` còn bản deploy ra `["osmfr","osmde"]`.
 
 > ## ⚠️ `*.openstreetmap.org` có thể bị chặn — và đó là lỗi khó đoán nhất của dự án này
 >
@@ -182,22 +174,20 @@ Không có mạng thì app **vẫn chạy hết luồng**: chỉ mất bản đ�
 
 **Ba lỗi kinh điển với `FIREBASE_PRIVATE_KEY`:**
 1. Phải **có dấu nháy kép** bao quanh — key chứa ký tự xuống dòng.
-2. Trong file `.env` ký tự xuống dòng nằm ở dạng literal `\n`, phải `.replace(/\\n/g, '\n')` khi đọc, nếu không sẽ lỗi `error:1E08010C:DECODER routines::unsupported`. Code trong `apps/api/src/db/firebase-admin.ts` đã xử lý sẵn.
-3. Không thêm `NEXT_PUBLIC_` vào bất kỳ biến nào ở trên — tiền tố đó nhúng giá trị thẳng vào bundle trình duyệt, tức là **công khai service account key**. (Ở `apps/api` thì tiền tố này vô nghĩa, nhưng đừng copy nhầm sang `apps/web`.)
-
-`tsx` tự đọc `apps/api/.env` qua cờ `--env-file-if-exists` trong script `dev` — không cần cài `dotenv`.
+2. Trong file `.env` ký tự xuống dòng nằm ở dạng literal `\n`, phải `.replace(/\\n/g, '\n')` khi đọc, nếu không sẽ lỗi `error:1E08010C:DECODER routines::unsupported`. Code trong `lib/server/db/firebase-admin.ts` đã xử lý sẵn.
+3. Không thêm `NEXT_PUBLIC_` vào bất kỳ biến nào ở trên — tiền tố đó nhúng giá trị thẳng vào bundle trình duyệt, tức là **công khai service account key**. Điều này **nguy hiểm hơn trước**: giờ `.env.local` là của chính project Next.js, tức đúng nơi tiền tố đó có hiệu lực thật.
 
 ---
 
 ## Khởi tạo Firebase Admin SDK
 
-Đã có sẵn ở `apps/api/src/db/firebase-admin.ts`. Ba chi tiết **bắt buộc**, đừng lược bỏ khi sửa:
+Đã có sẵn ở `lib/server/db/firebase-admin.ts`. Ba chi tiết **bắt buộc**, đừng lược bỏ khi sửa:
 
-- **`getApps()[0] ??`** — `tsx watch` chạy lại module nhiều lần trong cùng một tiến trình. Gọi `initializeApp()` thẳng sẽ ném `The default Firebase app already exists` ngay lần sửa file thứ hai.
+- **`getApps()[0] ??`** — hot-reload của `next dev` chạy lại module nhiều lần trong cùng một tiến trình. Gọi `initializeApp()` thẳng sẽ ném `The default Firebase app already exists` ngay lần sửa file thứ hai.
 - **`.replace(/\\n/g, '\n')`** — xem mục biến môi trường ở trên.
 - **Khởi tạo trễ (lazy)** — `getDb()` chỉ chạy `initializeApp` ở request đầu tiên thực sự cần Firestore. Nhờ vậy `GET /api/health` trả lời được ngay cả khi chưa có credential, đúng mục đích của route đó.
 
-Bản trước dùng `import 'server-only'` để chặn rò credential. Không còn cần nữa: `server-only` là package riêng của Next.js, mà `apps/api` không phải Next.js — và hàng rào giờ mạnh hơn, xem `CLAUDE.md` quy tắc 1.
+- **`import 'server-only'` ở dòng đầu** — đây là hàng rào chặn credential rò xuống trình duyệt. Kéo file này (hoặc bất kỳ service nào trong `lib/server/`) vào một Client Component là **build đỏ ngay**. Xem `CLAUDE.md` quy tắc 1; đừng gỡ dòng đó ra.
 
 ---
 
@@ -211,82 +201,50 @@ Query kết hợp nhiều điều kiện (ví dụ `where('flow')` + `where('cre
 
 Không bắt buộc — `techstack.md` đã chốt chạy local là đủ để demo. Mục này dành cho khi thực sự cần một link truy cập từ xa.
 
-**Phải deploy HAI nơi.** Đây là điều dễ quên nhất, và triệu chứng của việc quên rất dễ đọc nhầm thành lỗi giao diện: web lên được, trang mở được, nhưng ô tìm địa chỉ không ra gì và bản đồ trắng. Lý do là `apps/web` và `apps/api` là hai process riêng (xem `ARCHITECTURE.md`), nên deploy mỗi `apps/web` thì `rewrites` trong `next.config.ts` vẫn trỏ về `http://localhost:4000` — một địa chỉ không tồn tại trên máy chủ. Vercel trả `404 DNS_HOSTNAME_RESOLVED_PRIVATE` cho **mọi** `/api/*`, kể cả `POST /api/events`, và vì `lib/track.ts` cố tình nuốt lỗi (quy tắc "mất event còn hơn kẹt UI") nên **không một event nào được ghi mà app không hề báo gì**.
+**Một project = một nơi deploy.** Vercel tự nhận Next.js ở gốc repo, nên không cần `vercel.json`, không cần khai build command, và không có server thứ hai nào để quên.
 
-| | `apps/web` | `apps/api` |
-|---|---|---|
-| Nơi chạy | Vercel | **Render / Railway** |
-| Kiểu | build tĩnh + serverless | **một process Node chạy dài** |
-| Lệnh build | `npm run build` | không có |
-| Lệnh chạy | (Vercel tự lo) | `npm run start -w apps/api` |
-| Root directory | gốc repo | **gốc repo**, không phải `apps/api` |
+> **Bản trước phải deploy HAI nơi, và đó chính là thứ đã hỏng.** Deploy mỗi `apps/web` thì `rewrites` vẫn trỏ về `http://localhost:4000`, Vercel trả `404 DNS_HOSTNAME_RESOLVED_PRIVATE` cho **mọi** `/api/*` — bản đồ 401, ô tìm địa chỉ chết, và **không một event nào được ghi** mà app không báo gì (vì `lib/track.ts` cố ý nuốt lỗi). Gộp một project là cách sửa tận gốc chế độ hỏng đó. Xem `ARCHITECTURE.md`.
 
-**Vì sao `apps/api` phải là process chạy dài chứ không phải serverless.** `src/services/upstream.ts` là hàng đợi + cache **trong bộ nhớ của một tiến trình**: `minGapMs` giãn cách các lần gọi Photon/OSRM ra ≥ 600ms để không bị chặn IP. Nhiều instance serverless chạy song song làm hàng đợi đó thành vô nghĩa — mỗi instance tưởng mình là người duy nhất, và Photon/Overpass nhìn thấy một chùm request dồn dập từ cùng một nguồn. Cache cũng mất luôn, nên mỗi lần đổi màn là một lần gọi upstream thật.
+### Biến môi trường trên Vercel
 
-**Root directory phải là gốc repo** ở cả hai nơi: đây là npm workspaces, `npm install` phải chạy ở gốc thì `@gsm/shared` mới được symlink vào `node_modules`. Trỏ thẳng vào `apps/api` sẽ lỗi không tìm thấy package.
+Đúng bốn biến, y hệt `.env.local`:
 
-### Biến môi trường khi deploy
-
-Trên host của **`apps/api`**:
-
-| Biến | Giá trị | Ghi chú |
-|---|---|---|
-| `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL` | copy từ `.env` local | |
-| `FIREBASE_PRIVATE_KEY` | dán dạng có `\n` **literal** | `db/firebase-admin.ts` đã `.replace(/\\n/g, '\n')` |
-| `WEB_ORIGIN` | `https://<app>.vercel.app,http://localhost:3000` | **domain thật đứng đầu** — xem cảnh báo Stadia ở trên |
-| `NOMINATIM_CONTACT` | email liên hệ | điều khoản OSM |
-| `EVENTS_WRITE_KEY` | `openssl rand -hex 32` | xem mục dưới |
-| `PORT` | **đừng đặt** | Render tự đặt; `server.ts` đã đọc `process.env.PORT` |
-
-Trên **Vercel**:
-
-| Biến | Giá trị |
+| Biến | Ghi chú |
 |---|---|
-| `API_ORIGIN` | `https://<app>.onrender.com` |
-| `EVENTS_WRITE_KEY` | **giống hệt** giá trị bên `apps/api` |
+| `FIREBASE_PROJECT_ID` | copy từ `.env.local` |
+| `FIREBASE_CLIENT_EMAIL` | copy từ `.env.local` |
+| `FIREBASE_PRIVATE_KEY` | dán dạng có `\n` **literal** — `lib/server/db/firebase-admin.ts` đã `.replace(/\\n/g, '\n')` |
+| `NOMINATIM_CONTACT` | email liên hệ (điều khoản OSM) |
 
-Cả hai đều là biến server-side. **Tuyệt đối không thêm tiền tố `NEXT_PUBLIC_`** (quy tắc 2) — tiền tố đó nhúng giá trị vào bundle trình duyệt, và với `EVENTS_WRITE_KEY` thì làm vậy là phá huỷ đúng cái lý do khoá tồn tại.
+**Tuyệt đối không thêm tiền tố `NEXT_PUBLIC_`** (CLAUDE.md quy tắc 2) — tiền tố đó nhúng giá trị vào bundle trình duyệt, tức công khai service account key.
 
-`API_ORIGIN` được đọc **lúc build** (`next.config.ts` dòng đầu), nên đặt biến xong phải **redeploy** thì mới ăn.
-
-### Khoá cho `/api/events`
-
-Deploy công khai biến `POST /api/events` thành endpoint mở: ai cũng ghi document rác vào collection `events` được, và số liệu funnel hỏng theo. `EVENTS_WRITE_KEY` là hàng rào tối thiểu.
-
-Cách nó chạy: `apps/web/middleware.ts` bơm header `x-gsm-key` vào mọi `/api/*` **ở tầng máy chủ Vercel**, sau khi request đã rời khỏi máy người dùng; `apps/api/src/routes/events.routes.ts` kiểm tra header đó. Trình duyệt không bao giờ biết giá trị khoá — mở DevTools cũng không thấy, đọc bundle cũng không có.
-
-Không đặt biến = không kiểm tra gì. Đó là mặc định đúng cho máy mình, và là lý do chạy local không phải cấu hình thêm.
-
-Lệch giá trị giữa hai nơi thì mọi event bị trả 401 và `track.ts` nuốt lỗi — **hỏng im lặng**. Kiểm tra ngay sau khi deploy bằng lệnh ở mục dưới.
+Không có biến nào khác: không `PORT`, không `API_ORIGIN`, không `WEB_ORIGIN`.
 
 ### Kiểm tra sau khi deploy
 
 ```bash
 WEB=https://<app>.vercel.app
 
-curl -s -o /dev/null -w '%{http_code}\n' $WEB/api/health      # 200
-curl -s "$WEB/api/places?q=Ho%20Guom" | jq 'length'           # > 0
-curl -s $WEB/api/tiles                                        # {"providers":["osmfr","osmde"]}
-
-# Gọi THẲNG vào apps/api, không có khoá — phải bị chặn
-curl -s -o /dev/null -w '%{http_code}\n' -X POST \
-  https://<app>.onrender.com/api/events \
-  -H 'Content-Type: application/json' -d '{}'                 # 401
+curl -s -o /dev/null -w '%{http_code}\n' $WEB/api/health   # 200
+curl -s "$WEB/api/places?q=Ho%20Guom" | jq 'length'         # > 0
+curl -s $WEB/api/tiles                                      # {"providers":["osmfr","osmde"]}
 ```
 
-`/api/tiles` **không được còn `stadia` và `carto`**. Còn `stadia` nghĩa là `WEB_ORIGIN` sai thứ tự hoặc thiếu domain thật; còn `carto` nghĩa là CARTO đã mở lại raster miễn phí (chuyện tốt, không phải lỗi).
+`/api/tiles` **phải tự trả về danh sách không có `stadia`** mà không cần đặt biến nào — phép dò lấy referer từ chính request. Nếu vẫn thấy `stadia` thì mới có chuyện lạ. Còn `carto` nghĩa là CARTO đã mở lại raster miễn phí (chuyện tốt, không phải lỗi).
 
-Rồi đi hết một luồng trên web thật và đếm event như mục cuối `CLAUDE.md`. Nếu ra mảng rỗng thì gần như chắc chắn là `EVENTS_WRITE_KEY` lệch nhau giữa hai nơi.
+Rồi mở web, đi hết một luồng, và đếm event như mục cuối `CLAUDE.md`. Trong DevTools tab Network, lọc `tiles.` — **không được còn request nào tới `tiles.stadiamaps.com`**, và dòng `© OpenStreetMap` vẫn phải nằm ở góc bản đồ.
 
-### Gói free của Render ngủ sau 15 phút
+### Hai điều cần biết trước
 
-Request đầu tiên sau đó mất ~50 giây để đánh thức tiến trình. `lib/use-place-search.ts` đặt timeout 6 giây, nên **lần gõ địa chỉ đầu tiên sẽ báo lỗi tìm kiếm** — gõ lại là được. Biết trước điều này để lúc demo không tưởng là deploy hỏng. Muốn tránh hẳn thì mở web trước giờ demo một phút, hoặc trả phí.
+**`POST /api/events` là endpoint mở.** Trình duyệt gọi thẳng vào nó, nên không có chỗ nào giấu được một khoá chia sẻ — xem `api-endpoints.md` mục "Vì sao không còn khoá chia sẻ". Nguyên tắc giữ nguyên: **sinh xong dữ liệu phân tích rồi hãy deploy công khai.**
+
+**Hàng đợi rate-limit yếu đi trên serverless.** `lib/server/services/upstream.ts` giữ hàng đợi và cache trong bộ nhớ một tiến trình; mỗi lambda instance của Vercel có bộ nhớ riêng. Nếu bị Photon/Overpass chặn IP giữa buổi demo thì đây là chỗ đầu tiên nhìn vào, không phải lỗi mạng.
 
 ---
 
 ## Phần phân tích (từ Tuần 5)
 
-`analysis/` **không phải npm workspace** — nó là project Python, để ngoài `apps/` có chủ ý.
+`analysis/` **không phải một phần của app Next.js** — nó là project Python riêng, và đọc thẳng Firestore chứ không gọi qua `/api`.
 
 ```
 analysis/
@@ -322,17 +280,17 @@ Nếu PowerShell chặn script kích hoạt (`cannot be loaded because running s
 |---|---|---|
 | 1 | Biến `GOOGLE_APPLICATION_CREDENTIALS` đã export sẵn | Chạy trên CI, hoặc bạn tự export |
 | 2 | `analysis/.env` → cùng biến đó | Khi muốn đọc một project Firebase **khác** |
-| 3 | `apps/api/.env` → 3 biến `FIREBASE_*` | **Mặc định.** Ai chạy được `npm run dev` thì chạy được luôn script này |
+| 3 | `.env.local` → 3 biến `FIREBASE_*` | **Mặc định.** Ai chạy được `npm run dev` thì chạy được luôn script này |
 
 Nhờ đường 3 mà **không phải tải thêm service account key JSON nào** — bắt tải là tạo ra file bí mật thứ hai phải quản lý, cho đúng một quyền truy cập.
 
 > **Trước đây đường 2 là thứ tài liệu hứa nhưng code không có.** `fetch_events.py` đọc thẳng `os.environ`, mà không chỗ nào nạp `analysis/.env`, nên làm đúng y hướng dẫn thì script vẫn báo thiếu credential — phải tự `export` ngoài shell. Giờ nó nạp file đó thật.
 
-Script Python dựng credential từ dict (`type`, `project_id`, `client_email`, `private_key`, `token_uri`) thay vì đọc file JSON — cùng ba biến mà `apps/api/src/db/firebase-admin.ts` dùng, kể cả dòng `.replace('\\n', '\n')` cho private key.
+Script Python dựng credential từ dict (`type`, `project_id`, `client_email`, `private_key`, `token_uri`) thay vì đọc file JSON — cùng ba biến mà `lib/server/db/firebase-admin.ts` dùng, kể cả dòng `.replace('\\n', '\n')` cho private key.
 
 ### Seed dữ liệu giả lập
 
-`scripts/seed-events.js` cũng dùng đúng cơ chế đó (thử `serviceAccountKey.json` ở gốc repo trước, không có thì đọc `apps/api/.env`):
+`scripts/seed-events.js` cũng dùng đúng cơ chế đó (thử `serviceAccountKey.json` ở gốc repo trước, không có thì đọc `.env.local`):
 
 ```bash
 node scripts/seed-events.js --dry-run   # xem trước, không cần credential
@@ -346,9 +304,7 @@ node scripts/seed-events.js --clear     # dọn lại, chỉ xoá document có s
 
 ```
 node_modules/
-apps/web/.next/
-apps/api/.env
-apps/web/.env.local
+.next/
 .env
 .env*.local
 serviceAccount*.json
@@ -367,17 +323,16 @@ Tra theo **triệu chứng nguyên văn** hiện trên màn hình.
 
 ### Cổng đang bị chiếm
 
-Lần chạy trước chưa tắt hẳn. Hai app báo khác nhau:
+Lần chạy trước chưa tắt hẳn:
 
 ```
-[web] Error: listen EADDRINUSE: address already in use :::3000
-[api] Cong 4000 dang bi chiem — nhieu kha nang lan chay truoc chua tat han.
+Error: listen EADDRINUSE: address already in use :::3000
 ```
 
 Tìm và kết thúc tiến trình:
 
 ```bash
-lsof -ti:3000 | xargs kill -9        # WSL/macOS — đổi 3000 thành 4000 nếu cần
+lsof -ti:3000 | xargs kill -9        # WSL/macOS
 ```
 ```powershell
 netstat -ano | findstr :3000         # Windows — cột cuối là PID
@@ -388,13 +343,13 @@ taskkill /PID <PID> /F
 
 Ô tìm địa chỉ quay skeleton không bao giờ dứt, bản đồ không vẽ tuyến, dải "Gần bạn" trống — mà **không có lỗi nào in ra**, kể cả `EADDRINUSE`.
 
-Nguyên nhân thường gặp: lần `npm run dev` trước bị **Ctrl+Z** (treo) chứ không tắt hẳn. Tiến trình ở trạng thái đó **vẫn giữ cổng 4000** nên socket vẫn `LISTEN` và bắt tay TCP thành công — nhưng nó bị dừng nên **không bao giờ trả lời**. Lần chạy mới thấy cổng bận, còn trình duyệt thì chỉ thấy request treo vô hạn.
+Nguyên nhân thường gặp: lần `npm run dev` trước bị **Ctrl+Z** (treo) chứ không tắt hẳn. Tiến trình ở trạng thái đó **vẫn giữ cổng 3000** nên socket vẫn `LISTEN` và bắt tay TCP thành công — nhưng nó bị dừng nên **không bao giờ trả lời**. Lần chạy mới thấy cổng bận, còn trình duyệt thì chỉ thấy request treo vô hạn.
 
 Nhận ra bằng cột `STAT` có chữ **`T`**:
 
 ```bash
 ps -eo pid,stat,args | grep Mo-phong-web-dat-xe | grep -v grep
-#   33547 Tl   node ... src/server.ts      ← T = đã bị treo
+#   33547 Tl   node ... next dev --port 3000      ← T = đã bị treo
 ```
 
 Dọn (phải `-9`: tiến trình đang dừng không xử lý `SIGTERM`):
@@ -402,21 +357,16 @@ Dọn (phải `-9`: tiến trình đang dừng không xử lý `SIGTERM`):
 ```bash
 ps -eo pid,stat,args | grep Mo-phong-web-dat-xe | grep -v grep \
   | awk '$2 ~ /T/ {print $1}' | xargs -r kill -9
-ss -ltn | grep -E ":3000|:4000"      # phải không in gì
+ss -ltn | grep ":3000"               # phải không in gì
 npm run dev
 ```
 
 > Tắt bằng **Ctrl+C**, không phải Ctrl+Z. Ctrl+Z chỉ đẩy tiến trình vào nền ở trạng thái dừng.
 
-Từ phía FE, ô tìm địa chỉ giờ **bỏ cuộc sau 6 giây** và hiện cảnh báo kèm 5 gợi ý thay vì quay mãi (`REQUEST_TIMEOUT_MS` trong `apps/web/lib/use-place-search.ts`) — nhưng đó chỉ là đường lui, BE vẫn phải dọn.
-
-### `:4000/api/health` trả OK nhưng `:3000/api/health` hỏng
-Sai `rewrites` trong `apps/web/next.config.ts` — **không phải** sai Express. BE vẫn sống, chỉ là Next.js không chuyển tiếp request sang nó.
-
-Đây chính là lý do Phase 0 bắt kiểm tra bằng **hai** lệnh curl: từ phía trình duyệt, "BE chết" và "proxy hỏng" trông giống hệt nhau.
+Từ phía FE, ô tìm địa chỉ giờ **bỏ cuộc sau 6 giây** và hiện cảnh báo kèm 5 gợi ý thay vì quay mãi (`REQUEST_TIMEOUT_MS` trong `lib/use-place-search.ts`) — nhưng đó chỉ là đường lui, upstream vẫn phải hồi.
 
 ### `POST /api/events` trả 500, app vẫn click được bình thường
-Chưa có `apps/api/.env` — đúng như mô tả ở mục [Chạy nhanh](#chạy-nhanh). Xem log của tiến trình `[api]`, nó ghi rõ thiếu biến nào:
+Chưa có `.env.local` — đúng như mô tả ở mục [Chạy nhanh](#chạy-nhanh). Xem log của terminal đang chạy `npm run dev`, nó ghi rõ thiếu biến nào:
 
 ```
 Thieu bien moi truong Firebase: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY.
@@ -425,10 +375,10 @@ Thieu bien moi truong Firebase: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIRE
 Làm Phase 1 để sửa. Event bị mất nhưng luồng UI không vỡ — đó là chủ ý của `trackEvent` (`screen-map.md` mục 4), không phải lỗi.
 
 ### `error:1E08010C:DECODER routines::unsupported`
-`FIREBASE_PRIVATE_KEY` trong `apps/api/.env` thiếu **dấu nháy kép** bao quanh. Key chứa ký tự xuống dòng nên bắt buộc phải có. Xem mục [Biến môi trường](#biến-môi-trường).
+`FIREBASE_PRIVATE_KEY` trong `.env.local` thiếu **dấu nháy kép** bao quanh. Key chứa ký tự xuống dòng nên bắt buộc phải có. Xem mục [Biến môi trường](#biến-môi-trường).
 
 ### `The default Firebase app already exists`
-Mất `getApps()[0] ??` trong `apps/api/src/db/firebase-admin.ts`. `tsx watch` chạy lại module nhiều lần trong cùng một tiến trình, nên `initializeApp()` gọi thẳng sẽ ném lỗi ngay lần sửa file thứ hai.
+Mất `getApps()[0] ??` trong `lib/server/db/firebase-admin.ts`. Hot-reload của `next dev` chạy lại module nhiều lần trong cùng một tiến trình, nên `initializeApp()` gọi thẳng sẽ ném lỗi ngay lần sửa file thứ hai.
 
 ### Bản đồ hiện chữ "API KEY REQUIRED" chéo trên mọi tile
 
@@ -441,7 +391,7 @@ Xem nhà cung cấp nào còn dùng được:
 curl localhost:3000/api/tiles
 ```
 
-Nhà cung cấp bị đóng dấu sẽ **vắng mặt** trong danh sách trả về. Nếu danh sách trống hoặc thiếu đúng cái đang cần, thêm một nhà cung cấp mới vào `TILE_PROVIDERS` ở `packages/shared/src/tiles.ts` — **đừng** đi đăng ký API key rồi nhét vào `NEXT_PUBLIC_*`, tiền tố đó nhúng giá trị thẳng vào bundle trình duyệt (quy tắc 2).
+Nhà cung cấp bị đóng dấu sẽ **vắng mặt** trong danh sách trả về. Nếu danh sách trống hoặc thiếu đúng cái đang cần, thêm một nhà cung cấp mới vào `TILE_PROVIDERS` ở `lib/shared/tiles.ts` — **đừng** đi đăng ký API key rồi nhét vào `NEXT_PUBLIC_*`, tiền tố đó nhúng giá trị thẳng vào bundle trình duyệt (quy tắc 2).
 
 Tự kiểm tra một nhà cung cấp mới trước khi thêm, bằng đúng tile biển sâu mà phép dò dùng:
 ```bash
@@ -449,26 +399,29 @@ curl -so /dev/null -w '%{size_download}\n' <URL tile z=13 x=6707 y=3740>
 ```
 Dưới 800 byte là sạch. Trên ngưỡng đó nghĩa là giữa Biển Đông đang có chữ.
 
-### Trên bản deploy: bản đồ báo 401 và ô tìm địa chỉ không ra gì
+### Trên bản deploy: bản đồ báo 401 hoặc ô tìm địa chỉ không ra gì
 
-Hai triệu chứng trông như hai lỗi riêng, nhưng thường là **một nguyên nhân**: `apps/api` chưa được deploy, hoặc `API_ORIGIN` trên Vercel chưa trỏ đúng nó.
+Đây từng là triệu chứng của việc quên deploy `apps/api` — **không còn xảy ra được nữa** vì `/api/*` sống chung với trang web. Nếu vẫn gặp:
 
-Kiểm tra một lệnh là biết:
 ```bash
-curl -s -o /dev/null -w '%{http_code}\n' https://<app>.vercel.app/api/health
+curl -s -o /dev/null -w '%{http_code}\n' https://<app>.vercel.app/api/health   # phải 200
+curl -s https://<app>.vercel.app/api/tiles                                     # phải KHÔNG có "stadia"
 ```
 
-`404` kèm body `DNS_HOSTNAME_RESOLVED_PRIVATE` nghĩa là `rewrites` vẫn đang trỏ về `http://localhost:4000` — tức là thiếu biến `API_ORIGIN`, hoặc đã đặt biến nhưng **chưa redeploy** (biến đó đọc lúc build). Khi đó `/api/tiles` cũng chết, `lib/use-tile-providers.ts` lùi về nguyên cả bảng và bắt đầu từ Stadia, mà Stadia trả 401 với referer không phải localhost → chính là con số 401 nhìn thấy trong console.
-
-Nếu `/api/health` trả `200` mà bản đồ vẫn 401, thì lỗi nằm ở `WEB_ORIGIN` của BE: nó phải có domain thật ở **vị trí đầu** thì phép dò mới hỏi Stadia bằng đúng referer trình duyệt sẽ gửi. Sửa biến xong nhớ **restart service** — kết quả dò được cache 6 tiếng trong bộ nhớ tiến trình.
+- `/api/health` không ra `200` → build hỏng hoặc chưa deploy; đọc log build trên Vercel.
+- `/api/tiles` vẫn còn `stadia` → phép dò đang gửi referer sai. Nó lấy từ `x-forwarded-host` của chính request (`app/api/tiles/route.ts`), nên chuyện này chỉ xảy ra nếu có proxy lạ đứng trước. Lưu ý kết quả được **cache 6 giờ** trong bộ nhớ instance.
+- Tìm địa chỉ chết nhưng `/api/health` `200` → Photon đang chết hoặc chặn IP, không phải lỗi deploy. Xem mục bốn dịch vụ ngoài.
 
 ### Event trên bản deploy không vào Firestore, app vẫn click bình thường
 
-Đúng thiết kế của `lib/track.ts`: lỗi mạng bị nuốt để không bao giờ kẹt UI. Nên mọi hỏng hóc ở đường ghi event đều **im lặng**, và phải đi tìm bằng tay.
+Đúng thiết kế của `lib/track.ts`: lỗi mạng bị nuốt để không bao giờ kẹt UI. Nên mọi hỏng hóc ở đường ghi event đều **im lặng**, phải đi tìm bằng tay:
 
-Hai nguyên nhân, theo thứ tự hay gặp:
-1. `EVENTS_WRITE_KEY` trên Vercel và trên host của `apps/api` **lệch nhau** → API trả 401 cho mọi event. Kiểm tra: gọi thẳng API kèm khoá, body rác — nếu ra `400` (báo thiếu `session_id`) là khoá đúng, ra `401` là khoá sai.
-2. `apps/api` chưa deploy → xem mục ngay trên.
+```bash
+curl -s -w '\n[%{http_code}]\n' -X POST https://<app>.vercel.app/api/events \
+  -H 'Content-Type: application/json' -d '{}'
+```
+
+`400` kèm `Missing required field: session_id` nghĩa là route sống và validator chạy — vấn đề nằm ở credential Firebase trên Vercel. `500` nghĩa là ghi Firestore hỏng; đọc log function trên Vercel.
 
 ### Số `screen_view` nhiều gấp đôi số màn đã đi qua
 `useRef` chưa chặn được lần chạy thứ hai của React Strict Mode trong `next dev`. Nếu không sửa thì **mọi tỉ lệ funnel đều sai gấp đôi** — xem `screen-map.md` mục 4.
@@ -476,7 +429,7 @@ Hai nguyên nhân, theo thứ tự hay gặp:
 Kiểm tra bằng lệnh ở cuối `CLAUDE.md`, đếm số dòng `screen_view`.
 
 ### `Module not found: Can't resolve './types.js'`
-Import nội bộ trong `packages/shared` có đuôi `.js`. Webpack của Next không resolve `.js` về `.ts`, trong khi `tsx` thì chấp nhận — nên lỗi này **chỉ hiện ở `npm run build`, không hiện khi chạy BE**. Bỏ đuôi `.js` đi:
+Import tương đối có đuôi `.js`. Webpack của Next không resolve `.js` về `.ts`, trong khi `tsx` thì chấp nhận — nên lỗi này **chỉ hiện ở `npm run build`, không hiện khi chạy BE**. Bỏ đuôi `.js` đi:
 
 ```ts
 import type { ScreenName } from './types';     // đúng
@@ -494,7 +447,7 @@ Chỉ những chỗ **thật sự khác nhau**. Còn lại (`npm install`, `npm 
 
 | Việc | WSL / macOS | Windows PowerShell |
 |---|---|---|
-| Gọi API | `curl localhost:4000/api/health` | `curl.exe localhost:4000/api/health` |
+| Gọi API | `curl localhost:3000/api/health` | `curl.exe localhost:3000/api/health` |
 | Xem event một phiên | `curl "localhost:3000/api/events?session_id=X" \| jq '.[] \| {event_name, screen_name, step_index}'` | `Invoke-RestMethod "localhost:3000/api/events?session_id=X" \| Select-Object event_name, screen_name, step_index \| Format-Table` |
 | Tìm tiến trình chiếm cổng | `lsof -ti:3000` | `netstat -ano \| findstr :3000` |
 | Kích hoạt venv Python | `source .venv/bin/activate` | `.venv\Scripts\Activate.ps1` |
@@ -515,13 +468,13 @@ Chạy từ thư mục **gốc**:
 
 | Lệnh | Việc |
 |---|---|
-| `npm install` | Cài cho cả 3 workspace một lần |
-| `npm run dev` | Chạy song song `apps/api` (:4000) + `apps/web` (:3000) |
+| `npm install` | Cài dependency |
+| `npm run dev` | Chạy app ở :3000 — cả giao diện lẫn `/api/*` |
 | `npm run dev:api` / `npm run dev:web` | Chỉ một bên — hữu ích khi debug |
-| `npm run build` | Build `apps/web`, bắt lỗi TypeScript trước khi demo |
-| `npm run typecheck` | Kiểm tra type cả 3 workspace, không build |
+| `npm run build` | Bắt lỗi TypeScript + webpack trước khi demo |
+| `npm run typecheck` | Kiểm tra type, không build |
 | `npm run lint` | ESLint |
-| `curl localhost:4000/api/health` | BE sống chưa (Windows: `curl.exe`) |
+| `curl localhost:3000/api/health` | App sống chưa (Windows: `curl.exe`) |
 | `curl localhost:3000/api/health` | Proxy thông chưa (Windows: `curl.exe`) |
 | `curl "localhost:3000/api/events?session_id=..."` | Xem event của một phiên (Windows: `Invoke-RestMethod`) |
 

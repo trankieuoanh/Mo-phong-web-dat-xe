@@ -15,7 +15,7 @@
  */
 
 import { useRouter } from 'next/navigation';
-import { DEFAULT_PICKUP } from '@gsm/shared';
+import { DEFAULT_PICKUP } from '@/lib/shared';
 import { Icon } from '@/components/Icon';
 import { MapCanvas } from '@/components/MapCanvas';
 import { ScreenShell } from '@/components/ScreenShell';

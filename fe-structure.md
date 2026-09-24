@@ -1,6 +1,6 @@
-# fe-structure.md — cấu trúc frontend (`apps/web`)
+# fe-structure.md — cấu trúc giao diện (`app/`, `components/`, `lib/`)
 
-Mô tả **code hiện có** trong `apps/web`: file nào làm gì, phụ thuộc vào đâu, một tương tác đi qua những lớp nào.
+Mô tả **code giao diện hiện có**: file nào làm gì, phụ thuộc vào đâu, một tương tác đi qua những lớp nào. Phần server (`app/api/`, `lib/server/`) ở `be-structure.md`.
 
 Đây không phải hợp đồng dữ liệu. Muốn biết event nào mang field gì → `event-taxonomy.md`. Muốn biết route và quy tắc state → `screen-map.md`. File này trả lời câu khác: **code hiện thực những thứ đó ra sao**.
 
@@ -8,27 +8,26 @@ Mô tả **code hiện có** trong `apps/web`: file nào làm gì, phụ thuộc
 
 ## 1. Vai trò
 
-Next.js 15 (App Router), cổng **3000**. Chỉ frontend — **không có logic nghiệp vụ nào chạy ở server**.
+Next.js 15 (App Router), cổng **3000**. File này mô tả **nửa giao diện** của project: `app/` (trừ `app/api/`), `components/`, và `lib/` (trừ `lib/server/`).
 
-Ba điều quyết định hình dạng của toàn bộ thư mục này:
+Ba điều quyết định hình dạng của phần này:
 
 - **Mọi page đều `'use client'`.** Vì page nào cũng cần đọc state (giỏ hàng, lựa chọn) và bắn event, không có page nào render được ở server.
-- **Không có `firebase-admin` trong `dependencies`.** Credential nằm ở `apps/api`, một module graph khác — FE muốn chạm Firestore cũng không import nổi. Xem `CLAUDE.md` quy tắc 1.
-- **Không có `app/api/`.** API là process riêng ở cổng 4000; `next.config.ts` proxy `/api/*` sang đó.
+- **Không chạm `firebase-admin`.** Credential sống trong `lib/server/`, và mọi file ở đó mở đầu bằng `import 'server-only'` — kéo một cái vào page là build đỏ ngay. Xem `CLAUDE.md` quy tắc 1.
+- **`/api/*` nằm cùng project** (`app/api/**/route.ts`), nên mọi lời gọi đều same-origin: không proxy, không preflight, không cổng thứ hai.
 
-Ngoại lệ duy nhất chạy ở server là `middleware.ts` — nó **không xử lý nghiệp vụ gì**, chỉ gắn một header vào request trên đường đi (xem mục 5).
+> Trước đây đây là một package riêng (`apps/web`) nói chuyện với `lib/server` qua proxy. Xem `ARCHITECTURE.md` để biết vì sao gộp lại.
 
 ---
 
 ## 2. Cây thư mục
 
 ```
-apps/web/
-├─ next.config.ts          transpilePackages + rewrites proxy → :4000
-├─ middleware.ts           bơm header x-gsm-key vào /api/* (chỉ khi deploy)
+./                        gốc repo — một project Next.js duy nhất
+├─ next.config.ts          serverExternalPackages: ['firebase-admin']
 ├─ postcss.config.mjs      plugin @tailwindcss/postcss
 ├─ eslint.config.mjs
-├─ tsconfig.json           paths: @/* và @gsm/shared
+├─ tsconfig.json           paths: @/*
 │
 ├─ app/
 │  ├─ layout.tsx           font Inter (subset vietnamese) + <AppProvider>
@@ -51,7 +50,8 @@ apps/web/
 │  ├─ history/page.tsx      NGOÀI FUNNEL — lịch sử chuyến đi, không bắn event
 │  ├─ account/page.tsx      NGOÀI FUNNEL — Tài khoản phụ, trạng thái rỗng
 │  ├─ support/page.tsx      NGOÀI FUNNEL — Trung tâm hỗ trợ, 4 thẻ tĩnh
-│  └─ terms/page.tsx        NGOÀI FUNNEL — Điều khoản & Chính sách, 4 thẻ tĩnh
+│  ├─ terms/page.tsx        NGOÀI FUNNEL — Điều khoản & Chính sách, 4 thẻ tĩnh
+│  └─ api/                   SERVER — xem be-structure.md, KHÔNG thuộc file này
 │
 ├─ lib/
 │  ├─ track.ts             trackEvent · trackAddToCart · trackSelectFlow · useScreenView
@@ -62,7 +62,9 @@ apps/web/
 │  ├─ use-tile-providers.ts hook gọi GET /api/tiles — lọc nhà cung cấp tile đã hỏng
 │  ├─ app-context.tsx      AppProvider · useApp — state ride + cart + food
 │  ├─ session.ts           session_id / user_id / resetSession
-│  └─ format.ts            formatVnd — số nguyên VNĐ → "35.000đ"
+│  ├─ format.ts            formatVnd — số nguyên VNĐ → "35.000đ"
+│  ├─ shared/              dùng chung client + server
+│  └─ server/              SERVER — xem be-structure.md, page KHÔNG được import
 │
 └─ components/
    ├─ ScreenShell.tsx      chọn bố cục split / wide rồi bọc bằng AppShell
@@ -101,7 +103,7 @@ flowchart LR
   P[app/**/page.tsx<br/>13 page funnel + 2 ngoài funnel] --> C[components/]
   P --> L[lib/<br/>4 file]
   C --> L
-  L --> S[["@gsm/shared"]]
+  L --> S[["lib/shared"]]
   P --> S
 ```
 
@@ -127,7 +129,7 @@ flowchart LR
 | `/food/confirm` | `food_confirm` | 6 | ✓ | `place_order` | 100 |
 | `/food/success` | `food_success` | 7 | — | `back_to_home` | 72 |
 
-> **Không page nào gõ `step_index`.** Cột `step` ở trên do `trackEvent` tra bảng `SCREENS` trong `@gsm/shared`. Để đây chỉ để đối chiếu nhanh với `event-taxonomy.md`.
+> **Không page nào gõ `step_index`.** Cột `step` ở trên do `trackEvent` tra bảng `SCREENS` trong `lib/shared`. Để đây chỉ để đối chiếu nhanh với `event-taxonomy.md`.
 
 > **Event `back` không có trong bảng** vì nó không nằm trong file page nào cả — xem mục 6.
 
@@ -141,7 +143,7 @@ flowchart LR
 
 | Route | Bắn event | Làm gì |
 |---|:--:|---|
-| `/history` | **không** | `fetch('/api/events?user_id=...')` qua proxy same-origin. Gấp `confirm_ride` / `cancel_ride` → một chuyến xe, `place_order` → một đơn đồ ăn; tab Di chuyển có ba thẻ "Tổng số chuyến" / "Đã huỷ" / "Tổng chi tiêu", tab Đặt đồ ăn có hai. Tab bấm được thật. Ba trạng thái: skeleton / rỗng / lỗi (in nguyên văn thông báo Firestore vì nó chứa link tạo index) |
+| `/history` | **không** | `fetch('/api/events?user_id=...')` same-origin. Gấp `confirm_ride` / `cancel_ride` → một chuyến xe, `place_order` → một đơn đồ ăn; tab Di chuyển có ba thẻ "Tổng số chuyến" / "Đã huỷ" / "Tổng chi tiêu", tab Đặt đồ ăn có hai. Tab bấm được thật. Ba trạng thái: skeleton / rỗng / lỗi (in nguyên văn thông báo Firestore vì nó chứa link tạo index) |
 
 > **Một dòng ở tab Di chuyển = một SESSION, không phải một event.** Chuyến bị huỷ sinh **hai** event trong cùng session: `confirm_ride` ở màn xác nhận, rồi `cancel_ride` ở màn tìm tài xế. Lọc thẳng theo tên event sẽ cho ra hai dòng cho cùng một chuyến, và dòng `confirm_ride` hiện như một chuyến hoàn thành — đúng cái bảng này cần phân biệt. `rideEvents()` vì vậy gom theo `session_id` trước: session nào có `cancel_ride` thì lấy chính event đó làm dòng (nó mirror đủ field của `confirm_ride`) và bỏ dòng `confirm_ride` đi.
 >
@@ -173,21 +175,6 @@ Ba thứ file này giữ mà không chỗ nào khác giữ:
 3. **`useRef` chặn React Strict Mode** trong `useScreenView`. Thiếu nó thì mọi `screen_view` nhân đôi và funnel sai gấp đôi.
 
 `trackEvent` trả `void` có chủ ý — không ai `await` được nên không thể vô tình chặn điều hướng. Kèm `keepalive: true` và `.catch(() => {})`.
-
-### `middleware.ts` (không nằm trong `lib/`, nhưng đọc cùng `track.ts`)
-
-File duy nhất của `apps/web` chạy ở phía máy chủ. Việc của nó gọn trong một câu: **gắn header `x-gsm-key` vào mọi request `/api/*`**, rồi rewrite thẳng sang `API_ORIGIN`.
-
-```ts
-export const config = { matcher: '/api/:path*' };
-// không đặt EVENTS_WRITE_KEY → NextResponse.next(), rewrites của next.config.ts lo nốt
-```
-
-Vì sao không gắn header trong `track.ts` cho gọn: khoá đặt ở FE sẽ nằm trong bundle JS tải về máy người dùng, mở DevTools là thấy, và như vậy thì nó không còn chặn được ai. Đặt ở đây thì khoá chỉ tồn tại trên máy chủ — trình duyệt vẫn gọi `/api/events` same-origin y như cũ và không biết gì về nó.
-
-Tự rewrite thay vì `NextResponse.next()` rồi để `rewrites` của `next.config.ts` làm nốt: header sửa trong middleware chỉ chắc chắn đi theo request khi chính middleware quyết định đích đến. Cái giá khi đoán sai là `confirm_ride` và `place_order` âm thầm ăn 401 — đúng kiểu mất event cuối funnel mà `next.config.ts` đã phải viết hẳn một đoạn dài để tránh.
-
-Không đặt `EVENTS_WRITE_KEY` thì middleware thả request đi tiếp, tức là **chạy local không đổi gì**. Xem `setup.md` mục "Deploy".
 
 ### `app-context.tsx` (209 dòng)
 ```ts
@@ -246,7 +233,7 @@ Cụm `+`/`−` và nút re-center **giờ làm thật** (đổi zoom, đưa khu
 
 **Kéo và bấm chọn vị trí.** Kéo bật ở mọi bản đồ; cuộn-để-zoom **chỉ** bật khi `fill` (bố cục `split`) — khung 4:3 ở `/food/confirm` nằm giữa một cột đang cuộn, chặn `wheel` ở đó sẽ khoá cuộn trang. Có `onPick` thì bấm lên bản đồ trả về toạ độ; **ngưỡng 5px phân biệt bấm với kéo**, không có nó thì kéo bản đồ xong thả tay sẽ bị hiểu là chọn một điểm. Các nút điều khiển nằm trong khung bản đồ được lọc bằng `closest('button, a')` ở `pointerdown`, nếu không thì bấm "+" vừa phóng to vừa thả một cái ghim.
 
-Dòng **`© OpenStreetMap` là bắt buộc** theo điều khoản dùng tile. Bảng nhà cung cấp tile nằm ở `packages/shared/src/tiles.ts` chứ không phải trong component — BE phải dò đúng cái danh sách mà màn hình này sẽ hiện.
+Dòng **`© OpenStreetMap` là bắt buộc** theo điều khoản dùng tile. Bảng nhà cung cấp tile nằm ở `lib/shared/tiles.ts` chứ không phải trong component — BE phải dò đúng cái danh sách mà màn hình này sẽ hiện.
 
 **Hai lớp phòng vệ, bắt hai thứ khác nhau** — đừng bỏ lớp nào tưởng là thừa:
 
@@ -317,13 +304,13 @@ Người dùng bấm "Green Bike" ở `/ride/vehicle`:
 
 Chỗ đáng chú ý là bước 4 **không được `await`**. Ở những màn mà event bắn ngay trước `router.push` (`confirm_ride` ở `/ride/confirm`, `place_order` ở `/food/confirm`), `await` sẽ làm UI khựng ~200ms mỗi lần bấm — lỗi dễ mắc nhất trong loại app này. `trackEvent` trả `void` nên không ai `await` được, và `keepalive: true` lo phần gửi nốt khi trang đã chuyển.
 
-Request rời trình duyệt là **same-origin** (`/api/events`), Next.js proxy sang `:4000`. Ghi thẳng `http://localhost:4000` sẽ thành cross-origin, kích hoạt preflight `OPTIONS`, và `confirm_ride` / `place_order` — hai event bắn ngay trước khi chuyển trang — không kịp gửi. Lý do đầy đủ ở `techstack.md`.
+Request rời trình duyệt là **same-origin** (`/api/events`) và tới thẳng route handler của chính app này. Ghi thẳng `http://localhost:4000` sẽ thành cross-origin, kích hoạt preflight `OPTIONS`, và `confirm_ride` / `place_order` — hai event bắn ngay trước khi chuyển trang — không kịp gửi. Lý do đầy đủ ở `techstack.md`.
 
-Phần còn lại của hành trình (từ `:4000` trở đi) → `be-structure.md`.
+Phần còn lại của hành trình (từ route handler trở đi) → `be-structure.md`.
 
 ---
 
-## 8. Nhập gì từ `@gsm/shared`
+## 8. Nhập gì từ `lib/shared`
 
 FE dùng shared cho hai việc, không hơn:
 
@@ -358,8 +345,8 @@ Ngoài page: `lib/track.ts` nhập `SCREENS` và `ADD_TO_CART_STEP_INDEX`; `lib/
 Làm sai thứ tự sẽ sinh dữ liệu không dùng được:
 
 1. **`event-taxonomy.md`** — thêm màn vào bảng mục 2, thêm event vào mục 3/4. Chốt với mentor **trước khi code** (`CLAUDE.md` quy tắc 6).
-2. **`packages/shared/src/screens.ts`** — thêm vào `SCREENS` kèm `route`, `stepIndex`, `flow`. Thêm `ScreenName` mới vào `types.ts`.
-3. **`apps/web/app/.../page.tsx`** — `'use client'`, gọi `useScreenView('<screen_name>')`, bọc `<ScreenShell>`.
+2. **`lib/shared/screens.ts`** — thêm vào `SCREENS` kèm `route`, `stepIndex`, `flow`. Thêm `ScreenName` mới vào `types.ts`.
+3. **`app/.../page.tsx`** — `'use client'`, gọi `useScreenView('<screen_name>')`, bọc `<ScreenShell>`.
 4. **Guard nếu cần** — màn giữa luồng thì bọc `<FlowGuard>` với điều kiện state tương ứng.
 5. **Kiểm tra** — đi hết luồng rồi đếm: số `screen_view` phải đúng bằng số màn đã qua.
 

@@ -26,10 +26,10 @@ Mặc định khi build: **lựa chọn 1**. Nếu mentor ưu tiên bám sát nh
 
 ## 1. Khai báo theme (Tailwind v4)
 
-Dự án dùng Tailwind v4 — cấu hình bằng `@theme` trong CSS, **không** còn `tailwind.config.ts`. Chỉ có `apps/web/postcss.config.mjs` khai báo plugin `@tailwindcss/postcss`.
+Dự án dùng Tailwind v4 — cấu hình bằng `@theme` trong CSS, **không** còn `tailwind.config.ts`. Chỉ có `postcss.config.mjs` khai báo plugin `@tailwindcss/postcss`.
 
 ```css
-/* apps/web/app/globals.css */
+/* app/globals.css */
 @import "tailwindcss";
 
 @theme {
@@ -78,7 +78,7 @@ Thang spacing token (`xxs…3xl`) **bổ sung** chứ không thay thế thang s�
 Hai face gốc `UberMove` / `UberMoveText` là font độc quyền, không dùng được. `DESIGN.md` đã chỉ định bản thay thế: **Inter** — weight 700 cho display, 400/500 cho text.
 
 ```ts
-// apps/web/app/layout.tsx
+// app/layout.tsx
 import { Inter } from 'next/font/google';
 const inter = Inter({ subsets: ['latin', 'vietnamese'], variable: '--font-inter' });
 ```
@@ -90,7 +90,7 @@ Bắt buộc có subset `vietnamese` — thiếu nó thì "Bánh mì", "Đặt x
 Tailwind v4 không sinh sẵn class cho typography token, nên khai báo thành component class:
 
 ```css
-/* apps/web/app/globals.css, sau @theme */
+/* app/globals.css, sau @theme */
 @layer components {
   .t-display-xxl    { font: 700 52px/64px var(--font-display); }
   .t-display-xl     { font: 700 36px/44px var(--font-display); }
@@ -138,7 +138,7 @@ Tailwind v4 không sinh sẵn class cho typography token, nên khai báo thành 
 | `icon-button-circular` | Nút Back ở góc, nút +/− số lượng | `bg-canvas-soft text-ink rounded-full` |
 | `nav-bar` | Header của `Panel` — tiêu đề màn | `bg-canvas text-ink t-display-sm px-2xl py-lg border-b border-surface-pressed` |
 
-### Khung desktop — bổ sung khi dựng lại UI theo `apps/web/sample_ui/`
+### Khung desktop — bổ sung khi dựng lại UI theo `sample_ui/`
 
 | Token component | Dùng ở đâu | Class |
 |---|---|---|
@@ -187,7 +187,7 @@ Chỉ áp cho **lớp nổi lên trên nội dung khác**: dropdown của `UserM
 
 **Dùng ảnh thật** (`mock-data.md` mục 4 — quy tắc cấm ảnh thật đã bỏ). Khung giữ đúng tỉ lệ 4:3 mà `DESIGN.md` yêu cầu; `FoodThumb` render `<img>` khi món có `image`, và lui về khung glyph bên dưới khi không có.
 
-Dựng sẵn thành `apps/web/components/FoodThumb.tsx` — **không viết lại markup này ở page**, vì trước đây nó được chép tay ở 4 chỗ và 29 món cho ra 29 ô gần như giống hệt nhau, đủ để cả lưới trông như bản nháp.
+Dựng sẵn thành `components/FoodThumb.tsx` — **không viết lại markup này ở page**, vì trước đây nó được chép tay ở 4 chỗ và 29 món cho ra 29 ô gần như giống hệt nhau, đủ để cả lưới trông như bản nháp.
 
 ```html
 <!-- Nền chuyển sắc giữa HAI token đã có — không sinh giá trị mới (quy tắc 4) -->
@@ -201,4 +201,4 @@ Dựng sẵn thành `apps/web/components/FoodThumb.tsx` — **không viết lạ
 
 Hai biến thể: `cover` (4:3, trên thẻ món và màn chi tiết) và `tile` (`size-14`, trong hàng giỏ hàng và màn xác nhận).
 
-`FoodItem` có trường `image?: string` **để trống ở cả 29 món**. Khi có ảnh thật, thả file vào `apps/web/public/food/<id>.webp` rồi điền đường dẫn — `FoodThumb` tự đổi sang thẻ `<img>`, không phải sửa component nào.
+`FoodItem` có trường `image?: string` **để trống ở cả 29 món**. Khi có ảnh thật, thả file vào `public/food/<id>.webp` rồi điền đường dẫn — `FoodThumb` tự đổi sang thẻ `<img>`, không phải sửa component nào.

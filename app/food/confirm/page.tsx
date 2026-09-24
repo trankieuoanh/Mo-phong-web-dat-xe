@@ -8,7 +8,7 @@
  */
 
 import { useRouter } from 'next/navigation';
-import { DEFAULT_PICKUP, calcFoodTotals, getFoodItem, getOffer } from '@gsm/shared';
+import { DEFAULT_PICKUP, calcFoodTotals, getFoodItem, getOffer } from '@/lib/shared';
 import { BackButton } from '@/components/BackButton';
 import { FlowGuard } from '@/components/FlowGuard';
 import { FoodThumb } from '@/components/FoodThumb';

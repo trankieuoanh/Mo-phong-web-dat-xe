@@ -14,7 +14,7 @@
  */
 
 import { useRouter } from 'next/navigation';
-import { DEFAULT_PICKUP, VEHICLES, calcFare, type Vehicle } from '@gsm/shared';
+import { DEFAULT_PICKUP, VEHICLES, calcFare, type Vehicle } from '@/lib/shared';
 import { BackButton } from '@/components/BackButton';
 import { FlowGuard } from '@/components/FlowGuard';
 import { Icon, type IconName } from '@/components/Icon';

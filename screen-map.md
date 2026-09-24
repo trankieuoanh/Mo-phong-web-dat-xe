@@ -8,7 +8,7 @@ Mỗi màn hình = **một page App Router riêng**, không dùng một page + s
 
 Lý do: `previous_screen` và Back của trình duyệt hoạt động đúng miễn phí, URL phản ánh đúng vị trí trong luồng nên demo cho mentor dễ hơn, và refresh giữa chừng không văng về đầu luồng.
 
-Mọi đường dẫn dưới đây nằm trong **`apps/web/`**.
+Mọi đường dẫn dưới đây tính từ **gốc repo** — một project Next.js duy nhất.
 
 ```
 app/
@@ -43,9 +43,9 @@ app/
 
 > **Không có `/login`.** Dự án không có authentication — đây là quyết định có chủ ý, xem `api-endpoints.md`. Một màn đăng nhập giả chỉ thêm một đường đi lạc mà không đo thêm được gì. `UserMenu` ở top bar vì vậy là trang trí hoàn toàn; nó chỉ hiện `user_id` đang dùng, để demo thấy ngay khoá mà `/history` tra.
 
-Không còn `app/api/` — API nằm ở `apps/api`, một process riêng. `apps/web/next.config.ts` proxy `/api/*` sang đó.
+`app/api/**/route.ts` là API của chính app này — cùng project, cùng process. Nghiệp vụ server nằm ở `lib/server/`, và page **không được** import từ đó (CLAUDE.md quy tắc 1).
 
-Mọi page của 2 luồng đều là **client component** (`'use client'`) vì cần đọc state giỏ hàng / lựa chọn và bắn event. `apps/web` không có server-side logic nào.
+Mọi page của 2 luồng đều là **client component** (`'use client'`) vì cần đọc state giỏ hàng / lựa chọn và bắn event. Không page nào có server-side logic.
 
 ### Bảo vệ luồng (guard)
 Vào thẳng một URL giữa luồng mà state rỗng (ví dụ mở `/ride/confirm` khi chưa chọn xe) → `redirect` về **lối vào** của luồng (`/` cho ride, `/food` cho food) và **không bắn event nào**. Tránh sinh session rác trong dữ liệu phân tích — ride trả về `/` vì đó mới là nơi sinh `select_flow`, tức bước 0 của funnel.
@@ -57,7 +57,7 @@ Implement: component `<FlowGuard ready={...} fallback="...">` bọc nội dung m
 ## 2. Session & user
 
 ```ts
-// apps/web/lib/session.ts — client-only
+// lib/session.ts — client-only
 const SESSION_KEY = 'gsm_session_id';
 const USER_KEY    = 'gsm_user_id';
 ```
@@ -80,7 +80,7 @@ const USER_KEY    = 'gsm_user_id';
 Dùng React Context, không thêm thư viện state (đúng như `techstack.md`).
 
 ```ts
-// apps/web/lib/app-context.tsx
+// lib/app-context.tsx
 interface AppState {
   sessionId: string;
   userId: string;
@@ -115,7 +115,7 @@ interface AppState {
 >
 > **Vì sao khoá là `_v2`.** Hình dạng `ride` đã đổi (`addressId: string` → `destination: Place`). `readJson` có `try/catch` nhưng **không kiểm tra hình dạng**, nên một draft cũ còn trong tab của người dùng sẽ trả về `{addressId: '…'}` và làm màn confirm nổ. Đổi khoá là cách rẻ nhất để bỏ draft cũ đi; khoá cũ vẫn nằm trong `DRAFT_KEYS` để lần reset đầu tiên dọn nốt nó.
 - **Bộ lọc ở màn menu food KHÔNG vào `AppContext`.** Ô tìm, chip bữa, quán đang chọn, chip loại món đều là `useState` cục bộ của `app/food/page.tsx`: rời màn là quên, và đó là đúng — chúng là cách *tìm* món, không phải lựa chọn cần mang sang bước sau. Thứ cần mang sang đã nằm trong event (`discovery_source`).
-- Giỏ hàng lưu **`itemId` + `quantity`**, không lưu `price`/`name` — giá lấy từ `@gsm/shared` lúc render, để đổi giá trong mock không làm giỏ hàng cũ sai.
+- Giỏ hàng lưu **`itemId` + `quantity`**, không lưu `price`/`name` — giá lấy từ `lib/shared` lúc render, để đổi giá trong mock không làm giỏ hàng cũ sai.
 - Clear: `ride` sau `confirm_ride`; `cart` + `offerId` sau `place_order`; tất cả sau `back_to_home`.
 - **`route` phải bị xoá cùng lúc với việc đổi `destination`** (`/ride/address`). Tuyến đường đã cắt trong draft thuộc về điểm đến trước đó; giữ lại thì sau `change_address`, bấm Back của trình duyệt về `/ride/vehicle` sẽ thấy giá tính theo quãng đường cũ, và `confirm_ride` ghi `distance_km` không khớp `address_label` trong cùng một document.
 - `promoId`/`offerId` phân biệt 3 trạng thái: `undefined` = chưa tới bước đó, `null` = đã bỏ qua, `"promo-10k"` = đã chọn.
@@ -125,7 +125,7 @@ interface AppState {
 ## 4. Hợp đồng `trackEvent`
 
 ```ts
-// apps/web/lib/track.ts — client-only
+// lib/track.ts — client-only
 export function trackEvent(input: {
   eventName: EventName;
   screenName: ScreenName;
@@ -140,14 +140,14 @@ export function trackEvent(input: {
 1. **Không `async`, trả `void`.** Không ai `await` được → không thể vô tình chặn điều hướng. Đây là lỗi dễ mắc nhất trong loại app này: `await` trước `router.push` làm UI khựng ~200ms mỗi lần bấm.
 2. **`fetch(...).catch(() => {})`** — API lỗi hoặc mạng rớt tuyệt đối không được làm vỡ luồng UI. Mất một event chấp nhận được; kẹt người dùng thì không.
 3. **`keepalive: true`** trong `fetch` — event cuối (`confirm_ride`, `place_order`) vẫn gửi được khi điều hướng xảy ra ngay sau đó.
-4. **Luôn `fetch('/api/events')` đường tương đối.** Ghi thẳng `http://localhost:4000` sẽ thành cross-origin, kích hoạt preflight `OPTIONS`, và hai event ở quy tắc 3 không kịp gửi.
+4. **Luôn `fetch('/api/events')` đường tương đối.** Route handler nằm cùng project nên đây là same-origin, không có preflight `OPTIONS` — điều kiện để hai event ở quy tắc 3 kịp gửi trước khi trang chuyển. Ghi thẳng một origin khác sẽ phá đúng tính chất đó.
 5. **Không retry, không hàng đợi offline.** Ngoài phạm vi 6 tuần.
 6. Helper tự chèn `session_id`, `user_id` và `previous_screen`; component gọi **không** truyền ba trường này. `platform` do server gắn.
 7. `properties` mặc định `{}` khi không truyền.
 
 ### `flow` và `stepIndex` — tra bảng, không gõ tay
 
-Hai tham số này **mặc định lấy từ bảng `SCREENS`** trong `@gsm/shared` (mã hoá bảng ở `event-taxonomy.md` mục 2). Gõ tay `step_index` ở 13 page là nguồn sai số liệu số một, và sai kiểu đó *không có triệu chứng* — app vẫn chạy đẹp, chỉ có funnel sai, và chỉ phát hiện ra ở Tuần 5.
+Hai tham số này **mặc định lấy từ bảng `SCREENS`** trong `lib/shared` (mã hoá bảng ở `event-taxonomy.md` mục 2). Gõ tay `step_index` ở 13 page là nguồn sai số liệu số một, và sai kiểu đó *không có triệu chứng* — app vẫn chạy đẹp, chỉ có funnel sai, và chỉ phát hiện ra ở Tuần 5.
 
 Đúng **hai ngoại lệ** được truyền tay, và cả hai đều đi qua một helper riêng để không page nào phải tự gõ:
 
@@ -182,7 +182,7 @@ Không có màn lỗi/thất bại — app mô phỏng luôn thành công.
 
 ## 6. Responsive
 
-**Desktop-first.** Khung tham chiếu là **web Green SM trên máy tính**, không phải app điện thoại — xem 7 ảnh chụp trong `apps/web/sample_ui/` (`homepage.png`, `main_screen.png`, `history.png`, `login.png`, `tai_khoan_phu.png`, `trung_tam_ho_tro.png`, `dieu_khoan_va_chinh_sach.png`). Tất cả đều có rail icon dọc bên trái và top bar — trừ `dieu_khoan_va_chinh_sach.png`, vốn là trang marketing chứ không phải màn trong app.
+**Desktop-first.** Khung tham chiếu là **web Green SM trên máy tính**, không phải app điện thoại — xem 7 ảnh chụp trong `sample_ui/` (`homepage.png`, `main_screen.png`, `history.png`, `login.png`, `tai_khoan_phu.png`, `trung_tam_ho_tro.png`, `dieu_khoan_va_chinh_sach.png`). Tất cả đều có rail icon dọc bên trái và top bar — trừ `dieu_khoan_va_chinh_sach.png`, vốn là trang marketing chứ không phải màn trong app.
 
 > Bản trước của mục này chốt mobile-first `max-width: 480px`. Đã đổi vì ảnh mẫu cho thấy sản phẩm thật là web desktop; giữ một cột 480px giữa màn 1600px làm bản mô phỏng không nhận ra là Green SM. Thay đổi này **thuần trình bày** — không route nào, không event nào, không `step_index` nào bị ảnh hưởng.
 

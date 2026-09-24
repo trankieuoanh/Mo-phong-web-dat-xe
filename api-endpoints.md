@@ -1,16 +1,11 @@
 # api-endpoints.md — GSM ride-booking simulation
 
 ## Nguyên tắc
-API vẫn chỉ có 1 nhiệm vụ: ghi & đọc event. Implement bằng **Express** trong `apps/api` — path, method, request/response giữ nguyên hình dạng, chỉ đổi công cụ và vị trí file.
+API chỉ có 1 nhiệm vụ: ghi & đọc event, cộng bốn endpoint tra cứu dữ liệu thật. Implement bằng **Route Handler của Next.js App Router** (`app/api/**/route.ts`), gọi xuống `lib/server/`.
 
-**Hai địa chỉ, cùng một API:**
+**Một địa chỉ duy nhất: `localhost:3000/api/...`** — cho cả trình duyệt lẫn curl/Postman/Python. Không còn cổng thứ hai, không còn proxy, nên mọi request từ app đều same-origin và không có preflight `OPTIONS`.
 
-| Gọi từ | URL | Ghi chú |
-|---|---|---|
-| Trình duyệt (app) | `localhost:3000/api/...` | Qua proxy `rewrites` của Next.js — same-origin, không preflight |
-| curl / Postman / Python | `localhost:4000/api/...` | Gọi thẳng `apps/api`, được `cors()` cho phép |
-
-Trong app **luôn** dùng đường thứ nhất: `fetch('/api/events')`. Gọi thẳng cổng 4000 từ trình duyệt sẽ kích hoạt preflight `OPTIONS` và làm mất `confirm_ride` / `place_order` — lý do đầy đủ ở `techstack.md`.
+> Bản trước dùng Express chạy riêng ở cổng 4000, và tài liệu này từng phải mô tả *hai* địa chỉ. Path, method, request/response **giữ nguyên hình dạng** qua lần chuyển đó — chỉ công cụ và vị trí file đổi. Lý do gộp ở `ARCHITECTURE.md`.
 
 ## Danh sách endpoint
 
@@ -18,7 +13,7 @@ Trong app **luôn** dùng đường thứ nhất: `fetch('/api/events')`. Gọi 
 ```
 POST /api/events
 ```
-File: `apps/api/src/routes/events.routes.ts` → `validators/event.validator.ts` → `services/event.service.ts`.
+File: `app/api/events/route.ts` → `lib/server/validators/event.validator.ts` → `lib/server/services/event.service.ts`.
 
 **Request body:**
 ```json
@@ -52,13 +47,13 @@ File: `apps/api/src/routes/events.routes.ts` → `validators/event.validator.ts`
 | `session_id` | string, khác rỗng | ✅ |
 | `user_id` | string, khác rỗng | ✅ |
 | `flow` | `"ride"` \| `"food"` \| `"none"` | ✅ |
-| `event_name` | thuộc `EVENT_NAMES` trong `@gsm/shared` | ✅ |
-| `screen_name` | khoá của `SCREENS` trong `@gsm/shared` | ✅ |
+| `event_name` | thuộc `EVENT_NAMES` trong `lib/shared` | ✅ |
+| `screen_name` | khoá của `SCREENS` trong `lib/shared` | ✅ |
 | `step_index` | number nguyên ≥ 0 | ✅ |
 | `previous_screen` | `ScreenName` \| null | ❌ — mặc định `null` |
 | `properties` | object | ❌ — mặc định `{}` |
 
-> Validator **không** tự gõ lại danh sách `event_name`/`screen_name` — nó import từ `@gsm/shared`, cùng nguồn mà `apps/web` dùng để gọi. Hai bên vì thế không thể lệch nhau, và thêm một event mới chỉ phải sửa một chỗ.
+> Validator **không** tự gõ lại danh sách `event_name`/`screen_name` — nó import từ `lib/shared`, cùng nguồn mà giao diện dùng để gọi. Hai bên vì thế không thể lệch nhau, và thêm một event mới chỉ phải sửa một chỗ.
 >
 > `flow: "none"` chỉ dành cho `screen_view` ở màn `home` — lúc đó người dùng chưa chọn luồng nào. Xem `event-taxonomy.md` mục 1.
 
@@ -74,18 +69,16 @@ Route dùng **whitelist**: chỉ lấy đúng 8 field ở bảng trên từ body
 { "error": "Invalid value for flow: expected \"ride\" | \"food\"" }
 ```
 
-**Response lỗi (401)** — chỉ xuất hiện khi biến `EVENTS_WRITE_KEY` được đặt ở BE:
+**Response lỗi (413)** — body vượt 64 kB (thay cho `express.json({ limit: '64kb' })` của bản cũ):
 ```json
-{ "error": "Thiếu hoặc sai khoá ghi event" }
+{ "error": "Body quá lớn" }
 ```
-
-Xem mục "Khoá `x-gsm-key`" ở cuối tài liệu này.
 
 ### 2. Lấy toàn bộ event của 1 session
 ```
 GET /api/events?session_id=abc-123
 ```
-File: `apps/api/src/routes/events.routes.ts`, handler `GET`.
+File: `app/api/events/route.ts`, handler `GET`.
 
 **Response (200):** mảng document, sắp xếp theo `step_index` tăng dần — dùng cho phân tích & replay.
 
@@ -134,7 +127,7 @@ Tiền tố `prop_` **cố ý trùng** với `analysis/fetch_events.py`, nên ha
 ```
 GET /api/places?q=Hồ Gươm&limit=6
 ```
-File: `apps/api/src/routes/places.routes.ts` → `validators/place.validator.ts` → `services/place.service.ts`.
+File: `app/api/places/route.ts` → `lib/server/validators/place.validator.ts` → `lib/server/services/photon.service.ts`.
 
 Nguồn: **[Photon](https://photon.komoot.io/)** (komoot), chạy trên dữ liệu OpenStreetMap. Miễn phí, không API key.
 
@@ -142,7 +135,7 @@ Nguồn: **[Photon](https://photon.komoot.io/)** (komoot), chạy trên dữ li�
 
 > **`bbox` là bắt buộc.** Photon chỉ *ưu tiên* theo `lat`/`lon` chứ không cắt, nên tìm "Hồ Gươm" trả về một tiệm ăn ở München ngay ở kết quả thứ hai. Nominatim trước đây chặn bằng `countrycodes=vn`; Photon không có tham số đó nên phải dùng khung bao Việt Nam `102.1,8.2,109.6,23.4`.
 
-**Response (200):** mảng `Place` (kiểu ở `packages/shared/src/places.ts`)
+**Response (200):** mảng `Place` (kiểu ở `lib/shared/places.ts`)
 ```json
 [{ "id": "osm-N240109189", "label": "Hồ Hoàn Kiếm",
    "address": "Hàng Trống, Hoàn Kiếm, Hà Nội", "source": "search",
@@ -154,7 +147,7 @@ Nguồn: **[Photon](https://photon.komoot.io/)** (komoot), chạy trên dữ li�
 | `q` | string, 2–120 ký tự | ✅ |
 | `limit` | số nguyên 1–8, mặc định 6 | ❌ |
 
-**Vì sao phải proxy qua `apps/api` chứ không gọi thẳng từ trình duyệt** — ba lý do, lý do đầu là chặn cứng:
+**Vì sao phải proxy qua `lib/server` chứ không gọi thẳng từ trình duyệt** — ba lý do, lý do đầu là chặn cứng:
 
 1. Điều khoản OSM bắt buộc mỗi request mang `User-Agent` định danh, mà **trình duyệt không cho JavaScript đặt header đó**.
 2. OSM giới hạn tuyệt đối **1 request/giây**. Chỉ ở server mới đặt được hàng đợi thật; debounce phía client là gợi ý, không phải bảo đảm.
@@ -173,7 +166,7 @@ Endpoint này **không chạm Firestore** và **không ghi event nào**: gõ ph�
 GET /api/restaurants?lat=21.0369&lon=105.7856&radius=2000&limit=20
 GET /api/restaurants?lat=21.0369&lon=105.7856&q=pho
 ```
-File: **cùng** `apps/api/src/routes/places.routes.ts` → `validators/place.validator.ts` (`validateRestaurantQuery`) → **`services/overpass.service.ts`** (`searchRestaurants`).
+File: **cùng** `app/api/places.routes.ts` → `validators/place.validator.ts` (`validateRestaurantQuery`) → **`services/overpass.service.ts`** (`searchRestaurants`).
 
 Nguồn: **[Overpass API](https://overpass-api.de/)**, truy vấn thẳng cơ sở dữ liệu OpenStreetMap. Miễn phí, không API key.
 
@@ -182,7 +175,7 @@ Nguồn: **[Overpass API](https://overpass-api.de/)**, truy vấn thẳng cơ s�
 > 1. `*.openstreetmap.org` không kết nối được từ máy chạy dự án (xem mục 3b).
 > 2. **Nominatim là một *geocoder*, không phải chỉ mục POI.** `amenity=restaurant` là truy vấn có cấu trúc xếp theo "importance", nên nó trả về rất thưa — **6-hoặc-0 quán ngay giữa Cầu Giấy**. Overpass truy vấn theo bán kính và trả về **80 quán** ở đúng toạ độ đó. Đây là khác biệt về *đúng công cụ*, không phải về *máy chủ nào còn sống*.
 
-**Response (200):** mảng `Restaurant` (`packages/shared/src/places.ts`) — `Place` cộng các tag OSM:
+**Response (200):** mảng `Restaurant` (`lib/shared/places.ts`) — `Place` cộng các tag OSM:
 ```json
 [{ "id": "osm-N4510096889", "label": "Nhà Hàng Bò Đội Nón",
    "address": "60 Trần Đăng Ninh, Dịch Vọng, Cầu Giấy, Hà Nội", "source": "search",
@@ -209,7 +202,7 @@ out center 80;
 
 1. **`restaurant|fast_food|cafe`**, không chỉ `restaurant` — người Việt gọi quán bánh mì, quán cà phê đều là "quán ăn", và lọc cứng theo `restaurant` cắt mất phần lớn quán thật.
 2. **`nwr`** = node + way + relation. Quán lớn được vẽ là `way` (cả toà nhà) chứ không phải một điểm, nên chỉ lấy `node` sẽ bỏ sót đúng những quán dễ nhận ra nhất. `out center` cho mỗi phần tử một toạ độ tâm.
-3. **`q` được lọc ở JS, KHÔNG gửi lên Overpass.** Overpass **từ chối** (406 Not Acceptable) các truy vấn có lớp ký tự tiếng Việt trong regex — đây là bộ lọc của hạ tầng trước nó, không sửa được bằng cách viết regex khéo hơn. Lọc ở JS dùng `normalizeVi` (đã có sẵn trong `@gsm/shared`) nên **gõ "pho" ra "Phở", "ca phe" ra "Cà Phê"** — bộ lọc phía Overpass không làm được việc đó. Thêm nữa, **khoá cache không chứa `q`**, nên mỗi phím gõ thêm không sinh một lời gọi Overpass mới: cả màn tìm kiếm chạy trên một lần tải duy nhất.
+3. **`q` được lọc ở JS, KHÔNG gửi lên Overpass.** Overpass **từ chối** (406 Not Acceptable) các truy vấn có lớp ký tự tiếng Việt trong regex — đây là bộ lọc của hạ tầng trước nó, không sửa được bằng cách viết regex khéo hơn. Lọc ở JS dùng `normalizeVi` (đã có sẵn trong `lib/shared`) nên **gõ "pho" ra "Phở", "ca phe" ra "Cà Phê"** — bộ lọc phía Overpass không làm được việc đó. Thêm nữa, **khoá cache không chứa `q`**, nên mỗi phím gõ thêm không sinh một lời gọi Overpass mới: cả màn tìm kiếm chạy trên một lần tải duy nhất.
 4. **Gate riêng, `minGapMs` 300ms.** Overpass không áp luật 1 request/giây của OSM; dùng chung gate với Photon/OSRM sẽ kéo cả tra địa chỉ lẫn tuyến đường chậm theo mà không có lý do gì.
 
 > **Độ phủ tag vẫn thưa.** Nhiều quán không có `cuisine`, `opening_hours` hay `addr:*`. Mọi trường thêm đều optional, `address` lui về `"Chưa có địa chỉ chi tiết"`, và FE **không được lọc bỏ** quán thiếu tag. Quán **không có `name`** là trường hợp duy nhất bị loại — không hiển thị được.
@@ -220,7 +213,7 @@ out center 80;
 ```
 GET /api/reverse?lat=21.0369&lon=105.7856
 ```
-File: `apps/api/src/routes/places.routes.ts` → `validators/place.validator.ts` (`validateReverseQuery`) → `services/photon.service.ts` (`reversePlace`).
+File: `app/api/places.routes.ts` → `validators/place.validator.ts` (`validateReverseQuery`) → `services/photon.service.ts` (`reversePlace`).
 
 **Response (200):** một `Place`, hoặc `null` khi Photon không biết chỗ đó là đâu.
 ```json
@@ -247,9 +240,9 @@ Endpoint này **không chạm Firestore** và **không ghi event nào**.
 ```
 GET /api/route?from=21.0369,105.7856&to=21.2189,105.8045
 ```
-File: `apps/api/src/routes/route.routes.ts` → `validators/route.validator.ts` → `services/route.service.ts`.
+File: `app/api/route.routes.ts` → `validators/route.validator.ts` → `services/route.service.ts`.
 
-**Response (200):** một `RouteResult` (kiểu ở `packages/shared/src/route.ts`)
+**Response (200):** một `RouteResult` (kiểu ở `lib/shared/route.ts`)
 ```json
 { "distanceKm": 28.4, "durationMin": 38, "source": "osrm",
   "geometry": [[21.0369,105.7856], [21.0371,105.7859], "…vài trăm điểm…"] }
@@ -260,14 +253,14 @@ File: `apps/api/src/routes/route.routes.ts` → `validators/route.validator.ts` 
 | `from` | `"lat,lon"` — lat ∈ [-90,90], lon ∈ [-180,180] | ✅ |
 | `to` | như trên | ✅ |
 
-Nguồn: [OSRM](https://project-osrm.org/) `router.project-osrm.org`, hồ sơ `driving`. Miễn phí, không API key. Proxy qua `apps/api` vì cùng ba lý do với `/api/places`: đặt được `User-Agent`, giữ được hàng đợi, và cache dùng chung — `service` dùng lại **đúng cơ chế** đã viết trong `place.service.ts`.
+Nguồn: [OSRM](https://project-osrm.org/) `router.project-osrm.org`, hồ sơ `driving`. Miễn phí, không API key. Proxy qua `lib/server` vì cùng ba lý do với `/api/places`: đặt được `User-Agent`, giữ được hàng đợi, và cache dùng chung — `service` dùng lại **đúng cơ chế** đã viết trong `place.service.ts`.
 
 **Lỗi (502)** khi OSRM rớt / quá thời gian chờ:
 ```json
 { "error": "Không tính được tuyến đường lúc này (upstream 429)" }
 ```
 
-> **`router.project-osrm.org` là máy chủ demo công cộng, không cam kết uptime.** Vì vậy FE **bắt buộc có đường lui**: gặp 502 thì gọi `straightRoute()` trong `@gsm/shared` — nối thẳng hai điểm, quãng đường theo công thức haversine — rồi ghi `route_source: "straight"` vào event. Luồng đặt xe **không bao giờ bị chặn** vì một dịch vụ bên ngoài, và dữ liệu vẫn nói thật về việc con số đến từ đâu.
+> **`router.project-osrm.org` là máy chủ demo công cộng, không cam kết uptime.** Vì vậy FE **bắt buộc có đường lui**: gặp 502 thì gọi `straightRoute()` trong `lib/shared` — nối thẳng hai điểm, quãng đường theo công thức haversine — rồi ghi `route_source: "straight"` vào event. Luồng đặt xe **không bao giờ bị chặn** vì một dịch vụ bên ngoài, và dữ liệu vẫn nói thật về việc con số đến từ đâu.
 
 Endpoint này **không chạm Firestore** và **không ghi event nào**.
 
@@ -275,9 +268,9 @@ Endpoint này **không chạm Firestore** và **không ghi event nào**.
 ```
 GET /api/tiles
 ```
-File: `apps/api/src/routes/tiles.routes.ts` → `services/tiles.service.ts`. Không nhận tham số nào nên không có validator.
+File: `app/api/tiles/route.ts` → `lib/server/services/tiles.service.ts`. Không nhận tham số nào nên không có validator.
 
-**Response (200):** tên các nhà cung cấp còn dùng được, **giữ nguyên thứ tự ưu tiên** trong `TILE_PROVIDERS` (`packages/shared/src/tiles.ts`)
+**Response (200):** tên các nhà cung cấp còn dùng được, **giữ nguyên thứ tự ưu tiên** trong `TILE_PROVIDERS` (`lib/shared/tiles.ts`)
 ```json
 { "providers": ["stadia", "osmfr", "osmde"] }
 ```
@@ -309,7 +302,7 @@ Endpoint này **không chạm Firestore** và **không ghi event nào**.
 ```
 GET /api/health
 ```
-File: `apps/api/src/routes/health.routes.ts`. Response: `{ "status": "ok" }`. **Không chạm Firestore** — Firebase Admin khởi tạo trễ nên route này trả lời được cả khi chưa có credential. Dùng để test ở Phase 0, trước khi setup Firebase.
+File: `app/api/health/route.ts`. Response: `{ "status": "ok" }`. **Không chạm Firestore** — Firebase Admin khởi tạo trễ nên route này trả lời được cả khi chưa có credential. Dùng để test ở Phase 0, trước khi setup Firebase.
 
 ## Những gì KHÔNG có trong API này
 - Không có endpoint đặt xe/đặt đồ ăn thật — chỉ lưu event xác nhận như mọi event khác.
@@ -323,24 +316,15 @@ Hệ quả cần biết: khi deploy công khai, `POST /api/events` trở thành 
 
 Biện pháp đã chọn là **shared secret trong header** (mục ngay dưới). Hai lựa chọn còn lại từng cân nhắc: App Check gắn chặt vào Firebase SDK phía client mà dự án cố tình không có; rate limit theo IP thì chặt hơn nhưng cần thêm state, và `upstream.ts` đã cho thấy state trong bộ nhớ tiến trình là thứ phải tính kỹ. Shared secret là mức vừa đủ cho một app demo.
 
-### Khoá `x-gsm-key`
+### Vì sao không còn khoá chia sẻ
 
-Chỉ bật khi biến `EVENTS_WRITE_KEY` được đặt ở BE. **Không đặt = không kiểm tra**, và đó là mặc định khi chạy local — không ai phải cấu hình thêm để chạy dự án, `analysis/fetch_events.py` cũng không đổi gì.
+Đã từng có một guard `x-gsm-key` ở `/api/events`, dựng cho bản hai process. Nó hoạt động được **chỉ nhờ** chặng server→server giữa hai app: header được gắn ở tầng máy chủ, sau khi request đã rời máy người dùng, nên trình duyệt không bao giờ biết giá trị khoá.
 
-| | |
-|---|---|
-| Áp cho | **cả `POST` lẫn `GET /api/events`** (`/history` đọc lại event qua cùng đường proxy) |
-| Header | `x-gsm-key` |
-| Sai hoặc thiếu | `401 { "error": "Thiếu hoặc sai khoá ghi event" }` |
-| Ai gắn header | `apps/web/middleware.ts`, **ở tầng máy chủ** |
+Gộp một project thì chặng đó biến mất. Trình duyệt gọi thẳng vào route handler, nên bất cứ thứ gì `lib/track.ts` gửi được thì người dùng cũng đọc được trong bundle — khoá chỉ còn là hàng rào hình thức. Nó đã được gỡ, và tài liệu ghi lại điều này để không ai dựng lại nó mà tưởng là đang bảo vệ được gì.
 
-**Trình duyệt không bao giờ biết giá trị khoá.** Đây là điểm chính: `lib/track.ts` vẫn gọi `fetch('/api/events')` same-origin y như cũ, rồi máy chủ của `apps/web` mới gắn header trước khi chuyển tiếp sang `apps/api`. Mở DevTools cũng không thấy, đọc bundle cũng không có. Nếu gắn header trong `track.ts` thì khoá nằm trong JS tải về máy người dùng và hoàn toàn vô nghĩa — **đừng chuyển nó sang FE cho gọn**.
-
-Các endpoint còn lại (`/api/places`, `/api/reverse`, `/api/restaurants`, `/api/route`, `/api/tiles`, `/api/health`) **không bị chặn**: chúng chỉ đọc dữ liệu công khai, không ghi gì, nên đóng lại không được lợi gì mà mất khả năng gọi thẳng để debug.
-
-Vẫn nên giữ nguyên tắc **sinh xong dữ liệu phân tích rồi hãy deploy công khai**. Khoá chặn được bot và người tò mò, không chặn được người quyết tâm — họ vẫn mở được web và click thật.
+Muốn chặn thật thì cần thứ khác: rate limit theo IP có state ngoài bộ nhớ tiến trình, hoặc App Check. Cả hai đều ngoài phạm vi dự án 6 tuần.
 
 ## Lưu ý riêng cho Firestore
-Credential Firebase Admin SDK (service account key) chỉ sống trong `apps/api` (`apps/api/.env`, đã gitignore). `apps/web` **không có `firebase-admin` trong `dependencies`** nên không import nổi — xem `CLAUDE.md` quy tắc 1.
+Credential Firebase Admin SDK (service account key) chỉ sống trong `lib/server` (`.env.local`, đã gitignore). Mọi file ở đó mở đầu bằng `import 'server-only'`, nên kéo một cái vào Client Component là build đỏ ngay — xem `CLAUDE.md` quy tắc 1.
 
 Query kết hợp `where` + `orderBy` trên 2 field khác nhau sẽ bị Firestore từ chối **kèm một link tạo index sẵn trong thông báo lỗi**. Vì vậy `GET /api/events` trả nguyên văn message lỗi của Firestore thay vì nuốt đi — nó chứa đường dẫn cần đi (xem `db-design.md`).

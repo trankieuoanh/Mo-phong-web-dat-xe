@@ -7,7 +7,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { SHIPPING_FEE, calcFoodTotals, getFoodItem } from '@gsm/shared';
+import { SHIPPING_FEE, calcFoodTotals, getFoodItem } from '@/lib/shared';
 import { BackButton } from '@/components/BackButton';
 import { EmptyState } from '@/components/EmptyState';
 import { FlowGuard } from '@/components/FlowGuard';

@@ -96,9 +96,9 @@ Event kết thúc funnel ride, và là **nguồn duy nhất** dựng nên một 
 
 > Giá trị `screen_name`, `previous_screen`, `step_index` và cấu trúc `properties` của **mọi** event được quy định trong `event-taxonomy.md` — đó là nguồn sự thật, file này chỉ minh hoạ hình dạng document.
 
-`platform` do `apps/api` tự gắn, **không** nằm trong request body (xem `api-endpoints.md`).
+`platform` do `lib/server` tự gắn, **không** nằm trong request body (xem `api-endpoints.md`).
 
-## Cách ghi 1 document (trong `apps/api/src/services/event.service.ts`, dùng Admin SDK)
+## Cách ghi 1 document (trong `lib/server/services/event.service.ts`, dùng Admin SDK)
 ```js
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
@@ -148,6 +148,6 @@ Firestore tự tạo index đơn giản (theo 1 field), nhưng khi query kết h
 ## Về danh sách 17 trường của mentor (chưa confirm)
 Khi có list thật, chỉ cần thêm field vào object khi ghi document — không có bước "migrate schema" như SQL (`ALTER TABLE`). Field nào dùng để lọc/sắp xếp thường xuyên thì để ở top-level document (như `flow`, `session_id`), field đặc thù ít dùng để lọc thì gom vào `properties`.
 
-Cụ thể phải sửa: `EventPayload` trong `packages/shared/src/types.ts`, rồi `apps/api/src/validators/event.validator.ts` (whitelist hiện chỉ lấy đúng 8 field — field mới không thêm vào đây sẽ bị loại im lặng).
+Cụ thể phải sửa: `EventPayload` trong `lib/shared/types.ts`, rồi `lib/server/validators/event.validator.ts` (whitelist hiện chỉ lấy đúng 8 field — field mới không thêm vào đây sẽ bị loại im lặng).
 
 Quy trình chi tiết khi list được chốt: xem `event-taxonomy.md` mục 6.

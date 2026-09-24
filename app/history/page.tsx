@@ -14,13 +14,12 @@
  * Loc theo `user_id` chu khong phai `session_id`: `user_id` song o localStorage
  * nen bang nay ben qua nhieu phien, nhieu ngay — dung nghia "lich su nguoi dung".
  *
- * Duong goi API la `/api/events` SAME-ORIGIN qua proxy rewrites cua Next
- * (apps/web/next.config.ts). Khong bao gio goi thang localhost:4000 — xem
- * CLAUDE.md muc "Ba cai bay da biet".
+ * `/api/events` la route handler cua CHINH app nay (app/api/events/route.ts),
+ * nen moi request deu same-origin — khong co preflight, khong co proxy.
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { getOffer, getVehicle, type EventDoc } from '@gsm/shared';
+import { getOffer, getVehicle, type EventDoc } from '@/lib/shared';
 import { Icon } from '@/components/Icon';
 import { AppShell } from '@/components/shell/AppShell';
 import { formatVnd } from '@/lib/format';
@@ -160,7 +159,7 @@ export default function HistoryPage() {
 
   useEffect(() => {
     // getUserId() cham localStorage nen chi duoc goi trong effect,
-    // khong goi luc render (apps/web/lib/session.ts).
+    // khong goi luc render (lib/session.ts).
     const id = getUserId();
     setUserId(id);
 
@@ -171,7 +170,7 @@ export default function HistoryPage() {
         const body = await res.json();
         if (!res.ok) {
           // Route GET co y tra nguyen van thong bao loi cua Firestore vi no
-          // chua LINK TAO INDEX can bam (apps/api/src/routes/events.routes.ts).
+          // chua LINK TAO INDEX can bam (app/api/events/route.ts).
           throw new Error(body?.error ?? `HTTP ${res.status}`);
         }
         return body as (EventDoc & { id?: string })[];
@@ -312,8 +311,7 @@ export default function HistoryPage() {
                       {/* Hien nguyen van: thong bao cua Firestore co the chua link tao index. */}
                       <p className="t-caption mt-xs break-all text-body">{errorMessage}</p>
                       <p className="t-caption mt-md text-mute">
-                        Kiểm tra apps/api đã chạy chưa và credential Firebase trong apps/api/.env —
-                        xem setup.md.
+                        Kiểm tra credential Firebase trong .env.local — xem setup.md.
                       </p>
                     </td>
                   </tr>

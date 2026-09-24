@@ -12,7 +12,7 @@
  */
 
 import { useRouter } from 'next/navigation';
-import { DEFAULT_PICKUP, calcFare, calcRideTotals, getPromo, getVehicle } from '@gsm/shared';
+import { DEFAULT_PICKUP, calcFare, calcRideTotals, getPromo, getVehicle } from '@/lib/shared';
 import { BackButton } from '@/components/BackButton';
 import { FlowGuard } from '@/components/FlowGuard';
 import { Icon, type IconName } from '@/components/Icon';

@@ -1,6 +1,6 @@
-# be-structure.md — cấu trúc backend (`apps/api`)
+# be-structure.md — cấu trúc phía server (`app/api/` + `lib/server/`)
 
-Mô tả **code hiện có** trong `apps/api`: bốn lớp, mỗi lớp làm gì và không được làm gì, một request đi qua chúng ra sao.
+Mô tả **code hiện có** ở phía server: route handler, validator, service, db — mỗi lớp làm gì và không được làm gì, một request đi qua chúng ra sao.
 
 Đây không phải hợp đồng API. Muốn biết endpoint nào nhận field gì, trả mã lỗi nào → `api-endpoints.md`. Muốn biết document Firestore hình dạng ra sao → `db-design.md`. File này trả lời câu khác: **code hiện thực những thứ đó ra sao**.
 
@@ -8,50 +8,58 @@ Mô tả **code hiện có** trong `apps/api`: bốn lớp, mỗi lớp làm gì
 
 ## 1. Vai trò
 
-Express + TypeScript chạy qua `tsx`, cổng **4000**, process hoàn toàn riêng với `apps/web`.
+Route handler của App Router, chạy trong **cùng process** với giao diện (`next dev`, cổng 3000). Không có server thứ hai, không có cổng 4000.
+
+> **Trước đây đây là một app Express riêng (`apps/api`, cổng 4000)**, nối với giao diện bằng `rewrites` proxy. Nó bị gỡ vì deploy: quên host nó thì proxy trỏ về `localhost:4000` và **mọi** `/api/*` chết im lặng. Lịch sử đầy đủ ở `ARCHITECTURE.md`. Điều đáng nói cho người đọc code: **validator và service không đổi một dòng nào khi chuyển** — chúng vốn không import gì từ Express. Chỉ tầng HTTP được viết lại.
 
 Ba điều quyết định hình dạng thư mục này:
 
-- **Nơi duy nhất trong monorepo cầm credential Firestore.** `apps/web` không có `firebase-admin` trong `dependencies` nên không import nổi.
-- **Không biết gì về React.** Không JSX, không component, không render.
-- **Không có bước build.** `tsx` chạy thẳng `.ts`; script `dev` là `tsx watch --env-file-if-exists=.env src/server.ts`.
-
-Trình duyệt **không gọi thẳng** vào đây — `apps/web` proxy `/api/*` sang cổng này. `cors()` bật cho `WEB_ORIGIN` chỉ phục vụ gọi thẳng bằng curl/Postman khi debug.
+- **Nơi duy nhất cầm credential Firestore.** Không file nào ngoài `app/api/**` được import từ `lib/server/`, và hàng rào là gói `server-only`: kéo một service vào Client Component là **build đỏ ngay** (CLAUDE.md quy tắc 1).
+- **Không biết gì về React.** Không JSX, không component, không render — kể cả khi giờ nó nằm chung project.
+- **Mọi route đều `runtime = 'nodejs'`.** `firebase-admin` và `AbortSignal.timeout` không chạy được trên Edge runtime. Kèm `dynamic = 'force-dynamic'`: không route nào ở đây được cache tĩnh.
 
 ---
 
 ## 2. Cây thư mục
 
 ```
-apps/api/
-├─ package.json          dev: tsx watch --env-file-if-exists=.env src/server.ts
-├─ tsconfig.json
-├─ .env.example          FIREBASE_* · PORT · WEB_ORIGIN · NOMINATIM_CONTACT
-│                        (bản thật .env đã gitignore)
-└─ src/
-   ├─ server.ts                     express + cors + json + listen + xử lý EADDRINUSE
-   ├─ routes/
-   │  ├─ events.routes.ts           POST và GET /api/events
-   │  ├─ places.routes.ts           GET /api/places, /api/reverse, /api/restaurants
-   │  ├─ route.routes.ts            GET /api/route  — tìm tuyến đường thật
-   │  ├─ tiles.routes.ts            GET /api/tiles  — nhà cung cấp tile nào còn dùng được
-   │  └─ health.routes.ts           GET /api/health — không chạm Firestore
-   ├─ validators/
-   │  ├─ event.validator.ts         whitelist 8 field + validate query
-   │  ├─ place.validator.ts         q (2–120 ký tự) + limit (1–8)
-   │  └─ route.validator.ts         from/to dạng "lat,lon" 
-   ├─ services/
-   │  ├─ event.service.ts           createEvent · listEvents
-   │  ├─ photon.service.ts          Photon: tìm địa chỉ + reverse geocode
-   │  ├─ overpass.service.ts        Overpass: quán ăn thật theo bán kính
-   │  ├─ route.service.ts           OSRM: gọi + chuẩn hoá geometry sang [lat,lon]
-   │  ├─ tiles.service.ts           dò tile biển sâu để phát hiện watermark API key
-   │  └─ upstream.ts                hàng đợi + cache, DÙNG CHUNG cho các cái trên
-   └─ db/
-      └─ firebase-admin.ts          getDb() — khởi tạo trễ
+app/api/                            ← tầng HTTP. Tên THƯ MỤC là URL.
+├─ health/route.ts                  GET  /api/health — không chạm Firestore
+├─ events/route.ts                  POST + GET /api/events
+├─ places/route.ts                  GET  /api/places
+├─ reverse/route.ts                 GET  /api/reverse
+├─ restaurants/route.ts             GET  /api/restaurants — maxDuration = 30
+├─ route/route.ts                   GET  /api/route
+└─ tiles/route.ts                   GET  /api/tiles — referer lấy từ chính request
+
+lib/server/                         ← không phụ thuộc HTTP. Mọi file `import 'server-only'`.
+├─ validators/
+│  ├─ event.validator.ts            whitelist 8 field + validate query
+│  ├─ place.validator.ts            q (2–120 ký tự) + limit (1–8)
+│  └─ route.validator.ts            from/to dạng "lat,lon"
+├─ services/
+│  ├─ event.service.ts              createEvent · listEvents
+│  ├─ photon.service.ts             Photon: tìm địa chỉ + reverse geocode
+│  ├─ overpass.service.ts           Overpass: quán ăn thật theo bán kính
+│  ├─ route.service.ts              OSRM: gọi + chuẩn hoá geometry sang [lat,lon]
+│  ├─ tiles.service.ts              dò tile biển sâu để phát hiện watermark API key
+│  └─ upstream.ts                   hàng đợi + cache, DÙNG CHUNG cho các cái trên
+└─ db/
+   └─ firebase-admin.ts             getDb() — khởi tạo trễ
+
+.env.local                          FIREBASE_* · NOMINATIM_CONTACT (gitignored)
+                                    Mẫu ở .env.example
 ```
 
 `event.validator.ts` là file lớn nhất — xem mục 4 để biết vì sao.
+
+> **`app/api/route/route.ts` không phải lỗi gõ.** Tên thư mục là đường dẫn URL, tên file luôn là `route.ts` — nên endpoint `/api/route` bắt buộc trông như vậy.
+
+### Validator nhận thẳng `URLSearchParams` — và đó là lý do việc gộp rẻ
+
+Cả ba validator nhận `URLSearchParams`, không nhận `req` của framework nào. Bản Express phải tự bóc `new URLSearchParams(req.url.split('?')[1] ?? '')`; route handler chỉ cần `request.nextUrl.searchParams`, vốn **đã là** `URLSearchParams`. Nhờ vậy toàn bộ tầng validator và service chuyển sang mà không sửa một dòng.
+
+Giữ nguyên tính chất này khi thêm endpoint mới: **validator và service không được biết mình đang chạy dưới framework nào.**
 
 ### `upstream.ts` — vì sao hàng đợi và cache nằm một chỗ
 
@@ -79,76 +87,84 @@ Lỗi upstream trả **502** chứ không phải 500: lỗi nằm ở dịch v�
 
 ```mermaid
 flowchart LR
-  R[routes/<br/>HTTP] --> V[validators/<br/>kiểm tra dữ liệu]
-  R --> S[services/<br/>nghiệp vụ]
-  S --> D[db/<br/>Firestore]
-  V -.->|import| SH[["@gsm/shared"]]
+  R["app/api/**/route.ts<br/>HTTP"] --> V[lib/server/validators/<br/>kiểm tra dữ liệu]
+  R --> S[lib/server/services/<br/>nghiệp vụ]
+  S --> D[lib/server/db/<br/>Firestore]
+  V -.->|import| SH[["lib/shared"]]
 ```
 
 Ranh giới trách nhiệm — **mỗi lớp không được làm gì** cũng quan trọng như nó làm gì:
 
 | Lớp | Làm | **Không** làm |
 |---|---|---|
-| `server.ts` | Dựng app, middleware, mở cổng | Không chứa logic nghiệp vụ nào |
-| `routes/` | Đọc request, gọi validator, gọi service, chọn mã HTTP | Không tự validate, không tự gọi Firestore |
-| `validators/` | Kiểm tra kiểu và giá trị, whitelist field | Không chạm Firestore, không biết Express |
-| `services/` | Gắn field server, ghi/đọc Firestore, chuẩn hoá kết quả | Không biết `req`/`res`, không trả mã HTTP |
+| `app/api/**/route.ts` | Đọc request, gọi validator, gọi service, chọn mã HTTP | Không tự validate, không tự gọi Firestore |
+| `validators/` | Kiểm tra kiểu và giá trị, whitelist field | Không chạm Firestore, không biết framework |
+| `services/` | Gắn field server, ghi/đọc Firestore, chuẩn hoá kết quả | Không biết `Request`/`Response`, không trả mã HTTP |
 | `db/` | Khởi tạo Admin SDK, trả `Firestore` | Không biết collection nào đang được truy vấn |
 
-Lợi ích cụ thể: `validators/` không phụ thuộc Express nên test được bằng cách gọi hàm thẳng, và `services/` không phụ thuộc HTTP nên script Python hay job nền sau này dùng lại được.
+Lợi ích cụ thể: `validators/` không phụ thuộc framework nên test được bằng cách gọi hàm thẳng, và `services/` không phụ thuộc HTTP nên script Python hay job nền sau này dùng lại được. Đây cũng chính là thứ đã làm việc gộp hai app thành một trở nên rẻ — xem mục 2.
 
 ---
 
 ## 4. Từng lớp
 
-### `server.ts` (47 dòng)
+### Khuôn chung của một route handler
+
+Không còn `server.ts` dựng app: App Router tự ghép tên thư mục thành URL. Mỗi file bắt đầu bằng ba khai báo, và cả ba đều bắt buộc:
 
 ```ts
-app.use(cors({ origin: WEB_ORIGIN }));
-app.use(express.json({ limit: '64kb' }));
-app.use('/api', healthRouter);
-app.use('/api', eventsRouter);
-app.use(/* 404 fallback */);
+export const runtime = 'nodejs';        // firebase-admin + AbortSignal.timeout
+export const dynamic = 'force-dynamic'; // không được cache tĩnh
+
+export async function GET(request: NextRequest) {
+  const result = validateXQuery(request.nextUrl.searchParams);
+  if (!result.ok) return Response.json({ error: result.error }, { status: 400 });
+  try {
+    return Response.json(await doX(result.value));
+  } catch (error) {
+    console.error('[GET /api/x] …', error);
+    return Response.json({ error: 'Câu tiếng Việt' }, { status: 502 });
+  }
+}
 ```
 
-`PORT` và `WEB_ORIGIN` đọc từ env, có giá trị mặc định (`4000`, `http://localhost:3000`) nên chạy được ngay khi chưa có `.env`.
+Ba thứ mất đi cùng Express, ghi ra đây để không ai đi tìm:
 
-`WEB_ORIGIN` nhận **danh sách phân tách bằng dấu phẩy**, vì khi có bản deploy thì có hai origin hợp lệ cùng lúc: domain thật và `localhost:3000` lúc ngồi debug. Một chuỗi đơn vẫn chạy bình thường. Thứ tự **có ý nghĩa**: `services/tiles.service.ts` lấy phần tử đầu làm `Referer` khi dò tile, nên trên bản deploy phải để domain thật đứng trước (xem `setup.md` mục "Deploy").
+| Bản Express | Bây giờ |
+|---|---|
+| `cors({ origin: WEB_ORIGIN })` | Không cần — trình duyệt gọi same-origin |
+| `express.json({ limit: '64kb' })` | Tự kiểm `content-length` ở đầu `POST /api/events` |
+| 404 JSON `{error:'Not found'}` | Trang 404 của Next |
 
-Có `server.on('error')` bắt `EADDRINUSE` và thoát với thông báo rõ. Thiếu handler này thì lỗi mở cổng bị nuốt và **tiến trình treo im lặng, không in gì ra cả stdout lẫn stderr** — người dùng tưởng BE vẫn sống và đi tìm nhầm chỗ.
-
-### `routes/health.routes.ts` (14 dòng)
+### `app/api/health/route.ts` (15 dòng)
 ```
 GET /api/health → { "status": "ok" }
 ```
-**Không chạm Firestore.** Nhờ vậy nó trả lời được ngay cả khi chưa có credential — đúng mục đích: xác nhận Express chạy đúng *trước khi* Firebase vào cuộc, để hai loại lỗi không trộn vào nhau.
+**Không chạm Firestore, và không import gì từ `lib/server/db`.** Nhờ vậy nó trả lời được ngay cả khi chưa có `.env.local` — đúng mục đích: xác nhận app chạy đúng *trước khi* Firebase vào cuộc, để hai loại lỗi không trộn vào nhau.
 
-### `routes/events.routes.ts` (87 dòng)
+### `app/api/events/route.ts` (~80 dòng)
 ```ts
-export const eventsRouter: Router
+export async function POST(request: NextRequest)
+export async function GET(request: NextRequest)
 ```
-Hai handler, mỗi handler cùng một khuôn: validate → sai thì 400 → đúng thì gọi service trong `try/catch` → lỗi thì log đầy đủ phía server và trả JSON gọn cho client.
+Hai handler, cùng một khuôn: validate → sai thì 400 → đúng thì gọi service trong `try/catch` → lỗi thì log đầy đủ phía server và trả JSON gọn cho client.
 
-Trước cả hai handler có **một guard khoá chia sẻ**, áp cho cả `POST` lẫn `GET /events`:
+`POST` làm thêm hai việc mà Express từng làm hộ:
 
 ```ts
-eventsRouter.use('/events', (req, res, next) => {
-  if (!EVENTS_WRITE_KEY) return next();               // không đặt = không kiểm tra
-  if (req.get('x-gsm-key') !== EVENTS_WRITE_KEY) {
-    res.status(401).json({ error: 'Thiếu hoặc sai khoá ghi event' });
-    return;
-  }
-  next();
-});
+const declared = Number(request.headers.get('content-length') ?? 0);
+if (declared > MAX_BODY_BYTES) return Response.json({ error: 'Body quá lớn' }, { status: 413 });
+
+let body: unknown;
+try { body = await request.json(); }
+catch { return Response.json({ error: 'Body không phải JSON hợp lệ' }, { status: 400 }); }
 ```
 
-Ba điều cần biết trước khi sửa chỗ này:
+`MAX_BODY_BYTES = 64 * 1024` — cùng con số với `express.json({ limit: '64kb' })` trước đây. Một event hợp lệ nặng vài trăm byte, nên ngưỡng này không để tối ưu mà để một body khổng lồ không kịp đi xa hơn vào validator.
 
-- **Không đặt `EVENTS_WRITE_KEY` thì không kiểm tra gì** — là chủ ý, không phải sơ sót. Chạy local không ai phải cấu hình thêm, `analysis/fetch_events.py` cũng không đổi. Khoá chỉ bật ở nơi thật sự cần: bản deploy công khai.
-- **Khoá không do trình duyệt gắn.** `apps/web/middleware.ts` bơm header ở tầng máy chủ, sau khi request đã rời máy người dùng. Chuyển việc đó sang `lib/track.ts` là đưa khoá vào bundle và làm nó vô dụng.
-- **Chặn cả GET**, vì `/history` đọc lại event qua đúng đường proxy đó nên middleware đã bơm header sẵn cho mọi `/api/*`.
+**KHÔNG CÓ AUTHENTICATION**, và đó là quyết định có chủ ý chứ không phải thiếu sót — `api-endpoints.md` đã ghi từ đầu. Đã từng có một guard khoá chia sẻ `x-gsm-key` ở đây, dựng cho bản hai process; nó hoạt động được **chỉ nhờ** chặng server→server giữa hai app, nơi header được gắn sau khi request đã rời máy người dùng. Gộp một app thì chặng đó biến mất: trình duyệt gọi thẳng vào route này, nên bất cứ thứ gì `lib/track.ts` gửi được thì người dùng cũng đọc được trong bundle. Giữ lại chỉ là hàng rào hình thức, nên nó đã được gỡ.
 
-Các router khác không có guard: chúng chỉ đọc dữ liệu công khai và không ghi gì.
+Nguyên tắc thay thế, không đổi từ đầu dự án: **sinh xong dữ liệu phân tích rồi hãy deploy công khai.**
 
 ### `validators/event.validator.ts` (162 dòng) — file lớn nhất BE
 ```ts
@@ -166,7 +182,7 @@ Dài vì kiểm **từng field một** và trả đúng câu lỗi mà `api-endp
 Hai điểm thiết kế:
 
 - **Whitelist, không blacklist.** Chỉ đúng 8 field được lấy ra từ body; mọi field lạ bị bỏ **im lặng** (không trả lỗi). Nhờ vậy client gửi kèm `platform` hay `created_at` cũng không ghi đè được giá trị server tự gắn.
-- **Danh sách hợp lệ nhập từ `@gsm/shared`**, không gõ lại: `isEventName`, `isFlowValue`, `isScreenName`. Đây là lý do danh sách `event_name`/`screen_name` ở FE và BE **không thể lệch nhau** — thêm một event chỉ phải sửa một chỗ.
+- **Danh sách hợp lệ nhập từ `lib/shared`**, không gõ lại: `isEventName`, `isFlowValue`, `isScreenName`. Đây là lý do danh sách `event_name`/`screen_name` ở FE và BE **không thể lệch nhau** — thêm một event chỉ phải sửa một chỗ.
 
 Trả về kiểu union `{ ok: true, value } | { ok: false, error }` nên TypeScript ép route phải xử lý nhánh lỗi trước khi chạm `value`.
 
@@ -194,26 +210,26 @@ export function getDb(): Firestore
 
 Ba chi tiết bắt buộc, đừng lược bỏ:
 
-- **`getApps()[0] ?? initializeApp(...)`** — `tsx watch` chạy lại module nhiều lần trong cùng tiến trình; gọi `initializeApp()` thẳng sẽ ném `The default Firebase app already exists` ngay lần sửa file thứ hai.
+- **`getApps()[0] ?? initializeApp(...)`** — hot-reload của `next dev` chạy lại module nhiều lần trong cùng tiến trình; gọi `initializeApp()` thẳng sẽ ném `The default Firebase app already exists` ngay lần sửa file thứ hai.
 - **`.replace(/\\n/g, '\n')`** cho private key — trong `.env` ký tự xuống dòng ở dạng literal `\n`; thiếu bước này sẽ lỗi `error:1E08010C:DECODER routines::unsupported`.
 - **Khởi tạo trễ** — xem mục 8.
 
 Thiếu biến môi trường thì ném lỗi **chỉ rõ thiếu biến nào** và phải làm gì, chứ không để Firebase ném lỗi khó hiểu:
 ```
 Thieu bien moi truong Firebase: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY.
-Copy apps/api/.env.example thanh apps/api/.env roi dien gia tri (xem setup.md Phase 1).
+Copy .env.example thanh .env.local roi dien gia tri (xem setup.md Phase 1).
 ```
 
 ---
 
 ## 5. Luồng `POST /api/events`
 
-Tiếp nối mục 7 của `fe-structure.md` — request đã rời trình duyệt và qua proxy:
+Tiếp nối mục 7 của `fe-structure.md` — request đã rời trình duyệt:
 
 ```
-1. :3000/api/events          Next.js rewrites → :4000/api/events
-2. cors() + express.json()   parse body, giới hạn 64kb
-3. eventsRouter POST         nhận req.body (kiểu unknown)
+1. POST /api/events          same-origin, không preflight
+2. app/api/events/route.ts   chặn > 64kb, await request.json()
+3. POST handler              nhận body (kiểu unknown)
 4. validateEventPayload      8 field, whitelist; sai → 400, dừng tại đây
 5. createEvent(value)        gắn platform: 'web' + FieldValue.serverTimestamp()
 6. getDb().collection('events').add(...)   ← lần đầu mới chạy initializeApp
@@ -270,7 +286,7 @@ export function getDb(): Firestore {
 }
 ```
 
-Nếu khởi tạo ngay lúc load, **server sẽ không lên được** khi chưa có `.env` — và `GET /api/health` mất hết ý nghĩa, vì nó sinh ra chính để xác nhận Express sống *trước khi* credential vào cuộc.
+Nếu khởi tạo ngay lúc load, **route nào import nó cũng đổ** khi chưa có `.env.local` — và `GET /api/health` mất hết ý nghĩa, vì nó sinh ra chính để xác nhận Express sống *trước khi* credential vào cuộc.
 
 Nhờ khởi tạo trễ, trạng thái "chưa có Firebase" vẫn dùng được: app chạy, click hết cả hai luồng được, chỉ `POST /api/events` trả 500. Đó là trạng thái mặc định sau khi clone — xem `setup.md` mục Chạy nhanh.
 
@@ -279,16 +295,16 @@ Nhờ khởi tạo trễ, trạng thái "chưa có Firebase" vẫn dùng đượ
 ## 9. Thêm một endpoint mới
 
 1. **`api-endpoints.md` trước** — chốt path, method, request/response, mã lỗi. Tài liệu là hợp đồng; code đi sau.
-2. **`validators/`** — thêm hàm validate, trả kiểu union `{ ok, ... }`. Danh sách giá trị hợp lệ nhập từ `@gsm/shared`, đừng gõ lại.
+2. **`validators/`** — thêm hàm validate, trả kiểu union `{ ok, ... }`. Danh sách giá trị hợp lệ nhập từ `lib/shared`, đừng gõ lại.
 3. **`services/`** — thêm hàm nghiệp vụ. Không nhận `req`/`res`, chỉ nhận dữ liệu đã sạch.
 4. **`routes/`** — nối hai thứ trên, chọn mã HTTP, bọc `try/catch`.
-5. **Đăng ký** trong `server.ts` nếu là router mới.
+5. **Tạo thư mục** `app/api/<tên>/route.ts` — không có bước đăng ký nào, tên thư mục chính là URL.
 
-Thêm field vào event thì sửa `EventPayload` trong `packages/shared/src/types.ts` **và** whitelist trong `event.validator.ts` — whitelist hiện chỉ lấy đúng 8 field, field mới không thêm vào đó sẽ bị loại im lặng.
+Thêm field vào event thì sửa `EventPayload` trong `lib/shared/types.ts` **và** whitelist trong `event.validator.ts` — whitelist hiện chỉ lấy đúng 8 field, field mới không thêm vào đó sẽ bị loại im lặng.
 
 ---
 
-## 10. Nhập gì từ `@gsm/shared`
+## 10. Nhập gì từ `lib/shared`
 
 BE dùng shared rất ít, đúng một mục đích: **hợp đồng dữ liệu**.
 
@@ -307,13 +323,13 @@ BE **không** dùng `mock-data.ts` hay `pricing.ts` — dữ liệu tĩnh và t�
 
 ## 11. Trạng thái: BE đã xong tới đâu
 
-**Không còn `TODO` nào trong `apps/api`** — và từ khi `analysis/metrics.py` được viết đủ 6 nhóm chỉ số, **toàn repo không còn `TODO` nào**.
+**Không còn `TODO` nào ở phía server** — và từ khi `analysis/metrics.py` được viết đủ 6 nhóm chỉ số, **toàn repo không còn `TODO` nào**.
 
 **BE đã chạy thật với Firestore** — không còn gì để implement.
 
 | Endpoint | Code | Đã kiểm chứng tới đâu |
 |---|:--:|---|
-| `GET /api/health` | xong | ✅ Cả gọi thẳng `:4000` lẫn qua proxy `:3000` |
+| `GET /api/health` | xong | ✅ `curl localhost:3000/api/health` |
 | `POST /api/events` — validate | xong | ✅ 6 ca lỗi, đúng từng câu chữ trong `api-endpoints.md` |
 | `POST /api/events` — ghi Firestore | xong | ✅ 201 + `event_id` thật; `platform` và `created_at` do server gắn |
 | `GET /api/events?session_id=` | xong | ✅ Sắp theo `step_index`, `created_at` trả về dạng ISO |
@@ -368,14 +384,14 @@ Windows PowerShell dùng `curl.exe` thay cho `curl` — xem `setup.md` mục "L�
 Toàn bộ nhóm này **đã chạy thật**, output dưới đây là kết quả thật chứ không phải ví dụ minh hoạ.
 
 ```bash
-curl localhost:4000/api/health
+curl localhost:3000/api/health
 # {"status":"ok"}
 ```
 
 Sáu ca validate, mỗi ca nhắm một nhánh khác nhau trong `event.validator.ts`:
 
 ```bash
-post() { curl -s -w " <- HTTP %{http_code}\n" -X POST localhost:4000/api/events \
+post() { curl -s -w " <- HTTP %{http_code}\n" -X POST localhost:3000/api/events \
            -H 'Content-Type: application/json' -d "$1"; }
 
 # 1. Thiếu field bắt buộc
@@ -386,7 +402,7 @@ post '{"session_id":"s1","user_id":"u1","event_name":"screen_view","screen_name"
 post '{"session_id":"s1","user_id":"u1","flow":"xe","event_name":"screen_view","screen_name":"home","step_index":0}'
 # {"error":"Invalid value for flow: expected \"ride\" | \"food\" | \"none\""} <- HTTP 400
 
-# 3. event_name gõ nhầm — ca này chứng minh giá trị của @gsm/shared
+# 3. event_name gõ nhầm — ca này chứng minh giá trị của lib/shared
 post '{"session_id":"s1","user_id":"u1","flow":"ride","event_name":"select_vehicel","screen_name":"home","step_index":0}'
 # {"error":"Invalid value for event_name: unknown event \"select_vehicel\""} <- HTTP 400
 
@@ -403,7 +419,7 @@ post '{"session_id":"  ","user_id":"u1","flow":"ride","event_name":"screen_view"
 # {"error":"Invalid value for session_id: expected a non-empty string"} <- HTTP 400
 ```
 
-Ca số 3 đáng chú ý: `select_vehicel` thiếu một chữ cái so với `select_vehicle`. Không có `EVENT_NAMES` nhập từ `@gsm/shared`, lỗi gõ kiểu này sẽ **lọt xuống Firestore** và chỉ lộ ra ở Tuần 5 khi pandas đếm ra một event name lạ.
+Ca số 3 đáng chú ý: `select_vehicel` thiếu một chữ cái so với `select_vehicle`. Không có `EVENT_NAMES` nhập từ `lib/shared`, lỗi gõ kiểu này sẽ **lọt xuống Firestore** và chỉ lộ ra ở Tuần 5 khi pandas đếm ra một event name lạ.
 
 Body hợp lệ khi **chưa có** `.env`:
 
@@ -417,7 +433,7 @@ post '{"session_id":"s1","user_id":"u1","flow":"none","event_name":"screen_view"
 ```
 [api] [POST /api/events] ghi Firestore that bai: Error: Thieu bien moi truong Firebase:
 FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY.
-Copy apps/api/.env.example thanh apps/api/.env roi dien gia tri (xem setup.md Phase 1).
+Copy .env.example thanh .env.local roi dien gia tri (xem setup.md Phase 1).
 ```
 
 ### Nhóm B — cần Firebase (sau `setup.md` Phase 1)
@@ -430,23 +446,23 @@ post '{"session_id":"s1","user_id":"u1","flow":"ride","event_name":"select_vehic
 # → 201 {"event_id":"<firestore-doc-id>","created_at":"2026-09-16T..."}
 
 # Đọc lại một phiên — sắp theo step_index
-curl "localhost:4000/api/events?session_id=s1"
+curl "localhost:3000/api/events?session_id=s1"
 
 # Lọc theo luồng và khoảng thời gian — sắp theo created_at
-curl "localhost:4000/api/events?flow=ride&from=2026-09-01&to=2026-09-30"
+curl "localhost:3000/api/events?flow=ride&from=2026-09-01&to=2026-09-30"
 ```
 
 Kiểm tra query sai định dạng (không cần Firestore, validator chặn trước):
 
 ```bash
-curl "localhost:4000/api/events?flow=xe"        # → 400 expected "ride" | "food"
-curl "localhost:4000/api/events?from=hom-qua"   # → 400 expected an ISO date
-curl localhost:4000/api/khong-co-route          # → 404 {"error":"Not found"}
+curl "localhost:3000/api/events?flow=xe"        # → 400 expected "ride" | "food"
+curl "localhost:3000/api/events?from=hom-qua"   # → 400 expected an ISO date
+curl localhost:3000/api/khong-co-route          # → 404 (trang 404 cua Next, khong con JSON)
 ```
 
 > **Tổ hợp `flow` + `from`/`to` sẽ lỗi ở lần chạy đầu.** Firestore từ chối query kết hợp `where` trên hai field khác nhau khi chưa có composite index — nhưng kèm sẵn link tạo index trong thông báo lỗi. Bấm link, đợi ~1 phút, chạy lại. Đây là lý do `listEvents` trả nguyên văn message lỗi (mục 7).
 
-### Kiểm tra xuyên suốt cả hai app
+### Kiểm tra xuyên suốt
 
 Lệnh quan trọng nhất sau mỗi thay đổi liên quan tới tracking — đi hết một luồng bằng tay rồi:
 
@@ -468,14 +484,14 @@ Ba thứ dưới đây là **hợp đồng dữ liệu**, không phải chi ti�
 |---|---|---|
 | Whitelist 8 field | `event.validator.ts` | Thêm field vào `EventPayload` mà quên whitelist → field bị loại **im lặng**, không báo lỗi gì |
 | `platform` và `created_at` gắn phía server | `event.service.ts` | Tin giờ máy client thì mọi phân tích theo thời gian sai. Document cũ đã dùng giờ server |
-| Danh sách hợp lệ nhập từ `@gsm/shared` | `event.validator.ts` | Gõ lại danh sách ở BE = hai nguồn sự thật, FE và BE sẽ lệch nhau lúc nào không hay |
+| Danh sách hợp lệ nhập từ `lib/shared` | `event.validator.ts` | Gõ lại danh sách ở BE = hai nguồn sự thật, FE và BE sẽ lệch nhau lúc nào không hay |
 
 ### Thêm một field vào event — phải sửa hai chỗ
 
 Đây là cái bẫy dễ mắc nhất khi sửa BE:
 
-1. `packages/shared/src/types.ts` — thêm vào `EventPayload`.
-2. `apps/api/src/validators/event.validator.ts` — thêm vào **cả** phần kiểm tra **lẫn** object `value` trả về.
+1. `lib/shared/types.ts` — thêm vào `EventPayload`.
+2. `lib/server/validators/event.validator.ts` — thêm vào **cả** phần kiểm tra **lẫn** object `value` trả về.
 
 Thiếu bước 2 thì hậu quả **khác nhau tuỳ field bắt buộc hay optional** — đã kiểm chứng bằng cách thêm thử field rồi chạy `tsc`:
 
@@ -490,7 +506,7 @@ Cách phát hiện: sau khi thêm field optional, ghi một event thật rồi m
 
 ### Thêm một event name mới
 
-Sửa `packages/shared/src/types.ts`: **cả** union `EventName` **lẫn** mảng `EVENT_NAMES`. Có type assertion `MissingEventNames` bắt lỗi nếu quên mảng — build sẽ đỏ. Nhưng phải cập nhật `event-taxonomy.md` trước cả hai (`CLAUDE.md` quy tắc 6).
+Sửa `lib/shared/types.ts`: **cả** union `EventName` **lẫn** mảng `EVENT_NAMES`. Có type assertion `MissingEventNames` bắt lỗi nếu quên mảng — build sẽ đỏ. Nhưng phải cập nhật `event-taxonomy.md` trước cả hai (`CLAUDE.md` quy tắc 6).
 
 ### Đổi mã HTTP hay câu lỗi
 

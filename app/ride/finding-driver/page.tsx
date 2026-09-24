@@ -23,7 +23,7 @@ import {
   getPromo,
   getRandomDriver,
   getVehicle,
-} from '@gsm/shared';
+} from '@/lib/shared';
 
 export default function FindingDriverPage() {
   useScreenView('finding_driver');

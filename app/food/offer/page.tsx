@@ -29,7 +29,7 @@ import {
   ruleBlock,
   type DiscountRule,
   type RuleContext,
-} from '@gsm/shared';
+} from '@/lib/shared';
 import { BackButton } from '@/components/BackButton';
 import { DiscountCodeInput } from '@/components/DiscountCodeInput';
 import { FlowGuard } from '@/components/FlowGuard';

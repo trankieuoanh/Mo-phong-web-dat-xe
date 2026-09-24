@@ -1,8 +1,8 @@
 # mock-data.md — GSM ride-booking simulation
 
-> Toàn bộ dữ liệu tĩnh của app. Hardcode trong `packages/shared/src/mock-data.ts`, **không** gọi API để lấy. Các `id` ở đây đi thẳng vào `properties` của event nên **không được đổi tuỳ tiện** — đổi id sẽ làm dữ liệu các phiên cũ không ghép được với phiên mới.
+> Toàn bộ dữ liệu tĩnh của app. Hardcode trong `lib/shared/mock-data.ts`, **không** gọi API để lấy. Các `id` ở đây đi thẳng vào `properties` của event nên **không được đổi tuỳ tiện** — đổi id sẽ làm dữ liệu các phiên cũ không ghép được với phiên mới.
 >
-> **Logic tính tiền nằm ở file khác**: `packages/shared/src/pricing.ts` giữ `calcDiscount` (mục 3) và hai công thức tổng tiền (mục 6). Tách ra vì màn confirm hiển thị số tiền còn event `confirm_ride`/`place_order` ghi số tiền — hai chỗ đó bắt buộc ra cùng một con số.
+> **Logic tính tiền nằm ở file khác**: `lib/shared/pricing.ts` giữ `calcDiscount` (mục 3) và hai công thức tổng tiền (mục 6). Tách ra vì màn confirm hiển thị số tiền còn event `confirm_ride`/`place_order` ghi số tiền — hai chỗ đó bắt buộc ra cùng một con số.
 
 ## Hằng số chung
 
@@ -173,7 +173,7 @@ function calcDiscount(rule, subtotal: number, shippingFee = 0): number {
 
 **Xét quyền dùng** — `ruleBlock(rule, subtotal, ctx)` trả `null` khi dùng được, ngược lại trả điều kiện **đầu tiên** chưa thoả, theo thứ tự `vehicle` → `distance` → `hours` → `min_order`. Cụ thể trước, chung chung sau: với người đang chọn ô tô mà nhìn mã `GSMBIKE`, "Chỉ áp dụng cho xe máy" nói đúng vấn đề, còn "Cần đơn tối thiểu" thì không nói gì cả.
 
-`ruleBlock` trả về **dữ liệu, không phải câu chữ** (`packages/shared` không được biết tới `formatVnd`); việc đổi sang tiếng Việt nằm ở `formatRuleBlock()` trong `apps/web/lib/format.ts` — một chỗ duy nhất cho cả hai màn.
+`ruleBlock` trả về **dữ liệu, không phải câu chữ** (`lib/shared` không được biết tới `formatVnd`); việc đổi sang tiếng Việt nằm ở `formatRuleBlock()` trong `lib/format.ts` — một chỗ duy nhất cho cả hai màn.
 
 > **`activeHours` và bẫy hydration.** `ctx.hour` phải được đọc trong `useEffect`, **không** đọc lúc render: Next prerender client component ở server, mà giờ server (UTC) lệch giờ máy (UTC+7). Cùng quy ước đã ghi cho `mealOfHour()` ở §4. `hour === undefined` (lượt render đầu) được coi là **ngoài giờ**, nên server và lượt hydrate đầu cho ra cùng một HTML: cả hai đều vẽ mã giờ vàng ở trạng thái khoá.
 
@@ -201,11 +201,11 @@ export interface FoodItem {
   cuisine: Cuisine;      // nối món với tag `cuisine` thật của quán
   meals: Meal[];         // bữa nào hợp ăn món này
   description: string;
-  image?: string;        // đường dẫn trong apps/web/public — ĐỂ TRỐNG ở cả 29 món
+  image?: string;        // đường dẫn trong public — ĐỂ TRỐNG ở cả 29 món
 }
 ```
 
-**`image` vắng mặt ở toàn bộ 29 món, và đó là trạng thái đúng.** Lệnh cấm ảnh thật ở mục này không đổi; trường này tồn tại để hôm nào có ảnh thì thả file vào `apps/web/public/food/<id>.webp` rồi điền đường dẫn là xong, không phải sửa component nào. Khi vắng, `FoodThumb` vẽ khung có glyph theo `cuisine` (`tailwind-theme.md` mục 7). `image` **không đi vào event**.
+**`image` vắng mặt ở toàn bộ 29 món, và đó là trạng thái đúng.** Lệnh cấm ảnh thật ở mục này không đổi; trường này tồn tại để hôm nào có ảnh thì thả file vào `public/food/<id>.webp` rồi điền đường dẫn là xong, không phải sửa component nào. Khi vắng, `FoodThumb` vẽ khung có glyph theo `cuisine` (`tailwind-theme.md` mục 7). `image` **không đi vào event**.
 
 **Ba trục phân loại, vuông góc với nhau:** `category` là *loại* món (chính / uống / tráng miệng), `meals` là *lúc* ăn, `cuisine` là *kiểu bếp*. Mỗi trục là một bộ lọc khác nhau ở màn menu.
 
@@ -231,8 +231,8 @@ export interface FoodItem {
 
 Ảnh **tải sẵn về repo**, không gọi mạng lúc chạy:
 
-- `scripts/fetch-food-images.mjs` lấy ảnh từ **Wikimedia Commons** về `apps/web/public/food/<id>.jpg`.
-- Giấy phép và tác giả từng ảnh ghi ở **`apps/web/public/food/CREDITS.md`**. Ảnh Commons phần lớn là CC BY / CC BY-SA nên **ghi công là bắt buộc**, không phải phép lịch sự.
+- `scripts/fetch-food-images.mjs` lấy ảnh từ **Wikimedia Commons** về `public/food/<id>.jpg`.
+- Giấy phép và tác giả từng ảnh ghi ở **`public/food/CREDITS.md`**. Ảnh Commons phần lớn là CC BY / CC BY-SA nên **ghi công là bắt buộc**, không phải phép lịch sự.
 - Trường `image` trên `FoodItem` vẫn **optional**: món nào không có ảnh đúng thì để trống, và `FoodThumb` lui về khung có glyph theo `cuisine`. Một ô glyph thì thật thà, còn một tấm ảnh sai món thì không.
 
 > **Tìm ảnh tự động là trò đoán, và nó đoán sai 8/29 lần ở vòng đầu** — một khoanh thịt quay cho "bánh mì", một nồi lá dứa cho "chè", một gói khoai tây **có logo thương hiệu** cho "khoai tây chiên". Vì vậy script cho phép **ghim cứng tên tệp** cho từng món, và danh sách ghim hiện tại chính là kết quả của việc đã xem từng ảnh một. Xem lại bằng mắt sau mỗi lần chạy lại.
@@ -241,9 +241,9 @@ export interface FoodItem {
 
 Dải "Gần bạn" lấy quán từ **`GET /api/restaurants`** (Nominatim, `amenity=restaurant` quanh `DEFAULT_PICKUP`). **Không có danh sách nhà hàng nào để chốt ở đây** — `restaurant_id` là id `osm-<T><osm_id>`, cùng khuôn với địa chỉ người dùng tự tìm.
 
-Mỗi quán mang thêm **dữ liệu thật** đọc từ `extratags` của OSM: `cuisine`, `openingHours`, `phone` (kiểu `Restaurant` trong `packages/shared/src/places.ts`).
+Mỗi quán mang thêm **dữ liệu thật** đọc từ `extratags` của OSM: `cuisine`, `openingHours`, `phone` (kiểu `Restaurant` trong `lib/shared/places.ts`).
 
-**Quán thật ↔ món nối với nhau bằng `menuOf(restaurant)`** (`packages/shared/src/food.ts`): quy đổi tag `cuisine` thô sang kiểu bếp qua `CUISINE_ALIASES`, lọc món theo kiểu bếp đó, rồi xoay danh sách theo một hàm băm FNV-1a của `restaurant.id`. Bốn tính chất bắt buộc:
+**Quán thật ↔ món nối với nhau bằng `menuOf(restaurant)`** (`lib/shared/food.ts`): quy đổi tag `cuisine` thô sang kiểu bếp qua `CUISINE_ALIASES`, lọc món theo kiểu bếp đó, rồi xoay danh sách theo một hàm băm FNV-1a của `restaurant.id`. Bốn tính chất bắt buộc:
 
 1. **Theo kiểu bếp thật** — quán `japanese` ra sushi/ramen, quán `barbecue` ra đồ nướng. Trước đây mọi quán đều bốc từ cùng một rổ món Việt, nên một quán Nhật vẫn hiện ra bánh mì.
 2. **Tất định** — cùng một quán luôn ra cùng thực đơn, ở mọi phiên và mọi máy. Nếu ngẫu nhiên thì `select_restaurant` và `add_to_cart` trong cùng một phiên sẽ kể hai câu chuyện khác nhau.

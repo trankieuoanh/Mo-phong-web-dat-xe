@@ -85,7 +85,7 @@ body {
 /**
  * Vien focus dung chung cho moi phan tu bam duoc.
  *
- * Truoc day toan bo apps/web KHONG co mot quy tac focus nao (`grep focus-visible`
+ * Truoc day toan bo giao dien KHONG co mot quy tac focus nao (`grep focus-visible`
  * tra ve rong), va o tim o man menu con dat `outline-none`. Di het mot luong
  * bang phim Tab la mat dau con tro hoan toan — day la lo hong a11y, khong phai
  * chi tiet tham my.

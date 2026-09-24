@@ -4,8 +4,8 @@
 
 | Lớp | Trước đây | Bây giờ |
 |---|---|---|
-| Frontend | React (web, Vite) | **Next.js** (`apps/web`) |
-| Backend | Node/Express (`server/` riêng) | **Node/Express** (`apps/api`) — xem mục "Kiến trúc monorepo" bên dưới |
+| Frontend | React (web, Vite) | **Next.js** (App Router) |
+| Backend | Node/Express (`server/` riêng) | **Next.js Route Handlers** (`app/api/**`) — xem mục "Kiến trúc" bên dưới |
 | Database | Postgres (Supabase-hosted) | **Firestore** (Firebase) |
 | Platform | chưa chốt | **Firebase** |
 | Phân tích | Python/pandas đọc Postgres | Python/pandas đọc Firestore (qua Firebase Admin SDK) |
@@ -18,59 +18,55 @@
 | Styling | **Tailwind CSS** | Ghép trực tiếp với design token (token → class Tailwind), giống cách tổ chức bạn đã dùng ở dự án khác (P-222) |
 | Quản lý state trong app | **React state có sẵn** (`useState`/`useContext`) | App chỉ vài màn hình, giỏ hàng đơn giản — không cần Redux/Zustand |
 | Gọi API từ client | **`fetch` có sẵn của trình duyệt** | Không cần cài thêm axios cho vài endpoint đơn giản |
-| Package manager | **npm workspaces** | Có sẵn khi cài Node.js. Không cần Turborepo/Nx — 3 workspace thì cấu hình thêm chỉ tốn thời gian |
-| Chạy TypeScript ở BE | **tsx** | Chạy thẳng `.ts`, không cần bước build khi dev |
-| Chạy 2 process cùng lúc | **concurrently** | devDependency ở root, để `npm run dev` vẫn là một lệnh |
-| Hosting `apps/web` (nếu cần deploy) | **Vercel** | Preset `nextjs` sẵn, không phải cấu hình build. Đã thay cho lựa chọn Firebase Hosting ban đầu: dù sao cũng phải deploy 2 nơi (2 app = 2 process), nên "gộp chung 1 platform với Firestore" không còn là lợi thế |
-| Hosting `apps/api` (nếu cần deploy) | **Render / Railway** — một process Node chạy dài | **Không dùng serverless.** `services/upstream.ts` là hàng đợi + cache trong bộ nhớ của MỘT tiến trình: `minGapMs` giãn các lần gọi Photon/OSRM ra ≥600ms để không bị chặn IP. Nhiều instance serverless chạy song song làm hàng đợi đó thành vô nghĩa — mỗi instance tưởng mình là người duy nhất — và cache cũng mất theo |
+| Package manager | **npm** | Một `package.json` duy nhất. Từng dùng npm workspaces cho bản hai app; gộp lại thì không còn gì để workspace |
+| Hosting (nếu cần deploy) | **Vercel** | Tự nhận Next.js ở gốc repo, không cần `vercel.json`. Một project = **một nơi deploy**, và đó chính là thứ sửa được lỗi bản deploy cũ |
 | Testing framework | **Không cần** | Quy mô 6 tuần, tự test bằng cách click tay qua từng luồng là đủ, không cần viết test tự động |
 
 Lưu ý: không bắt buộc phải deploy public trong 6 tuần này — chạy local (`next dev`) để demo cho mentor là đủ. Chỉ cần deploy khi muốn có link truy cập từ xa; các bước và biến môi trường ở `setup.md` mục "Deploy".
 
-## Kiến trúc monorepo — đảo lại quyết định gộp
+## Kiến trúc: một project Next.js — và vì sao quyết định này đã lật hai lần
 
-> **Đọc kỹ mục này trước khi thắc mắc "sao không dùng Next.js API routes".** Bản trước của file này đã cố ý *bỏ* thư mục `server/` để gộp BE vào Next.js API routes. Quyết định đó nay **bị đảo lại**, có chủ ý, vì ưu tiên đã đổi: dễ phát triển và bảo trì khi nhiều người cùng làm, quan trọng hơn là ít process hơn một chút.
+Đây là chỗ dễ gây hoang mang nhất khi đọc lịch sử dự án, nên ghi thẳng ra:
 
-```
-apps/web/        Next.js 15 — CHỈ FE, cổng 3000
-apps/api/        Express + tsx — CHỈ BE, cổng 4000
-packages/shared/ @gsm/shared — types, bảng màn hình, mock data, pricing
-analysis/        Python (không phải npm workspace)
-```
-
-| Workspace | Trách nhiệm | Không được làm |
+| Lần | Hình dạng | Lý do |
 |---|---|---|
-| `apps/web` | UI 13 màn, state, bắn event | Không có `firebase-admin` trong `dependencies`. Không chạm Firestore |
-| `apps/api` | Validate + ghi/đọc Firestore | Không render UI, không biết gì về React |
-| `packages/shared` | Hợp đồng dữ liệu dùng chung | Không import từ `apps/*` (một chiều) |
+| 1 | Một Next.js, API routes chung | Đơn giản, một lệnh chạy |
+| 2 | Tách `apps/web` + `apps/api` (Express) | Ưu tiên chia việc trong nhóm; hàng rào credential là **vật lý** |
+| **3 (hiện tại)** | **Quay về một Next.js** | **Deploy** — xem ngay dưới |
+
+```
+app/            giao diện + app/api/** (route handler)
+lib/shared/     hợp đồng dữ liệu dùng chung
+lib/server/     validator · service · db — chỉ app/api/** được import
+analysis/       Python, đọc thẳng Firestore
+```
+
+**Thứ đã lật quyết định lần 3 không phải sở thích, mà là một lỗi thật trên bản deploy.** Tách hai app nghĩa là phải deploy hai nơi. Deploy mỗi `apps/web` lên Vercel thì `rewrites` vẫn trỏ về `http://localhost:4000`, và Vercel trả `404 DNS_HOSTNAME_RESOLVED_PRIVATE` cho **mọi** `/api/*`. Triệu chứng nhìn thấy: bản đồ 401, ô tìm địa chỉ không ra gì — và **không một event nào được ghi**, im lặng, vì `lib/track.ts` cố ý nuốt lỗi để không kẹt UI.
+
+Với một dự án mà sản phẩm cuối là dữ liệu funnel, "im lặng không ghi được event" là chế độ hỏng tệ nhất có thể. Một project thì không có cách nào rơi vào đó: `/api/*` sống hay chết cùng trang web.
 
 **Được gì:**
-- FE và BE sửa độc lập, không đụng file nhau — hợp với việc chia việc trong nhóm.
-- Hàng rào credential là **thật**, không phải quy ước: `apps/web` không có `firebase-admin` trong `dependencies`, nên muốn rò cũng không import nổi. Mạnh hơn `import 'server-only'` của bản gộp (vốn chỉ báo lỗi lúc build).
-- `packages/shared` khiến danh sách `event_name` / `screen_name` ở FE và BE **không thể lệch nhau** — cả hai import cùng một file.
+- Một `npm run dev`, một nơi deploy, không biến `API_ORIGIN`, không proxy.
+- `lib/shared` vẫn khiến danh sách `event_name` / `screen_name` ở hai phía **không thể lệch nhau**.
+- Bỏ được 4 thư viện: `express`, `cors`, `tsx`, `concurrently`.
+- Phép dò tile lấy origin từ **chính request** thay vì một biến môi trường phải khai tay — bớt hẳn một cách cấu hình sai.
 
-**Mất gì (chấp nhận):**
-- 2 process thay vì 1 — bù lại bằng `npm run dev` ở gốc, chạy song song, vẫn một lệnh.
-- Thêm 4 thư viện: `express`, `cors`, `tsx` (BE) và `concurrently` (devDependency ở root).
-- Phải xử lý ranh giới FE↔BE — xem mục kế tiếp.
+**Mất gì (chấp nhận, và đã cân nhắc):**
+- **Hàng rào credential yếu đi một bậc.** Bản tách có hàng rào vật lý: package giao diện không có `firebase-admin` nên không import nổi. Giờ thay bằng `server-only` — vẫn chặn ở mức **build đỏ**, nhưng là quy ước được công cụ ép chứ không phải bất khả thi vật lý.
+- **Hàng đợi rate-limit trong `upstream.ts` chỉ còn hiệu lực per-instance** trên serverless. Chi tiết và cách nhận biết ở `ARCHITECTURE.md` mục cuối.
+- Giao diện và server nằm chung một repo tree, nên khi chia việc trong nhóm phải tự giữ kỷ luật ranh giới `lib/server/` (CLAUDE.md quy tắc 1).
 
-### Cách nối FE với BE: proxy, không phải CORS
+### Cách nối giao diện với API: không cần nối gì cả
 
-`apps/web/next.config.ts` khai báo `rewrites` đưa `/api/*` sang `http://localhost:4000`. Trình duyệt vì thế luôn thấy `/api/events` là **same-origin**.
+`fetch('/api/events')` tới thẳng `app/api/events/route.ts` của chính app này. Same-origin, nên **không có preflight `OPTIONS`** — điều này quan trọng vì `confirm_ride` và `place_order` bắn ngay trước `router.push` và phải kịp đi trước khi trang chuyển. Bản tách phải dựng hẳn một proxy `rewrites` để đạt được đúng tính chất mà bản này có sẵn.
 
-Không phải tiện tay — nếu để trình duyệt gọi thẳng cổng 4000, mỗi POST `Content-Type: application/json` cross-origin sẽ kích hoạt **preflight `OPTIONS`**, tức 2 round trip cho mỗi event. Mà `confirm_ride` và `place_order` — hai event đánh dấu "hoàn thành funnel" — bắn ngay trước `router.push`, phải kịp cả preflight lẫn POST trước khi trang chuyển. Mất hai event đó là mất đúng cái mốc mà toàn bộ phân tích dựa vào.
+**Quy tắc "client không chạm database trực tiếp" vẫn giữ nguyên** — component React gọi `fetch('/api/events')`, route handler gọi `lib/server/`, và chỉ ở đó Firebase Admin SDK mới vào cuộc. Trình duyệt không bao giờ cầm credential.
 
-`cors()` vẫn bật ở `apps/api` cho `WEB_ORIGIN`, phục vụ việc gọi thẳng cổng 4000 khi debug bằng curl/Postman.
+### Vì sao `lib/shared` không có bước build
 
-**Quy tắc "client không chạm database trực tiếp" vẫn giữ nguyên** — chỉ đổi công cụ: các component React gọi `fetch('/api/events')`, proxy chuyển sang `apps/api`, và chỉ ở đó Firebase Admin SDK mới vào cuộc. Trình duyệt không bao giờ cầm credential.
+Nó là thư mục TypeScript thường trong cùng project, import qua alias `@/lib/shared` — Next tự transpile. Không có bước build nghĩa là bớt một cách hỏng: sửa type xong quên chạy `tsc` rồi ngồi debug lỗi ma.
 
-### Vì sao Express mà không phải Fastify/Hono
-Phổ biến nhất, nhiều tài liệu tiếng Việt nhất, dễ debug và dễ bảo vệ trước mentor. Với 2 endpoint thì hiệu năng của framework là chuyện không đáng bàn.
-
-### Vì sao `packages/shared` không có bước build
-`main` trỏ thẳng vào `src/index.ts`. `apps/api` chạy bằng `tsx` (transpile TS trực tiếp), `apps/web` khai báo `transpilePackages: ['@gsm/shared']`. Có bước build nghĩa là thêm một cách hỏng: sửa type xong quên chạy `tsc` rồi ngồi debug lỗi ma.
-
-Hệ quả cần nhớ: import nội bộ trong `packages/shared` **không ghi đuôi `.js`** — webpack của Next không resolve `.ts` từ đuôi `.js`.
+Hệ quả cần nhớ: **import tương đối không bao giờ ghi đuôi `.js`** — webpack của Next không resolve `.ts` từ đuôi `.js`, và lỗi này chỉ hiện ở `npm run build`, không hiện ở `npm run dev`.
 
 ## Firestore khác Postgres ở điểm nào — ảnh hưởng trực tiếp tới db-design
 - Không có bảng/cột cố định — dữ liệu là **document** (dạng giống JSON) nằm trong **collection** (ví dụ collection `events`, mỗi event là 1 document).

@@ -138,7 +138,7 @@ Vị trí GPS **phải được ghi vào `food.origin`**. Thiếu bước này l
 
 **Menu vẫn là dữ liệu tĩnh.** OpenStreetMap không có thực đơn và không nguồn mở nào có giá món thật. Quán là thật, thực đơn suy ra từ tag `cuisine` thật qua `menuOf()` — xem `mock-data.md` §4b. Tài liệu này không giả vờ ngược lại.
 
-**Ảnh món là ảnh thật**, tải sẵn về `apps/web/public/food/` từ Wikimedia Commons (`scripts/fetch-food-images.mjs`), ghi công ở `CREDITS.md`. Món thiếu ảnh lui về khung glyph.
+**Ảnh món là ảnh thật**, tải sẵn về `public/food/` từ Wikimedia Commons (`scripts/fetch-food-images.mjs`), ghi công ở `CREDITS.md`. Món thiếu ảnh lui về khung glyph.
 
 ---
 
@@ -168,7 +168,7 @@ sessionStorage key `gsm_food_draft`. `clearCart()` xoá luôn.
 | `EmptyState` | 1 dòng text trần |
 | `RestaurantCard` | card viết thẳng trong `page.tsx` |
 
-**`FoodThumb` — ảnh món không cần ảnh.** `mock-data.md` §4 cấm ảnh thật và không có field ảnh. Giữ nguyên lệnh cấm, nâng chất lượng khung: nền `bg-gradient-to-br from-canvas-soft to-surface-pressed` (hai token có sẵn — không sinh giá trị mới), một glyph theo `cuisine` ở `text-primary-dark`, chữ cái đầu làm lớp nền mờ. `FoodItem` thêm `image?: string` **để trống toàn bộ 29 món**, để sau này thả ảnh vào `apps/web/public/food/<id>.webp` là chạy, không phải sửa code.
+**`FoodThumb` — ảnh món không cần ảnh.** `mock-data.md` §4 cấm ảnh thật và không có field ảnh. Giữ nguyên lệnh cấm, nâng chất lượng khung: nền `bg-gradient-to-br from-canvas-soft to-surface-pressed` (hai token có sẵn — không sinh giá trị mới), một glyph theo `cuisine` ở `text-primary-dark`, chữ cái đầu làm lớp nền mờ. `FoodItem` thêm `image?: string` **để trống toàn bộ 29 món**, để sau này thả ảnh vào `public/food/<id>.webp` là chạy, không phải sửa code.
 
 Glyph mới vẽ thẳng vào `components/Icon.tsx` (`bowl`, `cup`, `cake`, `fish`, `pizza`, `grill`) — `CLAUDE.md` quy tắc 8 cấm **thư viện** icon, không cấm vẽ thêm path.
 
@@ -208,7 +208,7 @@ Ngoại lệ có chủ đích: cặp tab luồng thêm vào `TopBar` cho màn h�
 ```bash
 npm run typecheck && npm run lint && npm run build
 
-curl -s "localhost:4000/api/restaurants?lat=21.0369&lon=105.7856&q=pho" | jq '.[] | {label, cuisine}'
+curl -s "localhost:3000/api/restaurants?lat=21.0369&lon=105.7856&q=pho" | jq '.[] | {label, cuisine}'
 
 # Đi hết luồng food trên localhost:3000, rồi:
 curl -s "localhost:3000/api/events?session_id=<id>" | jq '.[] | {event_name, screen_name, step_index}'
@@ -222,9 +222,9 @@ Phải đúng:
 
 Kiểm tra quy tắc dự án:
 ```bash
-grep -r "firebase-admin" apps/web/                          # rỗng
-grep -rn "trackEvent(\|useScreenView(" apps/web/app/history  # rỗng
-grep -n "OpenStreetMap" apps/web/components/MapCanvas.tsx    # còn dòng ghi công
+grep -rn "lib/server" app components lib --include=*.tsx  # rỗng ngoài app/api/
+grep -rn "trackEvent(\|useScreenView(" app/history         # rỗng
+grep -n "OpenStreetMap" components/MapCanvas.tsx          # còn dòng ghi công
 ```
 
-Kiểm tra bằng mắt: tắt `apps/api` → `/food` vẫn dùng được, dải "Gần bạn" hiện lỗi kèm nút thử lại chứ không biến mất · từ chối quyền vị trí → lui về `DEFAULT_PICKUP` kèm caption · thu nhỏ xuống 375px → vẫn đổi được luồng · đi bằng phím Tab qua từng màn → mọi control đều thấy focus ring.
+Kiểm tra bằng mắt: tắt `lib/server` → `/food` vẫn dùng được, dải "Gần bạn" hiện lỗi kèm nút thử lại chứ không biến mất · từ chối quyền vị trí → lui về `DEFAULT_PICKUP` kèm caption · thu nhỏ xuống 375px → vẫn đổi được luồng · đi bằng phím Tab qua từng màn → mọi control đều thấy focus ring.

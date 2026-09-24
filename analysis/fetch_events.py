@@ -7,7 +7,7 @@ Chay tach biet voi Next.js app. Xem setup.md muc "Phan phan tich".
     pip install -r requirements.txt
     python fetch_events.py
 
-KHONG CAN CAU HINH GI THEM neu apps/api/.env da co credential: xem load_credential().
+KHONG CAN CAU HINH GI THEM neu .env.local da co credential: xem load_credential().
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ OUTPUT_DIR = HERE / "output"
 EVENTS_CSV = OUTPUT_DIR / "events.csv"
 
 ANALYSIS_ENV = HERE / ".env"
-API_ENV = ROOT / "apps" / "api" / ".env"
+API_ENV = ROOT / ".env.local"
 
 # 9 field top-level cua document — xem db-design.md.
 TOP_LEVEL_FIELDS = [
@@ -52,7 +52,7 @@ def read_env_file(path: Path) -> dict[str, str]:
     Bo dong trong va dong `#`, tach o dau `=`, boc ngoac kep/don neu co.
 
     GIOI HAN CO Y: khong xu ly gia tri trai nhieu DONG VAT LY. Da kiem tra
-    apps/api/.env: dong FIREBASE_PRIVATE_KEY nam tron mot dong (1755 ky tu), boc
+    .env.local: dong FIREBASE_PRIVATE_KEY nam tron mot dong (1755 ky tu), boc
     ngoac kep, xuong dong o dang literal `\\n` — dung dinh dang ma ham nay doc
     duoc. Ai doi cach luu key sang dang nhieu dong that thi phai sua ham nay,
     hoac them python-dotenv vao requirements.txt.
@@ -79,7 +79,7 @@ def load_credential() -> credentials.Base:
 
     1. GOOGLE_APPLICATION_CREDENTIALS co san trong moi truong.
     2. analysis/.env -> GOOGLE_APPLICATION_CREDENTIALS.
-    3. apps/api/.env -> ba bien FIREBASE_*, tuc DUNG NGUON MA apps/api DANG DUNG.
+    3. .env.local -> ba bien FIREBASE_*, tuc DUNG NGUON MA app DANG DUNG.
 
     Duong 2 truoc day duoc TAI LIEU HUA nhung khong ton tai trong code: ham nay
     doc thang os.environ, ma khong cho nao nap analysis/.env ca. Lam dung y
@@ -109,7 +109,7 @@ def load_credential() -> credentials.Base:
             "  1. bien moi truong GOOGLE_APPLICATION_CREDENTIALS\n"
             f"  2. {ANALYSIS_ENV}  (GOOGLE_APPLICATION_CREDENTIALS=...)\n"
             f"  3. {API_ENV}  (thieu: {', '.join(missing) or 'ca 3 bien'})\n\n"
-            "Cach nhanh nhat: chep apps/api/.env.example thanh apps/api/.env roi dien\n"
+            "Cach nhanh nhat: chep .env.example thanh .env.local roi dien\n"
             "gia tri (setup.md Phase 1) — cung file ma `npm run dev` dang dung."
         )
 
@@ -122,7 +122,7 @@ def load_credential() -> credentials.Base:
             "type": "service_account",
             "project_id": env["FIREBASE_PROJECT_ID"],
             "client_email": env["FIREBASE_CLIENT_EMAIL"],
-            # Cung dong replace voi apps/api/src/db/firebase-admin.ts va
+            # Cung dong replace voi lib/server/db/firebase-admin.ts va
             # scripts/seed-events.js: file .env luu xuong dong o dang literal `\n`.
             # Thieu no se loi: error:1E08010C:DECODER routines::unsupported
             "private_key": env["FIREBASE_PRIVATE_KEY"].replace("\\n", "\n"),

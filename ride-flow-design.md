@@ -14,7 +14,7 @@ Luồng ride hiện tại chạy đúng nhưng nhìn như một bản wireframe:
 
 Nguyên tắc xuyên suốt: *giao diện bám app thật, dữ liệu bám taxonomy đã chốt.* Chỗ nào hai bên không thoả hiệp được thì dữ liệu thắng, và lý do được ghi lại ngay tại chỗ.
 
-**Ngoài phạm vi:** luồng Food (không đổi), backend (không đổi), `packages/shared/src/types.ts` và `screens.ts` (không đổi một dòng nào).
+**Ngoài phạm vi:** luồng Food (không đổi), backend (không đổi), `lib/shared/types.ts` và `screens.ts` (không đổi một dòng nào).
 
 ---
 
@@ -105,7 +105,7 @@ Nút hành động chính nằm ở footer của `Panel`, dính đáy panel ch�
 
 **Một dòng địa chỉ** gồm: icon tròn (`icon-button-circular`) · `label` (`.t-body-md-strong`) · khoảng cách (`.t-caption text-mute`, **chỉ có với địa chỉ gợi ý**) · `address` đầy đủ (`.t-body-sm text-body`). Dòng đang chọn có `ring-2 ring-primary`.
 
-**Ô tìm kiếm gọi `GET /api/places`** (Nominatim/OpenStreetMap qua proxy `apps/api`), debounce 400 ms, chỉ gọi từ 3 ký tự trở lên, huỷ request cũ bằng `AbortController`. **Không bắn event**: kết quả cuối cùng đã nằm trong `select_address`; ghi thêm event cho mỗi ký tự gõ vào chỉ làm nhiễu.
+**Ô tìm kiếm gọi `GET /api/places`** (Photon/OpenStreetMap qua `app/api/places/route.ts`), debounce 400 ms, chỉ gọi từ 3 ký tự trở lên, huỷ request cũ bằng `AbortController`. **Không bắn event**: kết quả cuối cùng đã nằm trong `select_address`; ghi thêm event cho mỗi ký tự gõ vào chỉ làm nhiễu.
 
 `select_address` mang thêm **`address_source`** (`'preset' | 'search'`) để phân tích tách được "chọn gợi ý" với "tự tìm" — xem `event-taxonomy.md`.
 
@@ -327,7 +327,7 @@ Khoảng cách hiển thị ở Màn 1 **tính tại chỗ** bằng `haversineKm
 
 ## 6. State — `RideDraft` thêm hai trường
 
-`apps/web/lib/app-context.tsx`:
+`lib/app-context.tsx`:
 
 ```ts
 interface RideDraft {
@@ -389,7 +389,7 @@ Ngoại lệ duy nhất: **ô tìm kiếm ở Màn 1** có lọc được danh s
 - **Không cho kéo/pan bản đồ.** Zoom và re-center là đủ; kéo thả cần quản lý trạng thái con trỏ và tải tile động — nhiều code cho thứ không ai dùng trong một luồng 6 bước.
 - **Không định tuyến nhiều chặng, không giao thông thời gian thực.**
 - **Không thêm màn thất bại.** App mô phỏng luôn thành công (`screen-map.md` §5).
-- ~~**Không đổi `max-width` xuống 430px.**~~ Không còn áp dụng: `screen-map.md` §6 đã chuyển sang desktop-first theo `apps/web/sample_ui/`. Panel trái của bố cục `split` rộng 480px; bố cục `wide` đặt bề ngang qua prop `maxWidth`.
+- ~~**Không đổi `max-width` xuống 430px.**~~ Không còn áp dụng: `screen-map.md` §6 đã chuyển sang desktop-first theo `sample_ui/`. Panel trái của bố cục `split` rộng 480px; bố cục `wide` đặt bề ngang qua prop `maxWidth`.
 
 ## 10. Cần mentor chốt
 
@@ -426,8 +426,8 @@ curl "localhost:3000/api/events?session_id=<id>" | jq '.[] | {event_name, screen
 
 **Quy tắc dự án**
 ```bash
-grep -rn "step_index" apps/web/app/      # chỉ được có trong comment
-grep -r "firebase-admin\|NEXT_PUBLIC_" apps/web/   # phải rỗng
+grep -rn "step_index" app/      # chỉ được có trong comment
+grep -rn "NEXT_PUBLIC_" app components lib        # phải rỗng
 npm run typecheck && npm run lint && npm run build
 ```
 

@@ -33,7 +33,7 @@ PRIMARY_DARK = "#048589"
 COMPLETION_EVENT = {"ride": "confirm_ride", "food": "place_order"}
 
 # Nhan cho tung step_index. Doi chieu bang o event-taxonomy.md muc 2
-# (ban goc la SCREENS trong packages/shared/src/screens.ts).
+# (ban goc la SCREENS trong lib/shared/screens.ts).
 #
 # THEM MOT MAN THI PHAI SUA HAI BAN SAO NGOAI TYPESCRIPT: bang duoi day, va bang
 # SCREENS chep trong scripts/seed-events.js. Quen mot trong hai khong lam gi do
