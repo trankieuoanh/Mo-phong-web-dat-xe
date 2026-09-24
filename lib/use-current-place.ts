@@ -21,7 +21,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { DEFAULT_PICKUP, type Place } from '@gsm/shared';
+import { DEFAULT_PICKUP, type Place } from '@/lib/shared';
 
 export type CurrentPlaceStatus = 'locating' | 'ready' | 'fallback';
 

@@ -5,12 +5,11 @@
  *
  * KHONG BAN EVENT NAO — day la tra cuu ha tang, khong phai mot buoc funnel.
  *
- * Duong dan `/api/tiles` TUONG DOI, di qua proxy rewrites cua Next
- * (apps/web/next.config.ts). Goi thang localhost:4000 se thanh cross-origin.
+ * `/api/tiles` la route handler cua chinh app nay (app/api/tiles/route.ts).
  */
 
 import { useEffect, useState } from 'react';
-import { TILE_PROVIDERS, type TileProvider } from '@gsm/shared';
+import { TILE_PROVIDERS, type TileProvider } from '@/lib/shared';
 
 /**
  * Cache o cap MODULE, khong phai cap component.

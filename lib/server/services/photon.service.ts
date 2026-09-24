@@ -15,9 +15,10 @@
  *   2. Hang doi giua cac lan goi upstream.
  *   3. Cache dung chung — go "Cau Giay" roi xoa lui se hoi lai dung query cu.
  */
-import type { Place } from '@gsm/shared';
-import type { PlaceQuery, ReverseQuery } from '../validators/place.validator.js';
-import { createUpstreamGate } from './upstream.js';
+import 'server-only';
+import type { Place } from '@/lib/shared';
+import type { PlaceQuery, ReverseQuery } from '../validators/place.validator';
+import { createUpstreamGate } from './upstream';
 
 const PHOTON_SEARCH_URL = 'https://photon.komoot.io/api';
 const PHOTON_REVERSE_URL = 'https://photon.komoot.io/reverse';

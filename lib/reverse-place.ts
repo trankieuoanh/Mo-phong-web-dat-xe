@@ -5,15 +5,14 @@
  *
  * KHONG BAN EVENT NAO — day la tra cuu ha tang, khong phai mot buoc funnel.
  *
- * Duong dan `/api/reverse` TUONG DOI, di qua proxy rewrites cua Next
- * (apps/web/next.config.ts). Goi thang localhost:4000 se thanh cross-origin.
+ * `/api/reverse` la route handler cua chinh app nay (app/api/reverse/route.ts).
  *
  * La mot HAM chu khong phai hook: no chay khi nguoi dung bam vao ban do, khong
  * phai khi component mount — `use-current-place.ts` la hook vi no hoi GPS ngay
  * luc vao man.
  */
 
-import { mapPlaceId, type Place } from '@gsm/shared';
+import { mapPlaceId, type Place } from '@/lib/shared';
 
 /** Nhan dung khi khong tra cuu duoc ten. */
 function fallbackLabel(lat: number, lon: number): string {

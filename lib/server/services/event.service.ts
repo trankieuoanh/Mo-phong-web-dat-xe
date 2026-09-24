@@ -1,10 +1,11 @@
 /**
  * Ghi & doc collection `events`. Xem db-design.md va api-endpoints.md.
  */
+import 'server-only';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import type { CreateEventResponse, EventPayload } from '@gsm/shared';
-import { EVENTS_COLLECTION, getDb } from '../db/firebase-admin.js';
-import type { EventQuery } from '../validators/event.validator.js';
+import type { CreateEventResponse, EventPayload } from '@/lib/shared';
+import { EVENTS_COLLECTION, getDb } from '../db/firebase-admin';
+import type { EventQuery } from '../validators/event.validator';
 
 export async function createEvent(payload: EventPayload): Promise<CreateEventResponse> {
   const ref = await getDb()

@@ -9,10 +9,11 @@
  * Service nay KHONG tu suy bien: neu no lang le tra ve duong thang thi
  * `route_source` se ghi 'osrm' cho mot con so duong chim bay, va du lieu noi doi.
  */
-import type { RouteResult } from '@gsm/shared';
-import { roundKm } from '@gsm/shared';
-import type { RouteQuery } from '../validators/route.validator.js';
-import { createUpstreamGate } from './upstream.js';
+import 'server-only';
+import type { RouteResult } from '@/lib/shared';
+import { roundKm } from '@/lib/shared';
+import type { RouteQuery } from '../validators/route.validator';
+import { createUpstreamGate } from './upstream';
 
 const OSRM_URL = 'https://router.project-osrm.org/route/v1/driving';
 

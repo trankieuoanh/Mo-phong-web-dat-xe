@@ -16,9 +16,10 @@
  *
  * KHONG dung thu vien — `fetch` co san trong Node 18+ (CLAUDE.md quy tac 8).
  */
-import { normalizeVi, type Restaurant } from '@gsm/shared';
-import type { RestaurantQuery } from '../validators/place.validator.js';
-import { createUpstreamGate } from './upstream.js';
+import 'server-only';
+import { normalizeVi, type Restaurant } from '@/lib/shared';
+import type { RestaurantQuery } from '../validators/place.validator';
+import { createUpstreamGate } from './upstream';
 
 const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
 
@@ -195,7 +196,7 @@ async function callOverpass(query: RestaurantQuery): Promise<Restaurant[]> {
  *  1. Overpass TU CHOI cac truy van co lop ky tu tieng Viet trong regex — may
  *     chu tra ve 406 Not Acceptable. Khong phai loi cu phap ma la bo loc cua
  *     ha tang truoc no, nen khong sua bang cach viet regex kheo hon.
- *  2. `normalizeVi` (da co san trong @gsm/shared, dung cho tim mon) cho ta so
+ *  2. `normalizeVi` (da co san trong lib/shared, dung cho tim mon) cho ta so
  *     khop khong dau mien phi: go "pho" ra "Phở", "bun cha" ra "Bún Chả". Day la
  *     cach go pho bien nhat, va bo loc phia Overpass thi khong lam duoc.
  *  3. Cache dung chung: moi phim go them KHONG sinh mot loi goi Overpass moi, vi

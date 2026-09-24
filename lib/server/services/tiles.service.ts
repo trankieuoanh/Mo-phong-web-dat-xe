@@ -17,43 +17,33 @@
  *   - `onError` (FE)    bat "trinh duyet khong tai duoc" — mang cua nguoi dung
  *                       co the chan mot ten mien ma may chay BE van goi duoc.
  */
-import { PROBE_MAX_BYTES, PROBE_TILE, TILE_PROVIDERS } from '@gsm/shared';
-import { createUpstreamGate } from './upstream.js';
+import 'server-only';
+import { PROBE_MAX_BYTES, PROBE_TILE, TILE_PROVIDERS } from '@/lib/shared';
+import { createUpstreamGate } from './upstream';
 
 /** Qua moc nay thi coi nhu nha cung cap do khong tra loi. */
 const UPSTREAM_TIMEOUT_MS = 8000;
 
-/**
- * Cung mac dinh voi server.ts — trinh duyet that se tai tile tu day.
- *
- * `WEB_ORIGIN` co the la danh sach phan tach bang dau phay (server.ts cho phep
- * nhieu origin qua cua CORS). O DAY CHI LAY PHAN TU DAU, vi mot header `Referer`
- * chi mang duoc mot gia tri — dan ca chuoi "a,b" vao se thanh mot referer rac va
- * Stadia se tu choi. Tren ban deploy, phan tu dau phai la domain THAT: phep do
- * chi dung bang nguoi dung that neu no hoi upstream bang dung cai referer ma
- * trinh duyet se gui.
- */
-const WEB_ORIGIN = (process.env.WEB_ORIGIN ?? 'http://localhost:3000').split(',')[0]!.trim();
-
 const gate = createUpstreamGate({
-  // Ca phep do chi chiem MOT muc cache, nen minGapMs gan nhu khong bao gio cham
-  // toi — no o day de phong hai tab cung mo mot luc.
+  // Mot muc cache cho moi origin, nen minGapMs gan nhu khong bao gio cham toi —
+  // no o day de phong hai tab cung mo mot luc.
   minGapMs: 300,
   // 6 gio: mot nha cung cap khong khoa API key giua buoi demo. Giu dai de app
   // khong hoi lai upstream moi lan doi trang.
   ttlMs: 6 * 60 * 60 * 1000,
-  maxEntries: 1,
+  // Du cho localhost + domain production + vai domain preview cua Vercel.
+  maxEntries: 8,
 });
 
 /**
  * Mot nha cung cap "dung duoc" khi tile bien sau cua no vua tai duoc, vua DU
- * NHO. Xem chu thich cua `PROBE_MAX_BYTES` trong packages/shared/src/tiles.ts
+ * NHO. Xem chu thich cua `PROBE_MAX_BYTES` trong lib/shared/tiles.ts
  * de biet vi sao kich thuoc lai la thu phan biet duoc watermark.
  *
  * NEM khi khong ket noi duoc — day la truong hop KHONG KET LUAN DUOC, khac han
  * voi `false` (da tra loi, va cau tra loi sai). Xem `probeAll`.
  */
-async function probe(url: string): Promise<boolean> {
+async function probe(url: string, origin: string): Promise<boolean> {
   const response = await fetch(url, {
     headers: {
       Accept: 'image/png,image/*',
@@ -62,8 +52,10 @@ async function probe(url: string): Promise<boolean> {
       // tuy chon `referrer` cua fetch — tuy chon do la khai niem cua trinh duyet
       // va undici khong phai luc nao cung dich no ra header that.
       //
-      // Trinh duyet tu gui Referer cua chinh no, nen day chi la chuyen cua BE.
-      Referer: WEB_ORIGIN,
+      // `origin` di tu route handler xuong, lay tu CHINH request cua trinh
+      // duyet — xem app/api/tiles/route.ts. Khong con bien moi truong nao de
+      // dat sai o day.
+      Referer: origin,
     },
     signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
   });
@@ -90,14 +82,14 @@ async function probe(url: string): Promise<boolean> {
  * bat duoc. Nho vay cache 6 gio moi an toan — mot cu chop mang khong con dau
  * doc duoc ca danh sach.
  */
-async function probeAll(): Promise<string[]> {
+async function probeAll(origin: string): Promise<string[]> {
   const { z, x, y } = PROBE_TILE;
 
   // Ba nha cung cap la ba ten mien khac nhau, goi song song khong ai bi don dap.
   const verdicts = await Promise.all(
     TILE_PROVIDERS.map(async (provider) => {
       try {
-        return (await probe(provider.url(z, x, y))) ? provider.name : null;
+        return (await probe(provider.url(z, x, y), origin)) ? provider.name : null;
       } catch (error) {
         console.error(
           `[GET /api/tiles] ${provider.name} khong do duoc, TAM GIU LAI trong danh sach:`,
@@ -113,7 +105,14 @@ async function probeAll(): Promise<string[]> {
   return verdicts.filter((name): name is string => name !== null);
 }
 
-export function findUsableTileProviders(): Promise<string[]> {
-  // Mot khoa duy nhat: ca bang duoc do mot lan roi dung chung.
-  return gate.run('all', probeAll);
+/**
+ * `origin` la origin THAT cua request dang duoc phuc vu, khong phai mot hang so.
+ *
+ * No vua la `Referer` gui len upstream, vua la KHOA CACHE — hai vai tro nay
+ * phai di cung nhau: cung mot bang TILE_PROVIDERS cho ket qua khac nhau o
+ * localhost va o ban deploy (Stadia 401 khi referer khong phai localhost), nen
+ * dung chung mot o cache cho moi origin se tra loi sai cho mot trong hai.
+ */
+export function findUsableTileProviders(origin: string): Promise<string[]> {
+  return gate.run(origin, () => probeAll(origin));
 }

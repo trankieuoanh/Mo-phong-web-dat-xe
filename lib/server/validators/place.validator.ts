@@ -1,6 +1,7 @@
 /**
  * Validate query cua GET /api/places — hop dong o api-endpoints.md muc 3b.
  */
+import 'server-only';
 
 export interface PlaceQuery {
   q: string;

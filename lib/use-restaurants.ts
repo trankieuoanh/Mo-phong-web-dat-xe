@@ -6,7 +6,7 @@
  * KHONG BAN EVENT NAO — day la tra cuu ha tang. Event chi bat khi nguoi dung
  * BAM mot quan (`select_restaurant` o app/food/page.tsx).
  *
- * Duong dan TUONG DOI, di qua proxy rewrites cua Next — goi thang localhost:4000
+ * Duong dan tro toi route handler cua chinh app nay (app/api/restaurants/route.ts)
  * se thanh cross-origin (cung ly do da ghi o use-place-search.ts).
  *
  * Khac use-place-search.ts hai diem:
@@ -17,7 +17,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { haversineKm, type Place, type Restaurant } from '@gsm/shared';
+import { haversineKm, type Place, type Restaurant } from '@/lib/shared';
 
 export type RestaurantStatus = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -31,7 +31,7 @@ export interface RestaurantState {
   retry: () => void;
 }
 
-/** Duoi nguong nay thi khong goi API — cung nguong voi validator o apps/api. */
+/** Duoi nguong nay thi khong goi API — cung nguong voi validator o lib/server. */
 const MIN_QUERY_LENGTH = 2;
 
 /** Doi nguoi dung ngung go. 400ms du de mot tu tieng Viet go xong. */

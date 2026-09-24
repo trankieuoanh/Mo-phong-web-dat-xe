@@ -6,6 +6,7 @@
  * nay hai lan nghia la sua mot ben quen ben kia, ma trieu chung cua no la bi
  * chan IP giua luc demo chu khong phai mot test do.
  */
+import 'server-only';
 
 interface GateOptions {
   /** Khoang cach toi thieu giua hai lan goi upstream, don vi ms. */

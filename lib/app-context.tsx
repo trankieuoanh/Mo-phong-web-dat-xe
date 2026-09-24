@@ -20,7 +20,7 @@ import {
   type Place,
   type RouteResult,
   type MockDriver,
-} from '@gsm/shared';
+} from '@/lib/shared';
 import { getSessionId, getUserId, resetSession } from './session';
 import { resetPreviousScreen } from './track';
 

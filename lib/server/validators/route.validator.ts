@@ -1,7 +1,8 @@
 /**
  * Validate query cua GET /api/route — hop dong o api-endpoints.md muc 3c.
  */
-import type { LatLon } from '@gsm/shared';
+import 'server-only';
+import type { LatLon } from '@/lib/shared';
 
 export interface RouteQuery {
   from: LatLon;

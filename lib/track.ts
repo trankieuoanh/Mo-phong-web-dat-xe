@@ -3,7 +3,7 @@
 /**
  * Helper ghi event. Hop dong day du: screen-map.md muc 4.
  *
- * `flow` va `step_index` mac dinh TRA TU BANG SCREENS trong @gsm/shared,
+ * `flow` va `step_index` mac dinh TRA TU BANG SCREENS trong lib/shared,
  * khong go tay o tung page — vi step_index sai la loi khong co trieu chung:
  * app van chay dep, chi co funnel sai, va chi phat hien ra o Tuan 5.
  */
@@ -17,7 +17,7 @@ import {
   type EventPayload,
   type Flow,
   type ScreenName,
-} from '@gsm/shared';
+} from '@/lib/shared';
 import { getSessionId, getUserId } from './session';
 
 /**
@@ -116,7 +116,7 @@ export type FlowEntryScreen = Extract<ScreenName, 'home' | 'address_selection' |
 
 /**
  * `select_flow` luon mang step_index = 0 va flow = luong VUA CHON, du ban o man
- * nao — xem SELECT_FLOW_STEP_INDEX trong @gsm/shared.
+ * nao — xem SELECT_FLOW_STEP_INDEX trong lib/shared.
  *
  * Phai ban DONG BO ngay truoc `router.push`, khong duoc doi sang ban trong
  * useEffect cua man dich: lam vay `previous_screen` lech mot nac va loi do

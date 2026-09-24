@@ -4,15 +4,16 @@
  * Whitelist 8 field: moi field la khac bi loai bo IM LANG (khong tra loi).
  * `platform` va `created_at` do server tu gan, client gui len cung bi bo qua.
  *
- * `isEventName` / `isScreenName` nhap tu @gsm/shared — cung mot danh sach ma
- * apps/web dung de goi, nen hai ben khong the lech nhau.
+ * `isEventName` / `isScreenName` nhap tu lib/shared — cung mot danh sach ma
+ * giao dien dung de goi, nen hai ben khong the lech nhau.
  */
+import 'server-only';
 import {
   isEventName,
   isFlowValue,
   isScreenName,
   type EventPayload,
-} from '@gsm/shared';
+} from '@/lib/shared';
 
 export type ValidationResult =
   | { ok: true; value: EventPayload }

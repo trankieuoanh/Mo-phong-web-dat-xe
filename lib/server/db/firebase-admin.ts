@@ -1,9 +1,17 @@
 /**
- * Noi DUY NHAT trong toan monorepo cam credential Firestore.
+ * Noi DUY NHAT trong toan du an cam credential Firestore.
  *
- * apps/web khong co `firebase-admin` trong dependencies, nen khong import
- * duoc file nay du co co tinh — xem CLAUDE.md quy tac 1.
+ * `import 'server-only'` o ngay duoi day KHONG phai trang tri. Truoc day giao
+ * dien va backend la hai package rieng, nen hang rao la vat ly: package giao
+ * dien khong co `firebase-admin` trong dependencies, muon import file nay cung
+ * khong noi. Gop ve mot project thi hang rao do bien mat — moi thu nam chung
+ * mot module graph.
+ *
+ * `server-only` dung lai dung hang rao ay o mot cho khac: file nao keo module
+ * nay vao mot Client Component se HONG NGAY LUC BUILD, khong phai lo ra luc
+ * chay. Xem CLAUDE.md quy tac 1.
  */
+import 'server-only';
 import { cert, getApps, initializeApp, type App } from 'firebase-admin/app';
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';
 
@@ -25,7 +33,7 @@ function readCredentials() {
   if (missing.length > 0) {
     throw new Error(
       `Thieu bien moi truong Firebase: ${missing.join(', ')}. ` +
-        'Copy apps/api/.env.example thanh apps/api/.env roi dien gia tri (xem setup.md Phase 1).',
+        'Copy .env.example thanh .env.local roi dien gia tri (xem setup.md Phase 1).',
     );
   }
 
@@ -39,16 +47,17 @@ function readCredentials() {
 }
 
 function getApp(): App {
-  // `tsx watch` chay lai module nhieu lan trong cung mot tien trinh.
-  // Goi initializeApp() thang se nem "The default Firebase app already exists"
-  // ngay lan sua file thu hai.
+  // Hot-reload cua `next dev` chay lai module nhieu lan trong cung mot tien
+  // trinh. Goi initializeApp() thang se nem "The default Firebase app already
+  // exists" ngay lan sua file thu hai. (Ly do nay truoc day la `tsx watch`;
+  // doi runtime nhung cai bay thi y nguyen.)
   return getApps()[0] ?? initializeApp({ credential: cert(readCredentials()) });
 }
 
 /**
  * Khoi tao tre (lazy): GET /api/health phai tra loi duoc ngay ca khi chua co
- * credential. Do la ca muc dich cua route do — xac nhan server song TRUOC khi
- * Firebase vao cuoc, de loi Express va loi Firebase khong tron vao nhau.
+ * credential. Do la ca muc dich cua route do — xac nhan app song TRUOC khi
+ * Firebase vao cuoc, de hai loai loi khong tron vao nhau.
  */
 export function getDb(): Firestore {
   if (!firestore) firestore = getFirestore(getApp());

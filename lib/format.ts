@@ -2,7 +2,7 @@
  * Tien LUON la so nguyen VND trong du lieu (35000).
  * Chi format khi hien thi (35.000d). Xem CLAUDE.md muc Quy uoc code.
  */
-import { CURRENCY, VEHICLE_TYPE_LABELS, type RuleBlock } from '@gsm/shared';
+import { CURRENCY, VEHICLE_TYPE_LABELS, type RuleBlock } from '@/lib/shared';
 
 const vnd = new Intl.NumberFormat('vi-VN');
 
@@ -29,8 +29,8 @@ function formatHour(hour: number): string {
  * lai phai sua hai noi — de sot mot noi thi hai luong giai thich khac nhau ve
  * cung mot luat.
  *
- * `ruleBlock()` trong @gsm/shared tra ve du lieu chu khong phai cau chu vi
- * packages/shared khong duoc biet toi `formatVnd`.
+ * `ruleBlock()` trong lib/shared tra ve du lieu chu khong phai cau chu vi
+ * lib/shared khong duoc biet toi `formatVnd`.
  */
 export function formatRuleBlock(block: RuleBlock): string {
   switch (block.kind) {

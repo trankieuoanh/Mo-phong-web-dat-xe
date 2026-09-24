@@ -5,12 +5,11 @@
  *
  * KHONG BAN EVENT NAO — day la tra cuu ha tang, khong phai mot buoc funnel.
  *
- * Duong dan `/api/route` TUONG DOI, di qua proxy rewrites cua Next
- * (apps/web/next.config.ts). Goi thang localhost:4000 se thanh cross-origin.
+ * `/api/route` la route handler cua chinh app nay (app/api/route/route.ts).
  */
 
 import { useEffect, useState } from 'react';
-import { straightRoute, type Place, type RouteResult } from '@gsm/shared';
+import { straightRoute, type Place, type RouteResult } from '@/lib/shared';
 
 /**
  * Tra ve tuyen duong, hoac `null` khi chua du hai diem.
