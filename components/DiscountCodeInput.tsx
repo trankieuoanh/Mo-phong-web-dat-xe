@@ -14,7 +14,7 @@
  */
 
 import { useState } from 'react';
-import { ruleBlock, type DiscountRule, type RuleContext } from '@gsm/shared';
+import { ruleBlock, type DiscountRule, type RuleContext } from '@/lib/shared';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { formatRuleBlock } from '@/lib/format';
 

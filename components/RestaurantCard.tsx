@@ -10,7 +10,7 @@
  * con te hon mot dong thieu ghi chu (api-endpoints.md muc 3b-bis).
  */
 
-import { CUISINE_LABELS, cuisinesOf, roundKm, type Restaurant } from '@gsm/shared';
+import { CUISINE_LABELS, cuisinesOf, roundKm, type Restaurant } from '@/lib/shared';
 import { Icon } from '@/components/Icon';
 
 interface RestaurantCardProps {

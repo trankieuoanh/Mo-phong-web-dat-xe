@@ -16,7 +16,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { calcFoodTotals, getFoodItem } from '@gsm/shared';
+import { calcFoodTotals, getFoodItem } from '@/lib/shared';
 import { Icon } from '@/components/Icon';
 import { useApp } from '@/lib/app-context';
 

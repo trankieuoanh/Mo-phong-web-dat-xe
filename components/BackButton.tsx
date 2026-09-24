@@ -9,7 +9,7 @@
  */
 
 import { useRouter } from 'next/navigation';
-import type { ScreenName } from '@gsm/shared';
+import type { ScreenName } from '@/lib/shared';
 import { Icon } from '@/components/Icon';
 import { trackEvent } from '@/lib/track';
 

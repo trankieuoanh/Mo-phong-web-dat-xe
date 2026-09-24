@@ -16,7 +16,7 @@
  * next/image, cung lua chon da ghi o MapCanvas.tsx.
  */
 
-import type { Cuisine, FoodItem } from '@gsm/shared';
+import type { Cuisine, FoodItem } from '@/lib/shared';
 import { Icon, type IconName } from '@/components/Icon';
 
 /**
@@ -50,7 +50,7 @@ export function FoodThumb({ item, variant = 'cover', className }: FoodThumbProps
   if (item.image) {
     return (
       // Dung the <img> tho chu KHONG dung next/image, cung lua chon da ghi o
-      // MapCanvas.tsx: anh nam san trong apps/web/public, khong qua loader nao.
+      // MapCanvas.tsx: anh nam san trong public/, khong qua loader nao.
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src={item.image}

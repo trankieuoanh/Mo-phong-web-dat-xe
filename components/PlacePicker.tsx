@@ -6,7 +6,7 @@
  *
  * KHONG ban event nao — component cha quyet dinh ban gi khi `onPick` chay.
  *
- * SUY BIEN EM khi Photon rot / apps/api khong tra loi / mat mang: hien mot dong
+ * SUY BIEN EM khi Photon rot / route handler khong tra loi / mat mang: hien mot dong
  * canh bao NHUNG VAN liet ke dia chi goi y, de luong di tiep duoc. Cung tinh
  * than voi `trackEvent().catch(() => {})` — ha tang loi khong duoc ket nguoi dung.
  *
@@ -16,7 +16,7 @@
  */
 
 import { useState } from 'react';
-import { PRESET_PLACES, getAddress, haversineKm, roundKm, type Address, type Place } from '@gsm/shared';
+import { PRESET_PLACES, getAddress, haversineKm, roundKm, type Address, type Place } from '@/lib/shared';
 import { Icon, type IconName } from '@/components/Icon';
 import { MIN_QUERY_LENGTH, usePlaceSearch } from '@/lib/use-place-search';
 

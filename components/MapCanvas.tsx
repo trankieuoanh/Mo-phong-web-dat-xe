@@ -15,7 +15,7 @@
  */
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { LatLon, Place, RouteResult } from '@gsm/shared';
+import type { LatLon, Place, RouteResult } from '@/lib/shared';
 import { Icon } from '@/components/Icon';
 import { useTileProviders } from '@/lib/use-tile-providers';
 
@@ -26,7 +26,7 @@ const MAX_ZOOM = 18;
 const PADDING_RATIO = 0.12;
 
 /**
- * Bang nha cung cap tile nam o `packages/shared/src/tiles.ts` — BE phai do dung
+ * Bang nha cung cap tile nam o `lib/shared/tiles.ts` — phep do phai do dung
  * cai danh sach ma man hinh nay se hien.
  *
  * HAI LOP PHONG VE, BAT HAI THU KHAC NHAU:
@@ -41,7 +41,7 @@ const PADDING_RATIO = 0.12;
  *
  * Bai hoc: `onError` cua the <img> chi biet "tai duoc hay khong", khong biet
  * "dung hay sai". Muon biet dieu thu hai thi phai chu dong di do — viec cua
- * `apps/api/src/services/tiles.service.ts`.
+ * `lib/server/services/tiles.service.ts`.
  *
  * Nguoc lai, lop 1 khong thay duoc lop 2: may chay BE goi duoc mot ten mien
  * khong co nghia trinh duyet cua nguoi dung cung goi duoc.

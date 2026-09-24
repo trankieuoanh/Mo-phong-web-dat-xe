@@ -29,7 +29,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import type { Flow } from '@gsm/shared';
+import type { Flow } from '@/lib/shared';
 import { GsmLogo } from '@/components/GsmLogo';
 import { Icon, type IconName } from '@/components/Icon';
 import { trackSelectFlow, type FlowEntryScreen } from '@/lib/track';

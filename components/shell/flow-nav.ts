@@ -8,7 +8,7 @@
  * mau so cua ca funnel.
  */
 
-import type { Flow } from '@gsm/shared';
+import type { Flow } from '@/lib/shared';
 import type { FlowEntryScreen } from '@/lib/track';
 
 /**
