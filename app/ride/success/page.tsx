@@ -106,24 +106,24 @@ export default function RideSuccessPage() {
         </p>
       </div>
 
-      <div className="rounded-xl bg-canvas-soft p-2xl space-y-lg">
+      <div className="space-y-lg rounded-xl bg-canvas-soft p-lg md:p-2xl">
         {summary?.driverName && (
-          <div className="flex items-center gap-md p-md rounded-lg bg-primary-soft border border-primary">
-            <div className="size-12 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+          <div className="flex min-w-0 items-center gap-md rounded-lg border border-primary bg-canvas-soft p-lg md:p-md">
+            <div className="flex size-12 shrink-0 items-center justify-center rounded-full bg-primary-dark">
               <Icon name="users" size={20} className="text-on-primary" />
             </div>
-            <div className="flex-1">
-              <h3 className="t-body-md-strong">{summary.driverName}</h3>
-              <div className="flex items-center gap-md mt-xs text-sm text-body">
-                <span className="flex items-center gap-xs">
+            <div className="min-w-0 flex-1">
+              <h3 className="t-body-md-strong break-words">{summary.driverName}</h3>
+              <div className="mt-xs flex flex-col items-start gap-xs text-sm text-body sm:flex-row sm:flex-wrap sm:items-center sm:gap-md">
+                <span className="flex min-w-0 items-center gap-xs break-words">
                   <Icon name="users" size={14} /> {summary.driverPlate}
                 </span>
-                <span className="flex items-center gap-xs">
+                <span className="flex min-w-0 items-center gap-xs break-words">
                   <Icon name="phone" size={14} /> {summary.driverPhone}
                 </span>
               </div>
               {summary.driverEta && (
-                <p className="t-body-sm mt-xs text-primary flex items-center gap-xs">
+                <p className="t-body-sm mt-xs flex items-start gap-xs break-words text-primary-dark">
                   <Icon name="clock" size={14} /> Còn {summary.driverEta} phút đến đón
                 </p>
               )}
@@ -143,9 +143,9 @@ export default function RideSuccessPage() {
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between py-xs">
-      <span className="t-body-sm text-body">{label}</span>
-      <span className="t-body-md-strong">{value}</span>
+    <div className="flex flex-col gap-xxs py-xs sm:flex-row sm:items-baseline sm:justify-between sm:gap-md">
+      <span className="t-body-sm shrink-0 text-body">{label}</span>
+      <span className="t-body-md-strong min-w-0 break-words sm:text-right">{value}</span>
     </div>
   );
 }

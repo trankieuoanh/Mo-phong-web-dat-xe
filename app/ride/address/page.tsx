@@ -25,10 +25,10 @@ import { MapCanvas } from '@/components/MapCanvas';
 import { PlacePicker } from '@/components/PlacePicker';
 import { ScreenShell } from '@/components/ScreenShell';
 import { useApp } from '@/lib/app-context';
-import { trackEvent, useScreenView } from '@/lib/track';
+import { trackEvent, useFlowEntryView } from '@/lib/track';
 
 export default function AddressPage() {
-  useScreenView('address_selection');
+  useFlowEntryView('address_selection');
   const router = useRouter();
   const { ride, setRide } = useApp();
 
@@ -98,68 +98,86 @@ export default function AddressPage() {
         </Decor>
       }
     >
-      <PlacePicker
-        placeholder="Tìm điểm đến"
-        presetHeading="Địa chỉ đã lưu"
-        selectedId={ride.destination?.id}
-        onPick={selectAddress}
-        origin={pickup}
-        leading={
-          <Decor className="t-body-sm-strong inline-flex items-center gap-sm rounded-pill bg-canvas-soft px-lg py-sm text-primary-dark">
-            <Icon name="target" size={18} /> Sử dụng vị trí hiện tại
-          </Decor>
-        }
-      />
+      <div className={picking ? 'flex flex-col' : undefined}>
+        <div className={picking ? 'order-1 hidden desktop:order-1 desktop:block' : undefined}>
+          <PlacePicker
+            placeholder="Tìm điểm đến"
+            presetHeading="Địa chỉ đã lưu"
+            selectedId={ride.destination?.id}
+            onPick={selectAddress}
+            origin={pickup}
+            leading={
+              <Decor className="t-body-sm-strong inline-flex items-center gap-sm rounded-pill bg-canvas-soft px-lg py-sm text-primary-dark">
+                <Icon name="target" size={18} /> Sử dụng vị trí hiện tại
+              </Decor>
+            }
+          />
+        </div>
 
-      <div className="mt-2xl flex flex-wrap items-center gap-md">
-        <Decor className="t-body-sm-strong inline-flex items-center gap-sm rounded-pill bg-canvas-soft px-lg py-sm text-body">
-          <Icon name="heart" size={16} /> Địa chỉ đã lưu
-        </Decor>
-        {/* Chip nay truoc la <Decor>. Gio bam duoc that — bat/tat che do chon
-            tren ban do. KHONG ban event: bat che do chua phai mot lua chon,
-            `select_address` chi ban khi nguoi dung xac nhan diem da bam. */}
-        <button
-          type="button"
-          onClick={() => {
-            setPicking((on) => !on);
-            setPicked(null);
-          }}
-          aria-pressed={picking}
-          className={`t-body-sm-strong inline-flex items-center gap-sm rounded-pill px-lg py-sm transition-colors ${
-            picking
-              ? 'bg-primary-dark text-on-primary'
-              : 'bg-canvas-soft text-body hover:bg-surface-pressed'
+        <div className="order-2 mt-2xl flex flex-wrap items-center gap-md">
+          <Decor
+            className={`t-body-sm-strong items-center gap-sm rounded-pill bg-canvas-soft px-lg py-sm text-body ${
+              picking ? 'hidden desktop:inline-flex' : 'inline-flex'
+            }`}
+          >
+            <Icon name="heart" size={16} /> Địa chỉ đã lưu
+          </Decor>
+          {/* Chip nay truoc la <Decor>. Gio bam duoc that — bat/tat che do chon
+              tren ban do. KHONG ban event: bat che do chua phai mot lua chon,
+              `select_address` chi ban khi nguoi dung xac nhan diem da bam. */}
+          <button
+            type="button"
+            onClick={() => {
+              setPicking((on) => !on);
+              setPicked(null);
+            }}
+            aria-pressed={picking}
+            className={`t-body-sm-strong inline-flex min-h-12 items-center gap-sm rounded-pill px-lg transition-colors ${
+              picking
+                ? 'bg-primary-dark text-on-primary'
+                : 'bg-canvas-soft text-body hover:bg-surface-pressed'
+            }`}
+          >
+            <Icon name="map" size={16} /> Tìm trên bản đồ
+          </button>
+        </div>
+
+        {picking ? (
+          <div className="order-1 mt-lg rounded-xl bg-canvas-soft p-lg desktop:order-3">
+            {picked ? (
+              <>
+                <p className="t-body-md-strong break-words text-ink">{picked.label}</p>
+                <p className="t-body-sm mt-xxs break-words text-body">{picked.address}</p>
+                <div className="mt-lg">
+                  <PrimaryButton
+                    fullWidth={false}
+                    onClick={() => selectAddress(picked)}
+                    className="w-full desktop:w-auto"
+                  >
+                    Chọn điểm đến này
+                  </PrimaryButton>
+                </div>
+              </>
+            ) : (
+              <p className="t-body-sm break-words text-body">
+                {resolving
+                  ? 'Đang tra địa chỉ…'
+                  : 'Bấm một điểm trên bản đồ để chọn làm điểm đến.'}
+              </p>
+            )}
+          </div>
+        ) : null}
+
+        <div
+          className={`order-3 mt-lg items-center justify-between desktop:order-4 ${
+            picking ? 'hidden desktop:flex' : 'flex'
           }`}
         >
-          <Icon name="map" size={16} /> Tìm trên bản đồ
-        </button>
-      </div>
-
-      {picking ? (
-        <div className="mt-lg rounded-xl bg-canvas-soft p-lg">
-          {picked ? (
-            <>
-              <p className="t-body-md-strong text-ink">{picked.label}</p>
-              <p className="t-body-sm mt-xxs text-body">{picked.address}</p>
-              <div className="mt-lg">
-                <PrimaryButton fullWidth={false} onClick={() => selectAddress(picked)}>
-                  Chọn điểm đến này
-                </PrimaryButton>
-              </div>
-            </>
-          ) : (
-            <p className="t-body-sm text-body">
-              {resolving ? 'Đang tra địa chỉ…' : 'Bấm một điểm trên bản đồ để chọn làm điểm đến.'}
-            </p>
-          )}
+          <span className="t-body-sm text-body">Hiển thị địa chỉ sau sáp nhập tỉnh</span>
+          <Decor className="inline-flex h-6 w-11 items-center justify-end rounded-pill bg-surface-pressed p-xxs">
+            <span className="block size-4 rounded-full bg-canvas" />
+          </Decor>
         </div>
-      ) : null}
-
-      <div className="mt-lg flex items-center justify-between">
-        <span className="t-body-sm text-body">Hiển thị địa chỉ sau sáp nhập tỉnh</span>
-        <Decor className="inline-flex h-6 w-11 items-center justify-end rounded-pill bg-surface-pressed p-xxs">
-          <span className="block size-4 rounded-full bg-canvas" />
-        </Decor>
       </div>
     </ScreenShell>
   );

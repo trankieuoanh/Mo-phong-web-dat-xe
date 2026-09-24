@@ -85,16 +85,22 @@ function FoodItemContent({ itemId }: { itemId: string }) {
       tabs={['Đặt món', 'Đang diễn ra', 'Đơn đã lưu']}
       maxWidth="max-w-[760px]"
       title={item.name}
-      leading={<BackButton from="food_item_detail" to="food_menu" href="/food" />}
+      leading={
+        <span className="[&_button]:size-11">
+          <BackButton from="food_item_detail" to="food_menu" href="/food" />
+        </span>
+      }
       footer={
-        <PrimaryButton onClick={handleAddToCart}>
+        <PrimaryButton className="whitespace-normal" onClick={handleAddToCart}>
           Thêm vào giỏ · {formatVnd(item.price * quantity)}
         </PrimaryButton>
       }
     >
       {/* Hai cot tren desktop: khung anh trai, thong tin phai. */}
-      <div className="grid gap-2xl md:grid-cols-2">
-        <FoodThumb item={item} />
+      <div className="grid gap-2xl [@media(orientation:landscape)_and_(max-height:600px)]:grid-cols-2 md:grid-cols-2">
+        <div className="mx-auto w-full max-w-[360px] [@media(orientation:landscape)_and_(max-height:600px)]:max-w-[240px] md:max-w-none">
+          <FoodThumb item={item} />
+        </div>
 
         <div className="flex flex-col">
           <h2 className="t-display-md">{item.name}</h2>
@@ -107,9 +113,11 @@ function FoodItemContent({ itemId }: { itemId: string }) {
           <p className="t-body-sm mt-md text-body">{item.description}</p>
           <p className="t-display-sm mt-lg">{formatVnd(item.price)}</p>
 
-          <div className="mt-2xl flex items-center gap-lg">
+          <div className="mt-2xl flex items-center gap-lg [@media(orientation:landscape)_and_(max-height:600px)]:mt-lg">
             <span className="t-body-sm text-body">Số lượng</span>
-            <QuantityStepper quantity={quantity} onChange={changeQuantity} label={item.name} />
+            <div className="[&_button]:size-11">
+              <QuantityStepper quantity={quantity} onChange={changeQuantity} label={item.name} />
+            </div>
           </div>
 
           {inCart > 0 ? (

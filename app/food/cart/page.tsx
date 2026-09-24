@@ -108,7 +108,11 @@ function FoodCartContent() {
       tabs={['Đặt món', 'Đang diễn ra', 'Đơn đã lưu']}
       maxWidth="max-w-[760px]"
       title="Giỏ hàng"
-      leading={<BackButton from="food_cart" to="food_menu" href="/food" />}
+      leading={
+        <span className="[&_button]:size-11">
+          <BackButton from="food_cart" to="food_menu" href="/food" />
+        </span>
+      }
       footer={empty ? undefined : <PrimaryButton onClick={proceed}>Tiếp tục</PrimaryButton>}
     >
       {empty ? (
@@ -132,7 +136,7 @@ function FoodCartContent() {
               return (
                 <li
                   key={line.itemId}
-                  className="flex items-center gap-lg rounded-xl bg-canvas-soft p-lg"
+                  className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-lg gap-y-md rounded-xl bg-canvas-soft p-lg sm:flex sm:gap-y-0"
                 >
                   <FoodThumb item={item} variant="tile" />
 
@@ -148,17 +152,19 @@ function FoodCartContent() {
                     </span>
                   </div>
 
-                  <QuantityStepper
-                    quantity={line.quantity}
-                    onChange={(next) => changeQuantity(line.itemId, next)}
-                    label={item.name}
-                  />
+                  <div className="col-start-2 col-end-4 row-start-2 [&_button]:size-11">
+                    <QuantityStepper
+                      quantity={line.quantity}
+                      onChange={(next) => changeQuantity(line.itemId, next)}
+                      label={item.name}
+                    />
+                  </div>
 
                   <button
                     type="button"
                     aria-label={`Xoá ${item.name}`}
                     onClick={() => remove(line.itemId)}
-                    className="grid size-9 shrink-0 place-items-center rounded-full text-mute transition-colors hover:bg-canvas hover:text-ink"
+                    className="col-start-3 row-start-1 grid size-11 shrink-0 place-items-center rounded-full text-mute transition-colors hover:bg-canvas hover:text-ink"
                   >
                     <Icon name="trash" size={20} />
                   </button>
@@ -167,7 +173,7 @@ function FoodCartContent() {
             })}
           </ul>
 
-          <div className="mt-2xl rounded-xl bg-canvas-soft p-2xl">
+          <div className="mt-2xl rounded-xl bg-canvas-soft p-lg sm:p-2xl [&>*]:flex-wrap">
             <SummaryRow label="Tiền hàng" value={formatVnd(totals.cartTotal)} />
             <SummaryRow label="Phí giao hàng" value={formatVnd(SHIPPING_FEE)} />
             {/* Hang tong cong: ban cu dung lai o phi giao hang, tuc gio hang

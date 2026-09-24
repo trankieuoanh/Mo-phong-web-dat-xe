@@ -29,7 +29,7 @@ import { trackEvent, useScreenView } from '@/lib/track';
 export default function PickupPage() {
   const { ride } = useApp();
   return (
-    <FlowGuard ready={Boolean(ride.destination)} fallback="/">
+    <FlowGuard ready={Boolean(ride.destination)} fallback="/ride/address">
       <PickupContent />
     </FlowGuard>
   );
@@ -41,6 +41,7 @@ function PickupContent() {
   const { ride, setRide } = useApp();
   const [note, setNote] = useState(ride.driverNote ?? '');
   const [pickingPickup, setPickingPickup] = useState(false);
+  const [pickingPickupBySearch, setPickingPickupBySearch] = useState(false);
 
   // FlowGuard da bao dam `destination` ton tai; `pickup` luon co nho newRideDraft().
   const destination = ride.destination!;
@@ -61,6 +62,7 @@ function PickupContent() {
     // moi session co dung MOT `confirm_pickup` du nguoi dung doi qua doi lai.
     setRide({ pickup: place });
     setPickingPickup(false);
+    setPickingPickupBySearch(false);
   }
 
   /**
@@ -128,47 +130,77 @@ function PickupContent() {
             <p className="t-body-md-strong">Chọn điểm đón</p>
             <button
               type="button"
-              onClick={() => setPickingPickup(false)}
-              className="t-body-sm-strong inline-flex items-center gap-xxs rounded-pill px-md py-xs text-body hover:bg-canvas-soft"
+              onClick={() => {
+                setPickingPickup(false);
+                setPickingPickupBySearch(false);
+              }}
+              className="t-body-sm-strong inline-flex min-h-12 shrink-0 items-center gap-xxs rounded-pill px-md text-body hover:bg-canvas-soft"
             >
               <Icon name="close" size={16} /> Huỷ
             </button>
           </div>
-          <PlacePicker
-            placeholder="Tìm điểm đón"
-            presetHeading="Địa chỉ đã lưu"
-            selectedId={pickup.id}
-            onPick={choosePickup}
-            origin={destination}
-          />
+          {pickingPickupBySearch ? (
+            <>
+              <PlacePicker
+                placeholder="Tìm điểm đón"
+                presetHeading="Địa chỉ đã lưu"
+                selectedId={pickup.id}
+                onPick={choosePickup}
+                origin={destination}
+              />
+              <button
+                type="button"
+                onClick={() => setPickingPickupBySearch(false)}
+                className="t-body-sm-strong mt-lg inline-flex min-h-12 items-center gap-sm rounded-pill bg-canvas px-lg text-primary-dark hover:bg-surface-pressed"
+              >
+                <Icon name="map" size={16} /> Chọn bằng bản đồ
+              </button>
+            </>
+          ) : (
+            <div className="rounded-xl bg-canvas-soft p-lg">
+              <p className="t-body-sm break-words text-body">
+                Bấm một điểm trên bản đồ bên dưới để chọn điểm đón.
+              </p>
+              <PrimaryButton
+                variant="secondary"
+                className="mt-lg"
+                onClick={() => setPickingPickupBySearch(true)}
+              >
+                Tìm địa chỉ thay vì bản đồ
+              </PrimaryButton>
+            </div>
+          )}
         </>
       ) : (
         <>
           {/* card-soft-tinted — panel da la nen trang nen card dung `canvas-soft`. */}
-          <div className="rounded-xl bg-canvas-soft p-2xl">
+          <div className="rounded-xl bg-canvas-soft p-lg md:p-2xl">
             <p className="t-caption text-mute">Điểm đón</p>
-            <div className="mt-xxs flex items-baseline justify-between gap-md">
-              <p className="t-display-sm">{pickup.label}</p>
+            <div className="mt-xxs flex flex-col items-start gap-xxs sm:flex-row sm:items-baseline sm:justify-between sm:gap-md">
+              <p className="t-display-sm min-w-0 break-words">{pickup.label}</p>
               {!isPickupChanged(pickup) ? (
                 <span aria-hidden="true" className="t-caption shrink-0 text-mute">
                   bán kính 10 m
                 </span>
               ) : null}
             </div>
-            <p className="t-body-sm mt-xxs text-body">{pickup.address}</p>
+            <p className="t-body-sm mt-xxs break-words text-body">{pickup.address}</p>
 
             <button
               type="button"
-              onClick={() => setPickingPickup(true)}
-              className="t-body-sm-strong mt-md inline-flex items-center gap-sm rounded-pill bg-canvas px-lg py-sm text-primary-dark transition-colors hover:bg-surface-pressed"
+              onClick={() => {
+                setPickingPickup(true);
+                setPickingPickupBySearch(false);
+              }}
+              className="t-body-sm-strong mt-md inline-flex min-h-12 items-center gap-sm rounded-pill bg-canvas px-lg text-primary-dark transition-colors hover:bg-surface-pressed"
             >
               <Icon name="search" size={16} /> Đổi điểm đón
             </button>
 
             {/* Diem DEN — dia chi vua chon o man 1. */}
             <p className="t-caption mt-lg text-mute">Điểm đến</p>
-            <p className="t-body-md-strong mt-xxs">{destination.label}</p>
-            <p className="t-body-sm mt-xxs text-body">{destination.address}</p>
+            <p className="t-body-md-strong mt-xxs break-words">{destination.label}</p>
+            <p className="t-body-sm mt-xxs break-words text-body">{destination.address}</p>
 
             {/* text-input — tailwind-theme.md muc 4 */}
             <input

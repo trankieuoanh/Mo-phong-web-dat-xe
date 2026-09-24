@@ -127,7 +127,11 @@ function FoodOfferContent() {
       tabs={['Đặt món', 'Đang diễn ra', 'Đơn đã lưu']}
       maxWidth="max-w-[760px]"
       title="Chọn ưu đãi"
-      leading={<BackButton from="food_offer_selection" to="food_cart" href="/food/cart" />}
+      leading={
+        <span className="[&_button]:size-11">
+          <BackButton from="food_offer_selection" to="food_cart" href="/food/cart" />
+        </span>
+      }
       /* Pattern M — footer doi vai tro theo viec da tick hay chua. Ban cu chi co
          mot nut "Bo qua" dang `subtle`, nen buoc nay la man duy nhat trong ca
          app khong co hanh dong chinh o footer. */
@@ -144,11 +148,11 @@ function FoodOfferContent() {
       {/* O nhap ma — dua luong food ve ngang voi /ride/promo. Truoc day chi
           luong ride co, nen `offer_usage` va `promo_usage` khong so sanh duoc
           voi nhau vi mot ben thieu han mot cach tuong tac. */}
-      <div className="mb-lg">
+      <div className="mb-lg [&>div]:flex-wrap">
         <DiscountCodeInput rules={OFFERS} subtotal={cartTotal} ctx={ctx} onApply={pickByCode} />
       </div>
 
-      <ul className="flex flex-col gap-md">
+      <ul className="grid grid-cols-1 gap-md">
         {OFFERS.map((offer) => {
           const block = ruleBlock(offer, cartTotal, ctx);
           const available = block === null;
@@ -162,7 +166,7 @@ function FoodOfferContent() {
                 disabled={!available}
                 aria-pressed={selected}
                 onClick={() => setPicked(selected ? null : offer.id)}
-                className={`flex w-full items-center gap-lg rounded-xl bg-canvas-soft p-lg text-left text-ink transition-colors enabled:hover:bg-surface-pressed enabled:active:bg-surface-pressed disabled:cursor-not-allowed disabled:opacity-50 ${
+                className={`flex min-h-12 w-full items-center gap-lg rounded-xl bg-canvas-soft p-lg text-left text-ink transition-colors enabled:hover:bg-surface-pressed enabled:active:bg-surface-pressed disabled:cursor-not-allowed disabled:opacity-50 ${
                   selected ? 'ring-2 ring-primary' : ''
                 }`}
               >

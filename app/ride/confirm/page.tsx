@@ -34,7 +34,7 @@ export default function RideConfirmPage() {
   return (
     <FlowGuard
       ready={Boolean(ride.destination && ride.vehicleId && ride.promoId !== undefined)}
-      fallback="/"
+      fallback="/ride/address"
     >
       <RideConfirmContent />
     </FlowGuard>
@@ -107,7 +107,7 @@ function RideConfirmContent() {
       footer={<PrimaryButton onClick={confirmRide}>Đặt xe</PrimaryButton>}
     >
       {/* card-soft-tinted — panel da la nen trang nen card dung `canvas-soft`. */}
-      <div className="rounded-xl bg-canvas-soft p-2xl">
+      <div className="rounded-xl bg-canvas-soft p-lg md:p-2xl">
         <Row label="Điểm đón" value={pickup.label} />
         <Row label="Điểm đến" value={destination.label} />
         <Row label="Loại xe" value={vehicle?.name ?? '—'} />
@@ -119,7 +119,7 @@ function RideConfirmContent() {
 
         <div className="mt-md">
           {promo ? (
-            <span className="t-body-sm-strong inline-block rounded-pill bg-primary-dark px-lg py-sm text-on-primary">
+            <span className="t-body-sm-strong inline-block max-w-full whitespace-normal break-words rounded-pill bg-primary-dark px-lg py-sm text-on-primary">
               {promo.title} · −{formatVnd(totals.discountAmount)}
             </span>
           ) : (
@@ -130,13 +130,13 @@ function RideConfirmContent() {
         </div>
 
         <p className="t-caption mt-lg text-mute">Phương thức thanh toán</p>
-        <div className="mt-xs flex gap-sm">
+        <div className="mt-xs flex flex-wrap gap-sm">
           {PAYMENTS.map(({ id, label, icon }) => (
             <button
               key={id}
               type="button"
               onClick={() => setRide({ paymentMethod: id })}
-              className={`t-body-sm-strong inline-flex items-center gap-sm rounded-pill bg-canvas px-lg py-sm text-ink transition-colors hover:bg-surface-pressed ${
+              className={`t-body-sm-strong inline-flex min-h-12 items-center justify-center gap-sm rounded-pill bg-canvas px-lg text-ink transition-colors hover:bg-surface-pressed ${
                 id === paymentMethod ? 'ring-2 ring-primary' : ''
               }`}
             >
@@ -145,9 +145,9 @@ function RideConfirmContent() {
           ))}
         </div>
 
-        <div className="mt-lg flex items-center justify-between border-t border-canvas pt-lg">
+        <div className="mt-lg flex flex-wrap items-start justify-between gap-x-md gap-y-xxs border-t border-canvas pt-lg">
           <span className="t-body-md-strong">Tổng cộng</span>
-          <span className="t-display-sm">{formatVnd(totals.finalPrice)}</span>
+          <span className="t-display-sm ml-auto break-words text-right">{formatVnd(totals.finalPrice)}</span>
         </div>
       </div>
     </ScreenShell>
@@ -156,9 +156,9 @@ function RideConfirmContent() {
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between py-xs">
-      <span className="t-body-sm text-body">{label}</span>
-      <span className="t-body-md-strong">{value}</span>
+    <div className="flex flex-col gap-xxs py-xs sm:flex-row sm:items-baseline sm:justify-between sm:gap-md">
+      <span className="t-body-sm shrink-0 text-body">{label}</span>
+      <span className="t-body-md-strong min-w-0 break-words sm:text-right">{value}</span>
     </div>
   );
 }

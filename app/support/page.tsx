@@ -26,7 +26,7 @@ const ITEMS: InfoCard[] = [
 export default function SupportPage() {
   return (
     <AppShell section="Trung tâm hỗ trợ">
-      <div className="mx-auto w-full max-w-[1280px]">
+      <div className="mx-auto w-full min-w-0 max-w-[1280px] break-words px-lg desktop:px-0 [&_li>span:last-child]:min-w-0">
         <InfoCardGrid items={ITEMS} />
       </div>
     </AppShell>
