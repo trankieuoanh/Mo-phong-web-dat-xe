@@ -163,7 +163,9 @@ def fetch_events() -> pd.DataFrame:
 def main() -> None:
     df = fetch_events()
     OUTPUT_DIR.mkdir(exist_ok=True)
-    df.to_csv(EVENTS_CSV, index=False)
+    # utf-8-sig: co BOM thi Excel tren Windows moi doc dung tieng Viet.
+    # pandas.read_csv tu bo BOM nen metrics.py khong bi anh huong.
+    df.to_csv(EVENTS_CSV, index=False, encoding="utf-8-sig")
     print(f"Da ghi {len(df)} event vao {EVENTS_CSV}")
     if not df.empty:
         print(f"  {df['session_id'].nunique()} session, {df['user_id'].nunique()} user")
