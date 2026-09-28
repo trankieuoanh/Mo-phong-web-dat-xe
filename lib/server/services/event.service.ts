@@ -6,6 +6,8 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import type { CreateEventResponse, EventPayload } from '@/lib/shared';
 import { EVENTS_COLLECTION, getDb } from '../db/firebase-admin';
 import type { EventQuery } from '../validators/event.validator';
+import type { CacheStatus } from './query-cache';
+import { eventsCache, eventsCacheKey, invalidateEventsFor } from './events-cache';
 
 export async function createEvent(payload: EventPayload): Promise<CreateEventResponse> {
   const ref = await getDb()
@@ -17,6 +19,9 @@ export async function createEvent(payload: EventPayload): Promise<CreateEventRes
       created_at: FieldValue.serverTimestamp(),
     });
 
+  // SAU khi .add() thanh cong: ghi that bai thi da nem o tren, cache giu nguyen.
+  invalidateEventsFor(payload.session_id, payload.user_id);
+
   return {
     event_id: ref.id,
     // XAP XI, lech vai mili-giay: serverTimestamp() chua co gia tri that luc .add() tra ve.
@@ -26,7 +31,18 @@ export async function createEvent(payload: EventPayload): Promise<CreateEventRes
   };
 }
 
-export async function listEvents(query: EventQuery): Promise<Record<string, unknown>[]> {
+/**
+ * Doc qua cache — xem events-cache.ts. `flatten` chay SAU cache nen `?flat=1`
+ * va dang long nhau dung chung mot lan doc Firestore.
+ */
+export async function listEvents(
+  query: EventQuery,
+): Promise<{ events: Record<string, unknown>[]; cacheStatus: CacheStatus }> {
+  const { value, status } = await eventsCache.get(eventsCacheKey(query), () => fetchEvents(query));
+  return { events: query.flat ? flatten(value) : value, cacheStatus: status };
+}
+
+async function fetchEvents(query: EventQuery): Promise<Record<string, unknown>[]> {
   let ref = getDb().collection(EVENTS_COLLECTION) as FirebaseFirestore.Query;
 
   if (query.sessionId) ref = ref.where('session_id', '==', query.sessionId);
@@ -82,10 +98,7 @@ export async function listEvents(query: EventQuery): Promise<Record<string, unkn
   }
 
   // Chi nhanh sap-trong-bo-nho moi phai cat o day — xem ghi chu o cho dat limit.
-  const limited =
-    query.limit !== undefined && sortInMemory ? events.slice(0, query.limit) : events;
-
-  return query.flat ? flatten(limited) : limited;
+  return query.limit !== undefined && sortInMemory ? events.slice(0, query.limit) : events;
 }
 
 /**
