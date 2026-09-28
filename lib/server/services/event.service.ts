@@ -7,7 +7,14 @@ import type { CreateEventResponse, EventPayload } from '@/lib/shared';
 import { EVENTS_COLLECTION, getDb } from '../db/firebase-admin';
 import type { EventQuery } from '../validators/event.validator';
 import type { CacheStatus } from './query-cache';
-import { eventsCache, eventsCacheKey, invalidateEventsFor } from './events-cache';
+import {
+  EVENTS_FULL_RECONCILIATION_INTERVAL_MS,
+  eventsCache,
+  eventsCacheKey,
+  invalidateEventsFor,
+  isIncrementalQuery,
+} from './events-cache';
+import { syncEvents, type EventsSource, type SyncedDoc, type SyncTimestamp } from './events-sync';
 
 export async function createEvent(payload: EventPayload): Promise<CreateEventResponse> {
   const ref = await getDb()
@@ -38,18 +45,74 @@ export async function createEvent(payload: EventPayload): Promise<CreateEventRes
 export async function listEvents(
   query: EventQuery,
 ): Promise<{ events: Record<string, unknown>[]; cacheStatus: CacheStatus }> {
-  const { value, status } = await eventsCache.get(eventsCacheKey(query), () => fetchEvents(query));
-  return { events: query.flat ? flatten(value) : value, cacheStatus: status };
+  const key = eventsCacheKey(query);
+  const { value, status } = await eventsCache.get(key, (previous) =>
+    syncEvents(previous, firestoreSource(query), {
+      now: Date.now(),
+      reconcileMs: EVENTS_FULL_RECONCILIATION_INTERVAL_MS,
+      label: `[events] key=${key}`,
+    }),
+  );
+  const rows = value.rows;
+  return { events: query.flat ? flatten(rows) : rows, cacheStatus: status };
 }
 
-async function fetchEvents(query: EventQuery): Promise<Record<string, unknown>[]> {
-  let ref = getDb().collection(EVENTS_COLLECTION) as FirebaseFirestore.Query;
+/** Noi events-sync.ts voi Firestore that. Ba ham cung chung MOT bo loc. */
+function firestoreSource(query: EventQuery): EventsSource {
+  const toTimestamp = (ts: SyncTimestamp) => new Timestamp(ts.seconds, ts.nanoseconds);
+  return {
+    incremental: isIncrementalQuery(query),
+    fetchAll: () => fetchEvents(query),
+    // Khong orderBy: events-sync.ts tu sap lai sau khi ghep. Bo loc `flow ==`
+    // cong dieu kien khoang tren created_at dung CUNG composite index
+    // (flow, created_at) ma `?flow=` von da can — khong phat sinh index moi.
+    fetchSince: async (cursor) => {
+      const snapshot = await baseQuery(query).where('created_at', '>=', toTimestamp(cursor)).get();
+      return snapshot.docs.map(toSyncedDoc);
+    },
+    // Aggregation: tinh ~1 luot doc cho moi 1.000 document khop, khong phai 1/document.
+    countUpTo: async (cursor) => {
+      const snapshot = await baseQuery(query)
+        .where('created_at', '<=', toTimestamp(cursor))
+        .count()
+        .get();
+      return snapshot.data().count;
+    },
+  };
+}
 
+/** Cac dieu kien `where` cua GET /api/events — chua co orderBy/limit. */
+function baseQuery(query: EventQuery): FirebaseFirestore.Query {
+  let ref = getDb().collection(EVENTS_COLLECTION) as FirebaseFirestore.Query;
   if (query.sessionId) ref = ref.where('session_id', '==', query.sessionId);
   if (query.userId) ref = ref.where('user_id', '==', query.userId);
   if (query.flow) ref = ref.where('flow', '==', query.flow);
   if (query.from) ref = ref.where('created_at', '>=', Timestamp.fromDate(query.from));
   if (query.to) ref = ref.where('created_at', '<=', Timestamp.fromDate(query.to));
+  return ref;
+}
+
+function toSyncedDoc(doc: FirebaseFirestore.QueryDocumentSnapshot): SyncedDoc {
+  const data = doc.data();
+  const createdAt = data.created_at;
+  const isTimestamp = createdAt instanceof Timestamp;
+  return {
+    id: doc.id,
+    // Giu Timestamp THO lam cursor: chuoi ISO chi toi mili-giay, cat mat phan
+    // micro-giay ma Firestore dung de so sanh.
+    ts: isTimestamp ? { seconds: createdAt.seconds, nanoseconds: createdAt.nanoseconds } : null,
+    row: {
+      id: doc.id,
+      ...data,
+      // Timestamp cua Firestore serialize ra JSON thanh {_seconds, _nanoseconds} —
+      // pandas va jq deu khong doc duoc. Doi sang chuoi ISO ngay tai day.
+      created_at: isTimestamp ? createdAt.toDate().toISOString() : null,
+    },
+  };
+}
+
+async function fetchEvents(query: EventQuery): Promise<SyncedDoc[]> {
+  let ref = baseQuery(query);
 
   /**
    * Loc theo session thi sap theo buoc (dung cho replay mot phien);
@@ -79,22 +142,14 @@ async function fetchEvents(query: EventQuery): Promise<Record<string, unknown>[]
 
   const snapshot = await ref.get();
 
-  const events = snapshot.docs.map((doc) => {
-    const data = doc.data();
-    const createdAt = data.created_at;
-    return {
-      id: doc.id,
-      ...data,
-      // Timestamp cua Firestore serialize ra JSON thanh {_seconds, _nanoseconds} —
-      // pandas va jq deu khong doc duoc. Doi sang chuoi ISO ngay tai day.
-      created_at: createdAt instanceof Timestamp ? createdAt.toDate().toISOString() : null,
-    };
-  });
+  const events = snapshot.docs.map(toSyncedDoc);
 
   if (sortInMemory) {
     // created_at co the la null voi document vua ghi (serverTimestamp chua ket
     // thuc). Day chung xuong cuoi thay vi de String(null) xen vao giua.
-    events.sort((a, b) => String(a.created_at ?? '￿').localeCompare(String(b.created_at ?? '￿')));
+    events.sort((a, b) =>
+      String(a.row.created_at ?? '￿').localeCompare(String(b.row.created_at ?? '￿')),
+    );
   }
 
   // Chi nhanh sap-trong-bo-nho moi phai cat o day — xem ghi chu o cho dat limit.

@@ -40,6 +40,8 @@ interface QueryCacheOptions<T> {
   maxEntries: number;
   /** Ket qua khong qua duoc ham nay thi KHONG vao cache va bi coi la loi. */
   validate: (value: T) => boolean;
+  /** So ban ghi de in log — mac dinh do dai mang, `?` neu khong phai mang. */
+  size?: (value: T) => number;
   /** Tiem dong ho gia khi test — mac dinh `Date.now`. */
   now?: () => number;
 }
@@ -54,15 +56,18 @@ interface Flight<T> {
   promise: Promise<CacheResult<T>>;
 }
 
+/**
+ * `previous` la gia tri dang nam trong cache (ke ca khi da het han) — cho phep
+ * lam moi TANG DAN thay vi doc lai tu dau. KHONG duoc sua `previous` tai cho:
+ * lan lam moi co the that bai, va khi do chinh `previous` duoc tra ve (STALE).
+ */
+export type CacheLoader<T> = (previous: T | undefined) => Promise<T>;
+
 export interface QueryCache<T> {
-  get(key: string, load: () => Promise<T>): Promise<CacheResult<T>>;
+  get(key: string, load: CacheLoader<T>): Promise<CacheResult<T>>;
   /** Xoa cac khoa khop `match` (vang = xoa het). Tra ve so khoa da xoa. */
   invalidate(match?: (key: string) => boolean): number;
   stats(): CacheStats;
-}
-
-function sizeOf(value: unknown): string {
-  return Array.isArray(value) ? String(value.length) : '?';
 }
 
 export function createQueryCache<T>(options: QueryCacheOptions<T>): QueryCache<T> {
@@ -71,6 +76,8 @@ export function createQueryCache<T>(options: QueryCacheOptions<T>): QueryCache<T
   const cache = new Map<string, CacheEntry<T>>();
   const inflight = new Map<string, Flight<T>>();
   const counters = { hits: 0, misses: 0, refreshes: 0, waits: 0, stale: 0, errors: 0 };
+  const sizeOf = (value: T): string =>
+    options.size ? String(options.size(value)) : Array.isArray(value) ? String(value.length) : '?';
 
   function write(key: string, value: T): void {
     const at = now();
@@ -84,7 +91,7 @@ export function createQueryCache<T>(options: QueryCacheOptions<T>): QueryCache<T
     }
   }
 
-  function startFlight(key: string, previous: CacheEntry<T> | undefined, load: () => Promise<T>) {
+  function startFlight(key: string, previous: CacheEntry<T> | undefined, load: CacheLoader<T>) {
     // Dat `flight` vao Map TRUOC khi goi `load`, va moi lan ghi deu so danh tinh
     // `flight`: neu `invalidate` da go khoa nay giua chung thi ket qua cua lan
     // doc cu (bat dau truoc lan ghi) khong duoc phep lot vao cache.
@@ -102,7 +109,7 @@ export function createQueryCache<T>(options: QueryCacheOptions<T>): QueryCache<T
 
     flight.promise = (async (): Promise<CacheResult<T>> => {
       try {
-        const value = await load();
+        const value = await load(previous?.value);
         if (!options.validate(value)) {
           throw new Error(`${tag} ket qua doc ve khong hop le — khong cache`);
         }

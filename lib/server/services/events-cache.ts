@@ -6,19 +6,43 @@
  */
 import 'server-only';
 import type { EventQuery } from '../validators/event.validator';
+import { getSyncStats, type EventsSnapshot } from './events-sync';
 import { createQueryCache } from './query-cache';
 
-/** 5 phut: Power BI refresh trong khoang nay ton 0 luot doc Firestore. */
+/**
+ * 5 phut: Power BI refresh trong khoang nay ton 0 luot doc Firestore.
+ * Het han KHONG co nghia la doc lai toan bo — xem events-sync.ts.
+ */
 export const EVENTS_CACHE_TTL_MS = 5 * 60 * 1000;
 
-export const eventsCache = createQueryCache<Record<string, unknown>[]>({
+/**
+ * Doi chieu TOAN BO dinh ky, du dong bo tang dan van dang chay tot.
+ *
+ * Dem `count()` o moi lan lam moi da bat duoc seed (created_at lui ngay) va xoa
+ * ngoai API. Thu duy nhat no bo sot la sua tay tren console Firebase ma KHONG
+ * doi so luong document. 24 gio = ~1 lan doc toan bo moi ngay cho moi instance
+ * con song — du re so voi han muc 50.000, du nhanh de sai sot khong ton qua
+ * mot ngay. Cold start (restart, deploy, instance moi) von da doc toan bo.
+ */
+export const EVENTS_FULL_RECONCILIATION_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+export const eventsCache = createQueryCache<EventsSnapshot>({
   name: 'events',
   ttlMs: EVENTS_CACHE_TTL_MS,
   // Moi khoa giu ca mang event; ban khong loc ~9.000 dong. 50 khoa la du cho
   // Power BI + man /history cua vai nguoi dung ma khong phinh bo nho.
   maxEntries: 50,
-  validate: Array.isArray,
+  validate: (value) => Array.isArray(value?.docs) && Array.isArray(value?.rows),
+  size: (value) => value.rows.length,
 });
+
+/**
+ * Khoa nao dong bo tang dan duoc: chi khoa KHONG loc session/user va KHONG co
+ * limit — dung duong Power BI goi. Xem `EventsSource.incremental`.
+ */
+export function isIncrementalQuery(query: EventQuery): boolean {
+  return !query.sessionId && !query.userId && query.limit === undefined;
+}
 
 /**
  * Khoa = cac tham so DI VAO QUERY FIRESTORE, theo thu tu co dinh.
@@ -52,5 +76,5 @@ export function invalidateEventsFor(sessionId: string, userId: string): void {
 }
 
 export function getEventsCacheStats() {
-  return eventsCache.stats();
+  return { ...eventsCache.stats(), ...getSyncStats() };
 }
