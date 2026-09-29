@@ -16,6 +16,7 @@ import { cert, getApps, initializeApp, type App } from 'firebase-admin/app';
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';
 
 export const EVENTS_COLLECTION = 'events';
+export const USERS_COLLECTION = 'users';
 
 let firestore: Firestore | null = null;
 

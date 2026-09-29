@@ -4,14 +4,12 @@
  *
  * Hop dong day du o api-endpoints.md.
  *
- * KHONG CO AUTHENTICATION — day la quyet dinh co chu y, khong phai thieu sot,
- * va da duoc ghi tu dau o api-endpoints.md. Gop ve mot app Next.js nghia la
- * trinh duyet goi THANG vao day, nen khong con cho nao giau mot khoa chia se:
- * bat cu thu gi `lib/track.ts` gui duoc thi nguoi dung cung doc duoc trong
- * bundle. Nguyen tac vi vay giu nguyen: SINH XONG DU LIEU PHAN TICH ROI HAY
- * DEPLOY CONG KHAI.
+ * POST BAT BUOC DANG NHAP: `user_id` lay tu cookie `gsm_auth` (so dien thoai
+ * E.164), GHI DE gia tri client gui len — client khong gia mao duoc user.
+ * GET van mo (analysis / Power BI goi thang) — xem api-endpoints.md.
  */
 import type { NextRequest } from 'next/server';
+import { readAuth } from '@/lib/server/services/auth-token';
 import { createEvent, listEvents } from '@/lib/server/services/event.service';
 import {
   validateEventPayload,
@@ -30,6 +28,11 @@ export const dynamic = 'force-dynamic';
 const MAX_BODY_BYTES = 64 * 1024;
 
 export async function POST(request: NextRequest) {
+  const phone = readAuth(request);
+  if (!phone) {
+    return Response.json({ error: 'Chưa đăng nhập' }, { status: 401 });
+  }
+
   const declared = Number(request.headers.get('content-length') ?? 0);
   if (declared > MAX_BODY_BYTES) {
     return Response.json({ error: 'Body quá lớn' }, { status: 413 });
@@ -41,6 +44,12 @@ export async function POST(request: NextRequest) {
   } catch {
     // Express tra 400 cho JSON hong; giu nguyen hanh vi do.
     return Response.json({ error: 'Body không phải JSON hợp lệ' }, { status: 400 });
+  }
+
+  // Ghi de TRUOC khi validate: client co the chua kip co ban sao SDT trong
+  // localStorage (vd. vua xoa storage) — cookie moi la nguon that.
+  if (typeof body === 'object' && body !== null && !Array.isArray(body)) {
+    body = { ...body, user_id: phone };
   }
 
   const result = validateEventPayload(body);
