@@ -121,6 +121,15 @@ Tiền tố `prop_` **cố ý trùng** với `analysis/fetch_events.py`, nên ha
 
 > **Hạn mức đọc là thứ chặn trước tiên khi nối BI.** Một lần refresh toàn bộ ≈ số document trong collection. Với ~7.800 document: 1 lần/ngày = thoải mái, 6 lần/ngày = sát trần 50.000, mỗi giờ = vượt gần 4 lần. Dùng `from=` để chỉ kéo phần mới nếu cần refresh dày.
 
+> **`GET /api/events` có cache 5 phút trong bộ nhớ server** (`lib/server/services/events-cache.ts`). Khoá cache = bộ tham số đi vào query Firestore (`session_id`, `user_id`, `flow`, `from`, `to`, `limit`) — `flat` **không** nằm trong khoá, nên `?flat=1` và dạng lồng nhau dùng chung một lần đọc. Hệ quả cho Power BI: refresh đầu ≈ số document, mọi refresh trong 5 phút sau = **0 lượt đọc**, nhiều request cùng lúc khi cache trống/hết hạn chỉ sinh **một** query Firestore (single-flight). Header `X-Cache: HIT|MISS|REFRESH|WAIT|STALE` cho biết request vừa rồi đi đường nào; body không đổi.
+>
+> - **Hết 5 phút KHÔNG có nghĩa là đọc lại toàn bộ** (`lib/server/services/events-sync.ts`). Với khoá không lọc `session_id`/`user_id`/`limit` — đúng đường Power BI gọi — server chỉ đọc document có `created_at >=` mốc lớn nhất đã thấy (≈ số event mới), rồi đếm `count()` (~1 lượt đọc / 1.000 document) để đối chiếu. Lệch số lượng — tức có seed ghi lùi ngày hoặc có xoá ngoài API — thì mới đọc lại toàn bộ. Ngoài ra đối chiếu toàn bộ mỗi **24 giờ** (`EVENTS_FULL_RECONCILIATION_INTERVAL_MS`) để bắt thứ duy nhất `count()` không thấy: sửa tay trên console mà không đổi số lượng.
+> - Aggregation `count()` với `flow=` cần cùng composite index `(flow, created_at)` mà `?flow=` vốn đã cần.
+> - Làm mới thất bại mà còn bản cũ → trả bản cũ (`STALE`); không có bản cũ → 500 như trước.
+> - `POST /api/events` thành công chỉ xoá các khoá lọc theo **đúng** `session_id`/`user_id` vừa ghi (màn `/history` thấy ngay). Khoá rộng (không lọc, hoặc chỉ `flow`/`from`/`to`) chỉ hết hạn theo TTL — dữ liệu phân tích trễ tối đa 5 phút.
+> - Cache sống trong **một tiến trình**: mất khi restart/redeploy, và trên Vercel mỗi instance có bản riêng. Bộ đếm hit/miss ở `GET /api/health` (`events_cache`).
+> - `analysis/fetch_events.py` đọc **thẳng** Firestore, **không** đi qua cache này — mỗi lần chạy ≈ số document.
+
 > **`user_id` cố ý không dùng `orderBy` của Firestore.** Một `where('user_id','==')` cộng một `orderBy('created_at')` trên field khác sẽ bị Firestore từ chối và bắt tạo composite index — tức người chạy dự án phải bấm link, đợi index build, rồi mới demo được. Dữ liệu một người dùng chỉ vài trăm document, nên service lấy về rồi **sắp xếp trong bộ nhớ**. Đổi lại là không phải cấu hình gì thêm sau khi clone.
 
 ### 3b. Tìm địa chỉ thật

@@ -65,8 +65,9 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const events = await listEvents(result.value);
-    return Response.json(events);
+    const { events, cacheStatus } = await listEvents(result.value);
+    // Body giu nguyen; header chi de kiem tra cache co trung khong (curl -D-).
+    return Response.json(events, { headers: { 'X-Cache': cacheStatus } });
   } catch (error) {
     // Query ket hop where + orderBy tren 2 field khac nhau se bi Firestore tu choi
     // KEM MOT LINK TAO INDEX san trong thong bao loi. Bam link do, doi ~1 phut, chay lai.

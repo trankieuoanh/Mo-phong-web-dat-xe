@@ -43,7 +43,10 @@ lib/server/                         ← không phụ thuộc HTTP. Mọi file `i
 │  ├─ overpass.service.ts           Overpass: quán ăn thật theo bán kính
 │  ├─ route.service.ts              OSRM: gọi + chuẩn hoá geometry sang [lat,lon]
 │  ├─ tiles.service.ts              dò tile biển sâu để phát hiện watermark API key
-│  └─ upstream.ts                   hàng đợi + cache, DÙNG CHUNG cho các cái trên
+│  ├─ upstream.ts                   hàng đợi + cache, DÙNG CHUNG cho các cái trên
+│  ├─ query-cache.ts                cache TTL + single-flight + trả bản cũ khi lỗi (đọc Firestore)
+│  ├─ events-cache.ts               instance cache của GET /api/events (TTL 5 phút, đối chiếu 24h) + bộ đếm cho /api/health
+│  └─ events-sync.ts                đồng bộ tăng dần theo created_at + đối chiếu count() — không import firebase-admin
 └─ db/
    └─ firebase-admin.ts             getDb() — khởi tạo trễ
 
