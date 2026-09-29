@@ -61,7 +61,7 @@ Ba điều quyết định hình dạng của phần này:
 │  ├─ use-current-place.ts hook GPS, lui về DEFAULT_PICKUP khi bị từ chối
 │  ├─ use-tile-providers.ts hook gọi GET /api/tiles — lọc nhà cung cấp tile đã hỏng
 │  ├─ app-context.tsx      AppProvider · useApp — state ride + cart + food
-│  ├─ session.ts           session_id / user_id / resetSession
+│  ├─ session.ts           session_id / user_id (bản sao SĐT) / setUserId / clearUser / resetSession
 │  ├─ format.ts            formatVnd — số nguyên VNĐ → "35.000đ"
 │  ├─ shared/              dùng chung client + server
 │  └─ server/              SERVER — xem be-structure.md, page KHÔNG được import
@@ -89,7 +89,7 @@ Ba điều quyết định hình dạng của phần này:
       ├─ TopBar.tsx        tên mục + tab trang trí + tab luồng (dưới lg) + UserMenu
       ├─ flow-nav.ts       FLOW_ENTRY + FLOW_TABS — luật đổi luồng dùng chung
       ├─ CartButton.tsx    icon giỏ + badge số lượng, chỉ hiện ở luồng food
-      └─ UserMenu.tsx      chip người dùng — trang trí, hiện user_id đang dùng
+      └─ UserMenu.tsx      chip người dùng — hiện SĐT đăng nhập (= user_id) + nút Đăng xuất
 ```
 
 ---
@@ -153,7 +153,7 @@ flowchart LR
 
 **Không có trong `SCREENS`**, nên `screens.ts` và union `ScreenName` không phải sửa gì. Thêm `useScreenView` vào đây sẽ không compile — `ScreenName` không có giá trị tương ứng.
 
-> **Không có `/login`.** Dự án không có authentication, xem `api-endpoints.md`. `UserMenu` là trang trí hoàn toàn, chỉ hiện `user_id` — chính là khoá mà `/history` tra.
+> **`/login` — NGOÀI FUNNEL.** Đăng nhập bắt buộc bằng SĐT + mã SMS 6 số (`api-endpoints.md` mục 5). `middleware.ts` chuyển về đây khi chưa có cookie; `AppProvider` gọi `GET /api/auth/me` khi mount để kiểm chữ ký, 401 thì về `/login`. `signIn` / `signOut` trong `useApp()` đều mở session mới. `UserMenu` hiện SĐT — chính là `user_id` mà `/history` tra.
 
 ---
 

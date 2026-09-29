@@ -71,14 +71,16 @@ const USER_KEY    = 'gsm_user_id';
 
 | | `session_id` | `user_id` |
 |---|---|---|
-| Sinh bằng | `crypto.randomUUID()` | `'mock-user-' + crypto.randomUUID().slice(0, 8)` |
-| Lưu ở | `sessionStorage` | `localStorage` |
+| Sinh bằng | `crypto.randomUUID()` | Số điện thoại đăng nhập (E.164) — server gán từ cookie `gsm_auth` |
+| Lưu ở | `sessionStorage` | Cookie httpOnly (nguồn thật) + bản sao ở `localStorage` để hiển thị / lọc `/history` |
 | Vòng đời | Một tab, một lượt thử luồng | Bền qua nhiều session, nhiều ngày |
 | Ý nghĩa phân tích | 1 session = 1 lần thử hoàn thành luồng | Phân biệt người dùng quay lại |
 
 **Drafts được giữ:** quay về `/`, đổi luồng ở màn entry hoặc màn ngoài funnel, và điều hướng giữa các màn không xoá draft của ride/food. Cùng một bộ lựa chọn vẫn còn sau khi đổi luồng rồi quay lại.
 
 **Reset session:** chỉ khi bấm `back_to_home` ở màn success mới sinh `session_id` **mới** và dọn draft theo ranh giới hoàn thành một lượt thử. Một session vì thế vẫn tương ứng đúng một lần đi qua funnel; reset này không áp dụng cho việc chỉ mở chooser hoặc đổi luồng.
+
+**Đăng nhập bắt buộc:** `middleware.ts` chuyển về `/login` khi chưa có cookie. `/login` là màn **ngoài funnel** — không `useScreenView`, không `trackEvent`, không có trong `SCREENS`. Đăng nhập thành công hoặc đăng xuất (`UserMenu`) đều mở `session_id` mới.
 
 `crypto.randomUUID()` chỉ chạy được phía client → đọc/ghi storage trong `useEffect`, không đọc lúc render, tránh lỗi hydration mismatch của Next.js.
 
