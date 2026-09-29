@@ -368,6 +368,8 @@ Khai báo trong `lib/shared/types.ts`: union type `EventName` (để TypeScript 
 
 ## 6. Chỗ chờ danh sách 17 trường của mentor
 
+`user_id` = số điện thoại đăng nhập dạng E.164 (`+84912345678`), server gán từ cookie — xem `api-endpoints.md` mục 5. Event trước khi có đăng nhập mang `mock-user-*` và không gộp.
+
 Schema hiện tại có **9 field top-level** (`session_id`, `user_id`, `flow`, `event_name`, `screen_name`, `previous_screen`, `step_index`, `platform`, `created_at`). Khi mentor chốt danh sách 17 trường:
 
 1. Field dùng để **lọc/sắp xếp thường xuyên** → thêm vào top-level document.

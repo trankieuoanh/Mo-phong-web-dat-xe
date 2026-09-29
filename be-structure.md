@@ -189,6 +189,13 @@ Hai điểm thiết kế:
 
 Trả về kiểu union `{ ok: true, value } | { ok: false, error }` nên TypeScript ép route phải xử lý nhánh lỗi trước khi chạm `value`.
 
+### Đăng nhập: `services/otp.service.ts`, `auth-token.ts`, `sms.service.ts`
+
+- `otp.service.ts` — **không dùng Firestore** (hết quota thì vẫn đăng nhập được). `sendCode` sinh mã bằng `crypto.randomInt`, trả thử thách đã ký HMAC `{phone, hash(mã), hết hạn, nonce}` để route đặt vào cookie httpOnly `gsm_otp` (path `/api/auth`). `verifyCode` kiểm cookie đó. Cooldown 60s và đếm 5 lần sai nằm trong bộ nhớ tiến trình (best effort).
+- `user.service.ts` — `recordLogin` ghi `users/{phone}` **best effort**: Firestore lỗi thì chỉ log, không chặn đăng nhập.
+- `auth-token.ts` — ký / kiểm cookie `gsm_auth` bằng HMAC-SHA256 (`AUTH_SECRET`). `readAuth(request)` là thứ `POST /api/events` gọi để lấy `user_id`.
+- `sms.service.ts` — interface `SmsSender`. Đổi mock → SMS thật = thêm một sender dùng `fetch` + đổi `SMS_PROVIDER`; không route nào phải sửa.
+
 ### `services/event.service.ts` (53 dòng)
 ```ts
 createEvent(payload): Promise<CreateEventResponse>

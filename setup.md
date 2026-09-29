@@ -108,7 +108,7 @@ service cloud.firestore {
 
 ## Biến môi trường
 
-**Chỉ còn bốn biến, tất cả ở một file duy nhất.** `.env.local` ở gốc repo (đã có trong `.gitignore` — kiểm tra lại cho chắc):
+**Tất cả biến ở một file duy nhất.** `.env.local` ở gốc repo (đã có trong `.gitignore` — kiểm tra lại cho chắc):
 
 ```bash
 FIREBASE_PROJECT_ID=gsm-simulation
@@ -118,7 +118,14 @@ FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIEv...\n-----END PRIVATE KE
 # Tuỳ chọn — địa chỉ liên hệ gắn vào User-Agent khi gọi Photon/Overpass.
 # Có giá trị mặc định nên bỏ trống vẫn chạy được.
 NOMINATIM_CONTACT=ban@example.com
+
+# Đăng nhập SĐT + mã SMS. AUTH_SECRET >= 32 ký tự, sinh bằng:
+#   node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+AUTH_SECRET=...
+SMS_PROVIDER=mock
 ```
+
+**Đăng nhập khi dev:** mọi trang chuyển về `/login`. Nhập số điện thoại **thật hay giả đều được** — với `SMS_PROVIDER=mock` không có tin nào được gửi, mã 6 số hiện ngay trên màn `/login` và in ra console `npm run dev` (`[sms:mock] -> +84…`). Muốn gửi SMS thật: thêm một sender gọi REST API nhà cung cấp bằng `fetch` trong `lib/server/services/sms.service.ts`, rồi đổi `SMS_PROVIDER`. Trên Vercel nhớ thêm `AUTH_SECRET` vào biến môi trường.
 
 Next.js **tự nạp `.env.local`** cho cả `npm run dev` lẫn `npm run build` — không cần cờ, không cần `dotenv`. `scripts/seed-events.js` và `analysis/` cũng đọc đúng file này.
 
@@ -373,6 +380,12 @@ Thieu bien moi truong Firebase: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIRE
 ```
 
 Làm Phase 1 để sửa. Event bị mất nhưng luồng UI không vỡ — đó là chủ ý của `trackEvent` (`screen-map.md` mục 4), không phải lỗi.
+
+### `8 RESOURCE_EXHAUSTED: Quota exceeded`
+Project Firebase đã dùng hết hạn mức miễn phí trong ngày (Spark: 50.000 lượt đọc / 20.000 lượt ghi, reset lúc nửa đêm giờ Thái Bình Dương). Không phải lỗi code. Đăng nhập **vẫn chạy** vì OTP không dùng Firestore, nhưng ghi/đọc event sẽ lỗi tới khi reset. Xem lượt dùng ở Firebase Console → Firestore → **Usage**; thủ phạm thường là đọc toàn bộ collection `events` nhiều lần (analysis, Power BI, `?flat=1` không có bộ lọc) — mỗi document đọc về tính 1 lượt. Muốn hết giới hạn cứng: nâng lên gói Blaze (trả theo dùng).
+
+### Mọi trang cứ quay về `/login`, hoặc `POST /api/auth/send-code` trả 500
+Thiếu `AUTH_SECRET` (hoặc ngắn hơn 32 ký tự) trong `.env.local` — console server báo `Thieu AUTH_SECRET`. Thêm vào rồi **khởi động lại** `npm run dev`. Đổi `AUTH_SECRET` sẽ làm mọi cookie cũ mất hiệu lực — đăng nhập lại.
 
 ### `error:1E08010C:DECODER routines::unsupported`
 `FIREBASE_PRIVATE_KEY` trong `.env.local` thiếu **dấu nháy kép** bao quanh. Key chứa ký tự xuống dòng nên bắt buộc phải có. Xem mục [Biến môi trường](#biến-môi-trường).

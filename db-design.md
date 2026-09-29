@@ -21,11 +21,30 @@ events (collection)
      └─ created_at: timestamp     // Firestore server timestamp
 ```
 
+### `user_id` = số điện thoại đăng nhập
+
+Từ khi có đăng nhập, `user_id` là số điện thoại dạng **E.164** (`+84912345678`), do **server** gán từ cookie `gsm_auth` — không phải giá trị client tự sinh. Event cũ trước khi có đăng nhập vẫn mang `mock-user-*` và **không được gộp** vào tài khoản nào.
+
+> Số điện thoại là **dữ liệu cá nhân** và nằm thẳng trong mọi event. Đừng xuất collection `events` ra ngoài nhóm; nếu cần chia sẻ, băm `user_id` trước.
+
+## Collection `users`
+
+```
+users/{phone}              ← doc id = E.164
+  phone: string
+  created_at: timestamp    (lần đăng nhập đầu)
+  last_login_at: timestamp
+```
+
+Ghi **best effort** sau khi xác thực mã (`lib/server/services/user.service.ts`) — Firestore hết quota thì vẫn đăng nhập được, chỉ thiếu dòng sổ sách.
+
+Mã OTP **không** lưu ở Firestore: thử thách (hash của mã + hạn + nonce) nằm trong cookie httpOnly `gsm_otp` được ký HMAC. Lý do: đăng nhập là bắt buộc, không được để hết quota free tier chặn cửa.
+
 ## Ví dụ document — luồng Đặt xe
 ```json
 {
   "session_id": "abc-123",
-  "user_id": "mock-user-1",
+  "user_id": "+84912345678",
   "flow": "ride",
   "event_name": "select_vehicle",
   "screen_name": "vehicle_selection",
@@ -41,7 +60,7 @@ events (collection)
 ```json
 {
   "session_id": "abc-124",
-  "user_id": "mock-user-2",
+  "user_id": "+84987654321",
   "flow": "food",
   "event_name": "add_to_cart",
   "screen_name": "food_item_detail",
@@ -67,7 +86,7 @@ Event kết thúc funnel ride, và là **nguồn duy nhất** dựng nên một 
 ```json
 {
   "session_id": "abc-125",
-  "user_id": "mock-user-2",
+  "user_id": "+84987654321",
   "flow": "ride",
   "event_name": "confirm_ride",
   "screen_name": "ride_confirm",
@@ -105,7 +124,7 @@ import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 const db = getFirestore();
 await db.collection('events').add({
   session_id: 'abc-123',
-  user_id: 'mock-user-1',
+  user_id: '+84912345678',
   flow: 'ride',
   event_name: 'select_vehicle',
   screen_name: 'vehicle_selection',
