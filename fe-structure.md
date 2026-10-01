@@ -153,7 +153,7 @@ flowchart LR
 
 **Không có trong `SCREENS`**, nên `screens.ts` và union `ScreenName` không phải sửa gì. Thêm `useScreenView` vào đây sẽ không compile — `ScreenName` không có giá trị tương ứng.
 
-> **`/login` — NGOÀI FUNNEL.** Đăng nhập bắt buộc bằng SĐT + mã SMS 6 số (`api-endpoints.md` mục 5). `middleware.ts` chuyển về đây khi chưa có cookie; `AppProvider` gọi `GET /api/auth/me` khi mount để kiểm chữ ký, 401 thì về `/login`. `signIn` / `signOut` trong `useApp()` đều mở session mới. `UserMenu` hiện SĐT — chính là `user_id` mà `/history` tra.
+> **`/login` — NGOÀI FUNNEL.** Đăng nhập bằng SĐT + mã SMS 6 số (`api-endpoints.md` mục 5), **chỉ bắt buộc khi bấm Đặt xe / Đặt đơn**: `useApp().requireLogin(then)` mở `components/LoginModal.tsx` (dùng chung `components/LoginForm.tsx` với trang `/login`) rồi chạy `then`. `AppProvider` gọi `GET /api/auth/me` khi mount để kiểm chữ ký; 401 chỉ xoá bản sao SĐT. `signIn` giữ nguyên session, `signOut` mở session mới và về `/`. `UserMenu` hiện SĐT (đã đăng nhập) hoặc nút "Đăng nhập" (khách); `/history` của khách hiện lời mời đăng nhập.
 
 ---
 

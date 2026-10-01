@@ -18,7 +18,7 @@ import {
   type Flow,
   type ScreenName,
 } from '@/lib/shared';
-import { getSessionId, getUserId } from './session';
+import { getAnonId, getSessionId, getUserId } from './session';
 
 /**
  * Man truoc do trong lich su dieu huong.
@@ -110,7 +110,8 @@ export function trackEvent(input: TrackEventInput): void {
 
   const body: EventPayload = {
     session_id: getSessionId(),
-    user_id: getUserId(),
+    // Chua dang nhap -> id an danh; server ghi de bang SDT neu co cookie.
+    user_id: getUserId() || getAnonId(),
     flow: input.flow ?? spec.flow,
     event_name: input.eventName,
     screen_name: input.screenName,

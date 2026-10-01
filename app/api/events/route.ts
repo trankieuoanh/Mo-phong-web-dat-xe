@@ -4,13 +4,16 @@
  *
  * Hop dong day du o api-endpoints.md.
  *
- * POST BAT BUOC DANG NHAP: `user_id` lay tu cookie `gsm_auth` (so dien thoai
- * E.164), GHI DE gia tri client gui len — client khong gia mao duoc user.
+ * POST: co cookie `gsm_auth` hop le -> `user_id` = so dien thoai E.164, GHI DE gia
+ * tri client gui len (client khong gia mao duoc user). KHONG co cookie -> khach
+ * chua dang nhap: chi nhan `user_id` dang `anon-<id>`, gia tri khac bi 401.
+ * `confirm_ride` / `place_order` BAT BUOC co cookie — day moi la cho yeu cau dang nhap.
  * GET van mo (analysis / Power BI goi thang) — xem api-endpoints.md.
  */
 import type { NextRequest } from 'next/server';
 import { readAuth } from '@/lib/server/services/auth-token';
 import { createEvent, listEvents } from '@/lib/server/services/event.service';
+import { AUTH_REQUIRED_EVENTS, isAnonUserId } from '@/lib/shared';
 import {
   validateEventPayload,
   validateEventQuery,
@@ -29,9 +32,6 @@ const MAX_BODY_BYTES = 64 * 1024;
 
 export async function POST(request: NextRequest) {
   const phone = readAuth(request);
-  if (!phone) {
-    return Response.json({ error: 'Chưa đăng nhập' }, { status: 401 });
-  }
 
   const declared = Number(request.headers.get('content-length') ?? 0);
   if (declared > MAX_BODY_BYTES) {
@@ -46,10 +46,22 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: 'Body không phải JSON hợp lệ' }, { status: 400 });
   }
 
-  // Ghi de TRUOC khi validate: client co the chua kip co ban sao SDT trong
-  // localStorage (vd. vua xoa storage) — cookie moi la nguon that.
   if (typeof body === 'object' && body !== null && !Array.isArray(body)) {
-    body = { ...body, user_id: phone };
+    const raw = body as Record<string, unknown>;
+    if (phone) {
+      // Ghi de TRUOC khi validate: client co the chua kip co ban sao SDT trong
+      // localStorage (vd. vua xoa storage) — cookie moi la nguon that.
+      body = { ...raw, user_id: phone };
+    } else {
+      // Khach: chi id an danh hop le moi duoc ghi. Khong tin user_id tuy y.
+      if (!isAnonUserId(raw.user_id)) {
+        return Response.json({ error: 'Chưa đăng nhập' }, { status: 401 });
+      }
+      // Chan o SERVER de khong ne duoc bang curl: dat xe/dat don can SDT.
+      if ((AUTH_REQUIRED_EVENTS as readonly unknown[]).includes(raw.event_name)) {
+        return Response.json({ error: 'Cần đăng nhập để đặt' }, { status: 401 });
+      }
+    }
   }
 
   const result = validateEventPayload(body);

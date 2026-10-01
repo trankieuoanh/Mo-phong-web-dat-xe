@@ -15,7 +15,11 @@ POST /api/events
 ```
 File: `app/api/events/route.ts` → `lib/server/validators/event.validator.ts` → `lib/server/services/event.service.ts`.
 
-**Bắt buộc đăng nhập.** Thiếu cookie `gsm_auth` hợp lệ → `401 { "error": "Chưa đăng nhập" }`. `user_id` client gửi lên bị **ghi đè** bằng số điện thoại trong cookie (E.164, vd `+84912345678`) trước khi validate — client không giả mạo được người dùng.
+**Đăng nhập chỉ bắt buộc ở bước xác nhận.**
+- **Có** cookie `gsm_auth` hợp lệ: `user_id` client gửi lên bị **ghi đè** bằng số điện thoại trong cookie (E.164, vd `+84912345678`) trước khi validate — client không giả mạo được người dùng.
+- **Không** cookie (khách): chỉ nhận khi `user_id` có dạng `anon-<id>` (`isAnonUserId`, `lib/shared/phone.ts`), giá trị khác → `401 { "error": "Chưa đăng nhập" }`.
+- `confirm_ride` và `place_order` (`AUTH_REQUIRED_EVENTS`) **luôn cần cookie** → khách nhận `401 { "error": "Cần đăng nhập để đặt" }`.
+- `session_id` giữ nguyên qua lúc đăng nhập nên event `anon-…` và event `+84…` của cùng một lượt vẫn nối được.
 
 **Request body:**
 ```json
@@ -321,9 +325,9 @@ Files: `app/api/auth/*/route.ts` → `lib/server/validators/auth.validator.ts` �
 | `POST /api/auth/logout` | — | `200 { ok }`, xoá cookie |
 
 - Mã sống **5 phút**, sai tối đa **5 lần** thì phải gửi lại mã. **Không dùng Firestore:** `send-code` đặt cookie httpOnly `gsm_otp` (path `/api/auth`) chứa `{phone, hash(mã), hết hạn, nonce}` ký HMAC; `verify` kiểm cookie đó rồi xoá. Cooldown và đếm lần sai nằm trong bộ nhớ tiến trình — trên serverless nhiều instance thì giới hạn này lỏng hơn. `users/{phone}` ghi best effort.
-- `dev_code` chỉ có khi `SMS_PROVIDER=mock` **và** không phải production — để test bằng số thật mà không gửi tin nào.
+- `dev_code` chỉ có khi `SMS_PROVIDER=mock` **và** (không phải production **hoặc** `SMS_MOCK_EXPOSE_CODE=true`). Production + mock mà thiếu cờ này thì không tin nào được gửi và mã cũng không hiện — không ai đăng nhập được.
 - Cookie = `base64url(phone|hết hạn).HMAC-SHA256(AUTH_SECRET)`. Không lưu session ở DB; đổi `AUTH_SECRET` là đăng xuất mọi người.
-- `middleware.ts` chuyển mọi trang (trừ `/login`, `/api/*`, asset) về `/login?next=…` khi **không có** cookie. Nó chỉ kiểm tra cookie có mặt (Edge runtime, không được import `lib/server`); chữ ký thật kiểm ở `GET /api/auth/me` và `POST /api/events`.
+- **Không còn `middleware.ts`**: khách duyệt mọi trang. Hộp thoại đăng nhập (`LoginModal`) chỉ hiện khi bấm Đặt xe / Đặt đơn (`requireLogin` trong `lib/app-context.tsx`). Chữ ký cookie kiểm ở `GET /api/auth/me` (401 → chỉ xoá bản sao SĐT, không chuyển trang) và `POST /api/events`.
 
 ### 4. Health check
 ```
@@ -337,7 +341,7 @@ File: `app/api/health/route.ts`. Response: `{ "status": "ok" }`. **Không chạm
 - `GET /api/events` **không** yêu cầu đăng nhập — analysis / Power BI gọi thẳng. Chỉ POST bị chặn.
 
 ### Về authentication
-Ban đầu dự án cố ý không có đăng nhập (`user_id` là `mock-user-*`). Giờ đã có **đăng nhập bắt buộc bằng số điện thoại + mã SMS** (mục 5): `POST /api/events` chỉ nhận request có cookie hợp lệ và `user_id` = số điện thoại. Việc này cũng chặn luôn việc ghi document rác ẩn danh khi deploy công khai — nhưng một người có số điện thoại vẫn ghi được event tuỳ ý dưới tên mình.
+Ban đầu dự án cố ý không có đăng nhập (`user_id` là `mock-user-*`). Giờ có **đăng nhập bằng số điện thoại + mã SMS** (mục 5), bắt buộc ở bước xác nhận: `confirm_ride` / `place_order` cần cookie hợp lệ và mang `user_id` = số điện thoại; các event trước đó của khách mang `anon-<id>`. Server chỉ nhận đúng hai dạng `user_id` đó nên không ghi được document rác tuỳ ý — nhưng một người có số điện thoại (hay một id `anon-…` bất kỳ) vẫn ghi được event tuỳ ý.
 
 Biện pháp đã chọn là **shared secret trong header** (mục ngay dưới). Hai lựa chọn còn lại từng cân nhắc: App Check gắn chặt vào Firebase SDK phía client mà dự án cố tình không có; rate limit theo IP thì chặt hơn nhưng cần thêm state, và `upstream.ts` đã cho thấy state trong bộ nhớ tiến trình là thứ phải tính kỹ. Shared secret là mức vừa đủ cho một app demo.
 

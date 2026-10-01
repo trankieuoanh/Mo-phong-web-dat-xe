@@ -125,7 +125,7 @@ AUTH_SECRET=...
 SMS_PROVIDER=mock
 ```
 
-**Đăng nhập khi dev:** mọi trang chuyển về `/login`. Nhập số điện thoại **thật hay giả đều được** — với `SMS_PROVIDER=mock` không có tin nào được gửi, mã 6 số hiện ngay trên màn `/login` và in ra console `npm run dev` (`[sms:mock] -> +84…`). Muốn gửi SMS thật: thêm một sender gọi REST API nhà cung cấp bằng `fetch` trong `lib/server/services/sms.service.ts`, rồi đổi `SMS_PROVIDER`. Trên Vercel nhớ thêm `AUTH_SECRET` vào biến môi trường.
+**Đăng nhập khi dev:** khách duyệt tự do; hộp thoại đăng nhập chỉ hiện khi bấm **Đặt xe** (`/ride/confirm`) hoặc **Đặt đơn** (`/food/confirm`). Nhập số điện thoại **thật hay giả đều được** — với `SMS_PROVIDER=mock` không có tin nào được gửi, mã 6 số hiện ngay trên hộp thoại và in ra console `npm run dev` (`[sms:mock] -> +84…`). Muốn gửi SMS thật: thêm một sender gọi REST API nhà cung cấp bằng `fetch` trong `lib/server/services/sms.service.ts`, rồi đổi `SMS_PROVIDER`. Trên Vercel nhớ thêm `AUTH_SECRET` vào biến môi trường.
 
 Next.js **tự nạp `.env.local`** cho cả `npm run dev` lẫn `npm run build` — không cần cờ, không cần `dotenv`. `scripts/seed-events.js` và `analysis/` cũng đọc đúng file này.
 
@@ -214,7 +214,7 @@ Không bắt buộc — `techstack.md` đã chốt chạy local là đủ để 
 
 ### Biến môi trường trên Vercel
 
-Đúng bốn biến, y hệt `.env.local`:
+Y hệt `.env.local` — bốn biến Firebase/OSM **và ba biến đăng nhập** (thiếu `AUTH_SECRET` thì `send-code` trả 500):
 
 | Biến | Ghi chú |
 |---|---|
@@ -222,10 +222,13 @@ Không bắt buộc — `techstack.md` đã chốt chạy local là đủ để 
 | `FIREBASE_CLIENT_EMAIL` | copy từ `.env.local` |
 | `FIREBASE_PRIVATE_KEY` | dán dạng có `\n` **literal** — `lib/server/db/firebase-admin.ts` đã `.replace(/\\n/g, '\n')` |
 | `NOMINATIM_CONTACT` | email liên hệ (điều khoản OSM) |
+| `AUTH_SECRET` | chuỗi ngẫu nhiên >= 32 ký tự (`node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"`) |
+| `SMS_PROVIDER` | `mock` |
+| `SMS_MOCK_EXPOSE_CODE` | `true` — **bắt buộc** với `mock` trên production, nếu không mã không hiện ra và không ai đăng nhập được. Hệ quả: ai cũng đăng nhập được bằng số bất kỳ (chấp nhận được cho app mô phỏng). **Redeploy** sau khi đặt biến. |
 
 **Tuyệt đối không thêm tiền tố `NEXT_PUBLIC_`** (CLAUDE.md quy tắc 2) — tiền tố đó nhúng giá trị vào bundle trình duyệt, tức công khai service account key.
 
-Không có biến nào khác: không `PORT`, không `API_ORIGIN`, không `WEB_ORIGIN`.
+Không có biến nào khác ngoài các biến trên: không `PORT`, không `API_ORIGIN`, không `WEB_ORIGIN`.
 
 ### Kiểm tra sau khi deploy
 
@@ -384,8 +387,9 @@ Làm Phase 1 để sửa. Event bị mất nhưng luồng UI không vỡ — đ�
 ### `8 RESOURCE_EXHAUSTED: Quota exceeded`
 Project Firebase đã dùng hết hạn mức miễn phí trong ngày (Spark: 50.000 lượt đọc / 20.000 lượt ghi, reset lúc nửa đêm giờ Thái Bình Dương). Không phải lỗi code. Đăng nhập **vẫn chạy** vì OTP không dùng Firestore, nhưng ghi/đọc event sẽ lỗi tới khi reset. Xem lượt dùng ở Firebase Console → Firestore → **Usage**; thủ phạm thường là đọc toàn bộ collection `events` nhiều lần (analysis, Power BI, `?flat=1` không có bộ lọc) — mỗi document đọc về tính 1 lượt. Muốn hết giới hạn cứng: nâng lên gói Blaze (trả theo dùng).
 
-### Mọi trang cứ quay về `/login`, hoặc `POST /api/auth/send-code` trả 500
+### `POST /api/auth/send-code` trả 500, hoặc trên Vercel không thấy mã
 Thiếu `AUTH_SECRET` (hoặc ngắn hơn 32 ký tự) trong `.env.local` — console server báo `Thieu AUTH_SECRET`. Thêm vào rồi **khởi động lại** `npm run dev`. Đổi `AUTH_SECRET` sẽ làm mọi cookie cũ mất hiệu lực — đăng nhập lại.
+Trên **Vercel**: `SMS_PROVIDER=mock` + production thì mã **không** hiện ra — đặt `SMS_MOCK_EXPOSE_CODE=true` rồi redeploy.
 
 ### `error:1E08010C:DECODER routines::unsupported`
 `FIREBASE_PRIVATE_KEY` trong `.env.local` thiếu **dấu nháy kép** bao quanh. Key chứa ký tự xuống dòng nên bắt buộc phải có. Xem mục [Biến môi trường](#biến-môi-trường).

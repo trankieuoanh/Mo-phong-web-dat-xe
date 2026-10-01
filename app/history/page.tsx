@@ -20,9 +20,12 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { getOffer, getVehicle, type EventDoc } from '@/lib/shared';
+import { EmptyState } from '@/components/EmptyState';
 import { Icon } from '@/components/Icon';
+import { PrimaryButton } from '@/components/PrimaryButton';
 import { AppShell } from '@/components/shell/AppShell';
 import { formatVnd } from '@/lib/format';
+import { useApp } from '@/lib/app-context';
 import { getUserId } from '@/lib/session';
 
 type Status = 'loading' | 'ready' | 'error';
@@ -154,14 +157,19 @@ export default function HistoryPage() {
   const [status, setStatus] = useState<Status>('loading');
   const [errorMessage, setErrorMessage] = useState('');
   const [userId, setUserId] = useState('');
+  const { isAuthed, hydrated, requireLogin } = useApp();
   const [tab, setTab] = useState<Tab>('ride');
   const [query, setQuery] = useState('');
 
   useEffect(() => {
     // getUserId() cham localStorage nen chi duoc goi trong effect,
     // khong goi luc render (lib/session.ts).
+    if (!hydrated) return;
+    // Khach chua dang nhap khong co lich su — dung goi API voi user_id rong.
     const id = getUserId();
+    if (!isAuthed || !id.startsWith('+84')) return;
     setUserId(id);
+    setStatus('loading');
 
     let cancelled = false;
 
@@ -189,7 +197,7 @@ export default function HistoryPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [hydrated, isAuthed]);
 
   const trips = useMemo(() => {
     const rows = (
@@ -216,6 +224,26 @@ export default function HistoryPage() {
   const totalSpent = trips.reduce((sum, t) => (t.cancelled ? sum : sum + t.total), 0);
   const cancelledCount = trips.filter((t) => t.cancelled).length;
   const columns = tab === 'ride' ? RIDE_COLUMNS : FOOD_COLUMNS;
+
+  if (hydrated && !isAuthed) {
+    return (
+      <AppShell section="Hoạt động">
+        <div className="mx-auto w-full max-w-[1280px] px-lg desktop:px-0">
+          <h1 className="t-display-sm break-words">Lịch sử chuyến đi</h1>
+          <EmptyState
+            icon="phone"
+            title="Đăng nhập để xem lịch sử"
+            description="Lịch sử được lưu theo số điện thoại bạn dùng khi đặt xe hoặc đặt đồ ăn."
+            action={
+              <PrimaryButton fullWidth={false} onClick={() => requireLogin(() => {})}>
+                Đăng nhập
+              </PrimaryButton>
+            }
+          />
+        </div>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell section="Hoạt động">

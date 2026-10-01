@@ -41,7 +41,7 @@ export default function FoodConfirmPage() {
 function FoodConfirmContent() {
   useScreenView('food_confirm');
   const router = useRouter();
-  const { cart, offerId, food } = useApp();
+  const { cart, offerId, food, requireLogin } = useApp();
 
   // Man nay co the mo lai o mot tab moi sau khi storage bi xoa — khi do khong
   // co `origin`, va DEFAULT_PICKUP la dia chi mac dinh cua ca app.
@@ -87,7 +87,7 @@ function FoodConfirmContent() {
         </span>
       }
       footer={
-        <PrimaryButton className="whitespace-normal" onClick={placeOrder}>
+        <PrimaryButton className="whitespace-normal" onClick={() => requireLogin(placeOrder)}>
           Đặt đơn
         </PrimaryButton>
       }

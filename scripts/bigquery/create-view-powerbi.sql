@@ -6,6 +6,7 @@ SELECT
   event_id,
   session_id,
   user_id,
+  STARTS_WITH(user_id, 'anon-') AS is_anonymous_user,
   flow,
   event_name,
   screen_name,

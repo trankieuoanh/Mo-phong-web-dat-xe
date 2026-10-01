@@ -150,3 +150,6 @@ Biểu đồ dùng `matplotlib`, một màu `#048589` (primary-dark) cho toàn b
 ## Ngưỡng dữ liệu tối thiểu
 
 Muốn các tỉ lệ có nghĩa, cần ít nhất **30 session mỗi luồng**, trong đó có cả session cố tình bỏ dở ở các bước khác nhau. Sinh dữ liệu toàn phiên hoàn thành sẽ cho funnel phẳng 100% và không nói lên điều gì — kế hoạch sinh dữ liệu ở `roadmap.md` Tuần 6.
+
+
+> **`user_id` ẩn danh.** Khách chưa đăng nhập mang `user_id = anon-<uuid>`; đăng nhập xảy ra ở bước xác nhận nên cùng một `session_id` có thể có cả `anon-…` lẫn `+84…`. Mọi chỉ số funnel nhóm theo `session_id` nên không bị ảnh hưởng; chỉ khi cần "người" của session thì lấy `user_id` bắt đầu `+84` cuối cùng.

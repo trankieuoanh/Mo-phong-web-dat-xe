@@ -80,7 +80,7 @@ const USER_KEY    = 'gsm_user_id';
 
 **Reset session:** chỉ khi bấm `back_to_home` ở màn success mới sinh `session_id` **mới** và dọn draft theo ranh giới hoàn thành một lượt thử. Một session vì thế vẫn tương ứng đúng một lần đi qua funnel; reset này không áp dụng cho việc chỉ mở chooser hoặc đổi luồng.
 
-**Đăng nhập bắt buộc:** `middleware.ts` chuyển về `/login` khi chưa có cookie. `/login` là màn **ngoài funnel** — không `useScreenView`, không `trackEvent`, không có trong `SCREENS`. Đăng nhập thành công hoặc đăng xuất (`UserMenu`) đều mở `session_id` mới.
+**Đăng nhập chỉ khi xác nhận:** khách duyệt tự do; bấm "Đặt xe" (`ride_confirm`) hoặc "Đặt đơn" (`food_confirm`) mà chưa đăng nhập thì `requireLogin()` mở `LoginModal` ngay trên màn đó, xong tự chạy tiếp `confirm_ride` / `place_order`. Form/`/login` là **ngoài funnel** — không `useScreenView`, không `trackEvent`, không có trong `SCREENS`. Đăng nhập **giữ nguyên** `session_id` và draft; chỉ đăng xuất (`UserMenu`) mới mở `session_id` mới.
 
 `crypto.randomUUID()` chỉ chạy được phía client → đọc/ghi storage trong `useEffect`, không đọc lúc render, tránh lỗi hydration mismatch của Next.js.
 

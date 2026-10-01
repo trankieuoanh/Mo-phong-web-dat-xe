@@ -62,7 +62,7 @@ Không có test tự động — `techstack.md` đã chốt là kiểm thử b�
 8. **Không thêm thư viện** ngoài những gì `techstack.md` đã chốt: Next.js, React, Tailwind, firebase-admin, server-only. (Express, cors, tsx và concurrently đã bị gỡ cùng lúc với việc gộp — nếu thấy chúng ở đâu thì đó là tàn dư.) **Ngoại lệ duy nhất: `@google-cloud/bigquery`**, là `devDependency` chỉ `scripts/bigquery/` dùng — tuyệt đối không import từ `app/`, `components/`, `lib/`. Không Redux/Zustand (dùng Context), không axios (dùng `fetch`), không thư viện UI component, **không thư viện icon** (dùng `components/Icon.tsx`), **không thư viện bản đồ** — `MapCanvas.tsx` render tile OpenStreetMap bằng thẻ `<img>`, gọi OSRM bằng `fetch`, và tự viết cả phép chiếu Web Mercator hai chiều lẫn thao tác kéo/bấm-chọn-vị-trí, nên không cần Leaflet.
 9. **Năm route ngoài funnel không được gọi `useScreenView` hay `trackEvent`:** `/history`, `/account`, `/support`, `/terms`, `/login`. Chúng cố ý không có trong `SCREENS` — `/history` chỉ ĐỌC lại event đã có, ba route kia là màn tĩnh của sidebar. Thêm event vào đó là làm bẩn mọi tỉ lệ conversion. Kiểm tra: `grep -rn "trackEvent(\|useScreenView(" app/{history,account,support,terms,login}` → phải rỗng.
 10. **Bản đồ phải giữ dòng ghi công `© OpenStreetMap`.** Điều khoản dùng tile yêu cầu, không phải chi tiết thẩm mỹ. Kiểm tra: `grep -n "OpenStreetMap" components/MapCanvas.tsx`.
-11. **Đăng nhập bắt buộc bằng số điện thoại + mã SMS 6 số** (`api-endpoints.md` mục 5). `user_id` = số điện thoại E.164, **server** gán từ cookie `gsm_auth` ở `POST /api/events` — đừng tin `user_id` client gửi. `middleware.ts` chỉ kiểm tra cookie có mặt và **không được** import `lib/server`. Gửi SMS chỉ qua `getSmsSender()` (`SMS_PROVIDER=mock` mặc định); nhà cung cấp thật gọi bằng `fetch`, không thêm SDK. `AUTH_SECRET` không bao giờ mang tiền tố `NEXT_PUBLIC_`.
+11. **Đăng nhập bằng số điện thoại + mã SMS 6 số chỉ bắt buộc khi bấm Đặt xe / Đặt đơn** (`api-endpoints.md` mục 5) — qua `requireLogin()` trong `lib/app-context.tsx`, hiện `LoginModal`; khách duyệt mọi trang tự do, **không có `middleware.ts`**. Có cookie `gsm_auth` thì `user_id` = số điện thoại E.164 do **server** gán ở `POST /api/events` (đừng tin `user_id` client gửi); không cookie thì chỉ nhận `anon-<id>`, và `confirm_ride`/`place_order` bị 401. `signIn` **không** reset session. Form đăng nhập không được gọi `trackEvent`. Gửi SMS chỉ qua `getSmsSender()` (`SMS_PROVIDER=mock` mặc định); nhà cung cấp thật gọi bằng `fetch`, không thêm SDK. `AUTH_SECRET` không bao giờ mang tiền tố `NEXT_PUBLIC_`.
 12. **không bao giờ được commit code**
 
 ## Cấu trúc thư mục — MỘT project Next.js
@@ -72,7 +72,6 @@ package.json              một package duy nhất, không còn workspaces
 tsconfig.json             strict, paths → @/*
 next.config.ts            serverExternalPackages: ['firebase-admin']
 .env.local                credential Firebase + AUTH_SECRET + SMS_PROVIDER (gitignored)
-middleware.ts             chuyển về /login khi chưa có cookie gsm_auth
 
 app/
   layout.tsx              AppProvider + font Inter (subset vietnamese)

@@ -44,7 +44,7 @@ export default function RideConfirmPage() {
 function RideConfirmContent() {
   useScreenView('ride_confirm');
   const router = useRouter();
-  const { ride, setRide } = useApp();
+  const { ride, setRide, requireLogin } = useApp();
 
   // FlowGuard da bao dam `destination`; `pickup` luon co nho newRideDraft().
   const destination = ride.destination!;
@@ -104,7 +104,7 @@ function RideConfirmContent() {
       aside={<MapCanvas pickup={pickup} destination={destination} route={route} fill />}
       title="Xác nhận chuyến đi"
       leading={<BackButton from="ride_confirm" to="promo_selection" href="/ride/promo" />}
-      footer={<PrimaryButton onClick={confirmRide}>Đặt xe</PrimaryButton>}
+      footer={<PrimaryButton onClick={() => requireLogin(confirmRide)}>Đặt xe</PrimaryButton>}
     >
       {/* card-soft-tinted — panel da la nen trang nen card dung `canvas-soft`. */}
       <div className="rounded-xl bg-canvas-soft p-lg md:p-2xl">

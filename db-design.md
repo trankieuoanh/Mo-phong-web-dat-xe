@@ -23,7 +23,7 @@ events (collection)
 
 ### `user_id` = số điện thoại đăng nhập
 
-Từ khi có đăng nhập, `user_id` là số điện thoại dạng **E.164** (`+84912345678`), do **server** gán từ cookie `gsm_auth` — không phải giá trị client tự sinh. Event cũ trước khi có đăng nhập vẫn mang `mock-user-*` và **không được gộp** vào tài khoản nào.
+Từ khi có đăng nhập, `user_id` là số điện thoại dạng **E.164** (`+84912345678`), do **server** gán từ cookie `gsm_auth` — không phải giá trị client tự sinh. Khách chưa đăng nhập mang `anon-<uuid>` (client sinh, server chỉ nhận đúng dạng này); `confirm_ride`/`place_order` luôn có SĐT. Event cũ trước khi có đăng nhập vẫn mang `mock-user-*` và **không được gộp** vào tài khoản nào.
 
 > Số điện thoại là **dữ liệu cá nhân** và nằm thẳng trong mọi event. Đừng xuất collection `events` ra ngoài nhóm; nếu cần chia sẻ, băm `user_id` trước.
 
