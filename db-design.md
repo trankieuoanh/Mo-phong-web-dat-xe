@@ -161,6 +161,27 @@ Script cũng phải tự gán `platform: 'web'` và `created_at: Timestamp.fromD
 
 Phân tích muốn **chỉ lấy dữ liệu thật** thì lọc `seed_batch` vắng mặt; muốn **chỉ lấy dữ liệu giả** thì lọc nó có mặt. `fetch_events.py` kéo hết cả hai và có `seed_batch` trong `TOP_LEVEL_FIELDS`, nên cột này ra thẳng `events.csv` — rỗng (`NaN`) ở mọi event do người thật click.
 
+## Sink BigQuery cho `events`
+
+`events` được đồng bộ **một chiều, tăng dần** sang BigQuery `gsm_analytics.fact_events` bằng `scripts/bigquery/sync-events.js` (schema và cách chạy: `docs/BIGQUERY_SETUP.md`). Firestore vẫn là nguồn sự thật; API `/api/events` không đổi. `event_id` = document ID Firestore, `seed_batch` được giữ để tách dữ liệu giả.
+
+Checkpoint lưu ở doc `system/bigquery_events_sync` (`cursor` là Timestamp, `last_run_at`, `last_summary`). Đây là collection hệ thống của script, **không** phải dữ liệu app — đừng xoá khi chưa muốn đồng bộ lại từ đầu (xoá thì chạy `--backfill`).
+
+## Collection `pbi_*` — dữ liệu Power BI
+
+`scripts/import-powerbi.js` nạp 11 CSV trong `powerBI/` thành 11 collection `pbi_<tên file>` (`pbi_dim_user`, `pbi_fact_ride`, `pbi_fact_food`, `pbi_fact_promo_burn`…). Tách hẳn khỏi `events`/`users`: schema khác (user `U00001`, không phải SĐT) và không được trộn vào funnel.
+
+- Doc id = khoá tự nhiên (`R0000001`, `U00001`, `WELCOME30-v1`, `20260601`; budget = `<month_start>_<service>_<hex_id>_<segment>`) → chạy lại là ghi đè, không nhân đôi.
+- `session_start`, `event_datetime` là `Timestamp` (giờ VN, +07:00); các cột ngày còn lại giữ chuỗi `YYYY-MM-DD`; id luôn là chuỗi.
+- Mỗi document có `import_batch`; `--clear` xoá đúng những document có field này.
+- Gói Spark (20k write/ngày): mặc định mỗi lần ghi tối đa 18.000, tiến độ lưu ở `scripts/.import-powerbi-state.json` (gitignored) — chạy lại cùng lệnh để nạp tiếp (~8 ngày cho 137k document).
+
+```bash
+node scripts/import-powerbi.js --dry-run   # xem trước, không cần credential
+node scripts/import-powerbi.js             # nạp tiếp
+node scripts/import-powerbi.js --clear     # xoá toàn bộ pbi_*
+```
+
 ## Lưu ý về index
 Firestore tự tạo index đơn giản (theo 1 field), nhưng khi query kết hợp `where` + `orderBy` trên 2 field khác nhau (như ví dụ trên), hoặc nhiều `where` cùng lúc (lọc theo `flow` và khoảng `created_at`), Firestore sẽ **yêu cầu tạo composite index** — lần đầu chạy sẽ báo lỗi kèm link để tạo index đó ngay trên console, không cần tự đoán trước.
 
