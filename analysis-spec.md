@@ -4,7 +4,7 @@
 
 ## Nạp dữ liệu
 
-`fetch_events.py` đọc toàn bộ collection `events` bằng `firebase-admin`, đổ ra `output/events.csv`:
+`fetch_events.py` đọc toàn bộ bảng `events` từ D1 qua REST, đổ ra `output/events.csv`:
 
 ```python
 rows = [{'event_id': d.id, **d.to_dict()} for d in db.collection('events').stream()]
@@ -16,7 +16,7 @@ df = pd.concat([df.drop(columns=['properties']), props.add_prefix('prop_')], axi
 
 `properties.entry_source` được đọc thành cột phẳng `prop_entry_source`. Cột này có thể vắng ở dữ liệu cũ; khi đó các `select_flow` tiếp tục dùng quy tắc legacy để phân biệt flow switch. Seed mặc định bao gồm các phiên direct cho cả Ride và Food, đồng thời giữ các phiên chọn luồng từ `/` để so sánh.
 
-Tách bước tải và bước tính: `fetch_events.py` chạm mạng, `metrics.py` chỉ đọc CSV. Nhờ vậy sửa công thức không phải gọi lại Firestore mỗi lần.
+Tách bước tải và bước tính: `fetch_events.py` chạm mạng, `metrics.py` chỉ đọc CSV. Nhờ vậy sửa công thức không phải gọi lại D1 mỗi lần.
 
 **Lọc trước khi tính** — bỏ các session rác:
 - Session chỉ có đúng 1 event (mở trang rồi đóng ngay).

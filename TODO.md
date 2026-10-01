@@ -1,6 +1,8 @@
 # TODO
 
 - [ ] Migrate Firebase → Cloudflare D1
+- [ ] Check sync 11 table if receive new data
 - [ ] Landing Page
-- [ ] login behavior
+- [ ] production like needed
+- [x] login behavior
 - [ ] clean prj

@@ -13,7 +13,7 @@ Next.js 15 (App Router), cổng **3000**. File này mô tả **nửa giao diện
 Ba điều quyết định hình dạng của phần này:
 
 - **Mọi page đều `'use client'`.** Vì page nào cũng cần đọc state (giỏ hàng, lựa chọn) và bắn event, không có page nào render được ở server.
-- **Không chạm `firebase-admin`.** Credential sống trong `lib/server/`, và mọi file ở đó mở đầu bằng `import 'server-only'` — kéo một cái vào page là build đỏ ngay. Xem `CLAUDE.md` quy tắc 1.
+- **Không chạm database.** Token Cloudflare D1 sống trong `lib/server/`, và mọi file ở đó mở đầu bằng `import 'server-only'` — kéo một cái vào page là build đỏ ngay. Xem `CLAUDE.md` quy tắc 1.
 - **`/api/*` nằm cùng project** (`app/api/**/route.ts`), nên mọi lời gọi đều same-origin: không proxy, không preflight, không cổng thứ hai.
 
 > Trước đây đây là một package riêng (`apps/web`) nói chuyện với `lib/server` qua proxy. Xem `ARCHITECTURE.md` để biết vì sao gộp lại.
@@ -24,7 +24,7 @@ Ba điều quyết định hình dạng của phần này:
 
 ```
 ./                        gốc repo — một project Next.js duy nhất
-├─ next.config.ts          serverExternalPackages: ['firebase-admin']
+├─ next.config.ts          (trống — không còn serverExternalPackages)
 ├─ postcss.config.mjs      plugin @tailwindcss/postcss
 ├─ eslint.config.mjs
 ├─ tsconfig.json           paths: @/*

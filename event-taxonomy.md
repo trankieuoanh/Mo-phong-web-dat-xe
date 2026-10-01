@@ -1,6 +1,6 @@
 # event-taxonomy.md — GSM ride-booking simulation
 
-> Đây là **hợp đồng dữ liệu** của toàn dự án. Mọi event ghi vào Firestore phải khớp bảng dưới. Khi thêm màn/hành động mới, cập nhật file này TRƯỚC khi code.
+> Đây là **hợp đồng dữ liệu** của toàn dự án. Mọi event ghi vào D1 (bảng `events`) phải khớp bảng dưới. Khi thêm màn/hành động mới, cập nhật file này TRƯỚC khi code.
 
 ## 1. Quy tắc chung
 
@@ -375,4 +375,4 @@ Schema hiện tại có **9 field top-level** (`session_id`, `user_id`, `flow`, 
 1. Field dùng để **lọc/sắp xếp thường xuyên** → thêm vào top-level document.
 2. Field **đặc thù theo loại event** → thêm vào `properties`.
 3. Cập nhật bảng ở mục 3–4 của file này, rồi `lib/shared/types.ts` (union `EventName` + mảng `EVENT_NAMES`, và `EventPayload` nếu là field top-level), `lib/shared/screens.ts` nếu là màn mới, và `lib/server/validators/event.validator.ts` nếu cần luật kiểm tra riêng.
-4. Firestore **không cần migrate** — document cũ thiếu field mới vẫn đọc được, script pandas xử lý bằng `.fillna()`.
+4. D1 **không cần migrate** khi chỉ thêm khoá vào `properties` (JSON) — event cũ thiếu khoá mới vẫn đọc được, script pandas xử lý bằng `.fillna()`. Thêm **cột** mới thì cần migration (`migrations/*.sql`).

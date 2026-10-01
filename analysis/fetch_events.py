@@ -1,4 +1,4 @@
-"""Keo toan bo collection `events` tu Firestore -> output/events.csv.
+"""Keo toan bo bang `events` tu Cloudflare D1 (qua REST) -> output/events.csv.
 
 Chay tach biet voi Next.js app. Xem setup.md muc "Phan phan tich".
 
@@ -7,17 +7,21 @@ Chay tach biet voi Next.js app. Xem setup.md muc "Phan phan tich".
     pip install -r requirements.txt
     python fetch_events.py
 
-KHONG CAN CAU HINH GI THEM neu .env.local da co credential: xem load_credential().
+KHONG CAN CAU HINH GI THEM neu .env.local da co ba bien CLOUDFLARE_* — xem load_config().
+Khong can thu vien nao ngoai pandas: goi REST bang urllib cua thu vien chuan.
 """
 
 from __future__ import annotations
 
+import json
 import os
+import re
+import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 
-import firebase_admin
 import pandas as pd
-from firebase_admin import credentials, firestore
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
@@ -27,8 +31,12 @@ EVENTS_CSV = OUTPUT_DIR / "events.csv"
 
 ANALYSIS_ENV = HERE / ".env"
 API_ENV = ROOT / ".env.local"
+WRANGLER = ROOT / "wrangler.jsonc"
 
-# 9 field top-level cua document — xem db-design.md.
+PAGE_SIZE = 2000  # dong moi request REST (phan hoi D1 khong gioi han cung, nhung giu nho cho an toan)
+RETRIES = 5
+
+# Cac cot top-level cua bang `events` — xem db-design.md va docs/d1-schema-design.md.
 TOP_LEVEL_FIELDS = [
     "session_id",
     "user_id",
@@ -74,85 +82,109 @@ def read_env_file(path: Path) -> dict[str, str]:
     return values
 
 
-def load_credential() -> credentials.Base:
-    """Credential Firestore — thu BA duong, theo thu tu.
+def load_config() -> dict[str, str]:
+    """Cau hinh Cloudflare D1 — doc theo thu tu: bien moi truong, analysis/.env, .env.local.
 
-    1. GOOGLE_APPLICATION_CREDENTIALS co san trong moi truong.
-    2. analysis/.env -> GOOGLE_APPLICATION_CREDENTIALS.
-    3. .env.local -> ba bien FIREBASE_*, tuc DUNG NGUON MA app DANG DUNG.
-
-    Duong 2 truoc day duoc TAI LIEU HUA nhung khong ton tai trong code: ham nay
-    doc thang os.environ, ma khong cho nao nap analysis/.env ca. Lam dung y
-    huong dan van hong.
-
-    Duong 3 de ai chay duoc `npm run dev` thi chay duoc luon script nay — bat ho
-    tai them mot service account key nua la tao ra file bi mat thu hai phai quan
-    ly, cho cung mot quyen truy cap.
+    Can: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_TOKEN (quyen D1 Read tro len) va
+    CLOUDFLARE_D1_DATABASE_ID (mac dinh lay `database_id` trong wrangler.jsonc). Dung CHUNG
+    file `.env.local` voi `npm run dev`, nen ai chay duoc app thi chay duoc luon script nay.
     """
-    cred_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+    merged: dict[str, str] = {}
+    for source in (read_env_file(API_ENV), read_env_file(ANALYSIS_ENV), dict(os.environ)):
+        merged.update({k: v for k, v in source.items() if v})
 
-    if not cred_path:
-        cred_path = read_env_file(ANALYSIS_ENV).get("GOOGLE_APPLICATION_CREDENTIALS")
+    account = merged.get("CLOUDFLARE_ACCOUNT_ID")
+    token = merged.get("CLOUDFLARE_API_TOKEN")
+    database = merged.get("CLOUDFLARE_D1_DATABASE_ID")
+    if not database and WRANGLER.exists():
+        match = re.search(r'"database_id"\s*:\s*"([0-9a-f-]{36})"', WRANGLER.read_text(encoding="utf-8"))
+        database = match.group(1) if match else None
 
-    if cred_path:
-        if not Path(cred_path).exists():
-            raise SystemExit(f"GOOGLE_APPLICATION_CREDENTIALS tro toi file khong ton tai: {cred_path}")
-        return credentials.Certificate(cred_path)
-
-    env = read_env_file(API_ENV)
-    needed = ["FIREBASE_PROJECT_ID", "FIREBASE_CLIENT_EMAIL", "FIREBASE_PRIVATE_KEY"]
-    missing = [key for key in needed if not env.get(key)]
-
+    missing = [
+        name
+        for name, value in (
+            ("CLOUDFLARE_ACCOUNT_ID", account),
+            ("CLOUDFLARE_API_TOKEN", token),
+            ("CLOUDFLARE_D1_DATABASE_ID (hoac wrangler.jsonc)", database),
+        )
+        if not value
+    ]
     if missing:
         raise SystemExit(
-            "Khong tim thay credential Firebase o cả ba nơi:\n"
-            "  1. bien moi truong GOOGLE_APPLICATION_CREDENTIALS\n"
-            f"  2. {ANALYSIS_ENV}  (GOOGLE_APPLICATION_CREDENTIALS=...)\n"
-            f"  3. {API_ENV}  (thieu: {', '.join(missing) or 'ca 3 bien'})\n\n"
-            "Cach nhanh nhat: chep .env.example thanh .env.local roi dien\n"
-            "gia tri (setup.md Phase 1) — cung file ma `npm run dev` dang dung."
+            "Thieu cau hinh Cloudflare D1: " + ", ".join(missing) + "\n"
+            f"Dien vao {API_ENV} (xem .env.example) — cung file ma `npm run dev` dang dung."
         )
 
-    # Bo khoa toi thieu, doc tu source cua firebase_admin + google-auth:
-    # Certificate() kiem `type`, from_service_account_info() doi `client_email` +
-    # `token_uri`, signer doi `private_key`, con `project_id` de Firestore biet
-    # noi can ket noi.
-    return credentials.Certificate(
-        {
-            "type": "service_account",
-            "project_id": env["FIREBASE_PROJECT_ID"],
-            "client_email": env["FIREBASE_CLIENT_EMAIL"],
-            # Cung dong replace voi lib/server/db/firebase-admin.ts va
-            # scripts/seed-events.js: file .env luu xuong dong o dang literal `\n`.
-            # Thieu no se loi: error:1E08010C:DECODER routines::unsupported
-            "private_key": env["FIREBASE_PRIVATE_KEY"].replace("\\n", "\n"),
-            "token_uri": "https://oauth2.googleapis.com/token",
-        }
+    return {
+        "url": f"https://api.cloudflare.com/client/v4/accounts/{account}/d1/database/{database}/query",
+        "token": token,  # type: ignore[dict-item]
+    }
+
+
+def d1_query(config: dict[str, str], sql: str, params: list) -> list[dict]:
+    """Chay MOT cau lenh SELECT tham so hoa; retry co backoff cho loi tam thoi (429/5xx/mang)."""
+    request = urllib.request.Request(
+        config["url"],
+        data=json.dumps({"sql": sql, "params": params}).encode("utf-8"),
+        headers={"Authorization": f"Bearer {config['token']}", "Content-Type": "application/json"},
+        method="POST",
     )
-
-
-def get_client() -> firestore.Client:
-    if not firebase_admin._apps:
-        firebase_admin.initialize_app(load_credential())
-    return firestore.client()
+    for attempt in range(1, RETRIES + 1):
+        try:
+            with urllib.request.urlopen(request, timeout=60) as response:
+                body = json.load(response)
+            if not body.get("success"):
+                raise SystemExit(f"D1 tu choi cau lenh: {body.get('errors')}")
+            return body["result"][0]["results"]
+        except urllib.error.HTTPError as error:
+            if error.code in (429, 500, 502, 503, 504) and attempt < RETRIES:
+                time.sleep(2**attempt)
+                continue
+            # KHONG in header (chua token): chi ma trang thai + than loi.
+            raise SystemExit(f"D1 tra HTTP {error.code}: {error.read().decode('utf-8', 'replace')[:300]}") from None
+        except (urllib.error.URLError, TimeoutError) as error:
+            if attempt >= RETRIES:
+                raise SystemExit(f"Khong goi duoc D1: {error}") from None
+            time.sleep(2**attempt)
+    return []
 
 
 def fetch_events() -> pd.DataFrame:
-    docs = get_client().collection("events").stream()
-
+    """Doc TOAN BO `events` theo keyset (created_at, id) — moi trang chi doc dung so dong cua no."""
+    config = load_config()
     rows: list[dict] = []
-    for doc in docs:
-        data = doc.to_dict() or {}
-        row = {"event_id": doc.id}
-        row.update({field: data.get(field) for field in TOP_LEVEL_FIELDS})
+    cursor: tuple[str, str] | None = None
 
-        # `properties` la map long nhau — trai phang thanh cot `prop_<ten>`
-        # de pandas loc duoc truc tiep. Document cu thieu field moi se thanh NaN,
-        # xu ly bang .fillna() — Firestore khong can migrate (db-design.md).
-        for key, value in (data.get("properties") or {}).items():
-            row[f"prop_{key}"] = value
+    while True:
+        if cursor is None:
+            page = d1_query(config, "SELECT * FROM events ORDER BY created_at, id LIMIT ?", [PAGE_SIZE])
+        else:
+            page = d1_query(
+                config,
+                "SELECT * FROM events WHERE (created_at, id) > (?, ?) ORDER BY created_at, id LIMIT ?",
+                [cursor[0], cursor[1], PAGE_SIZE],
+            )
+        for data in page:
+            row = {"event_id": data["id"]}
+            row.update({field: data.get(field) for field in TOP_LEVEL_FIELDS})
 
-        rows.append(row)
+            # `properties` la JSON long nhau — trai phang thanh cot `prop_<ten>`
+            # de pandas loc duoc truc tiep. Event cu thieu khoa moi se thanh NaN,
+            # xu ly bang .fillna() (db-design.md).
+            try:
+                properties = json.loads(data.get("properties") or "{}")
+            except json.JSONDecodeError:
+                properties = {}
+            for key, value in properties.items():
+                row[f"prop_{key}"] = value
+
+            rows.append(row)
+        print(f"\r  da doc {len(rows)} event…", end="", flush=True)
+        if len(page) < PAGE_SIZE:
+            break
+        last = page[-1]
+        cursor = (last["created_at"], last["id"])
+    print()
 
     df = pd.DataFrame(rows)
     if not df.empty:

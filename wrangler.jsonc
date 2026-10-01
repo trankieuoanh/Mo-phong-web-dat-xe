@@ -1,0 +1,14 @@
+// Chi dung cho `wrangler d1 migrations ...` (tao/ap dung schema). App chay tren Vercel va
+// goi D1 qua REST API (docs/d1-schema-design.md), KHONG qua binding nay.
+{
+  "name": "gsm-simulation",
+  "compatibility_date": "2026-10-01",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "gsm-db",
+      "database_id": "30743910-5390-41f4-afcd-51e9e31a54b7",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

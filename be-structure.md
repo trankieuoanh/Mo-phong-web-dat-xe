@@ -2,7 +2,7 @@
 
 Mô tả **code hiện có** ở phía server: route handler, validator, service, db — mỗi lớp làm gì và không được làm gì, một request đi qua chúng ra sao.
 
-Đây không phải hợp đồng API. Muốn biết endpoint nào nhận field gì, trả mã lỗi nào → `api-endpoints.md`. Muốn biết document Firestore hình dạng ra sao → `db-design.md`. File này trả lời câu khác: **code hiện thực những thứ đó ra sao**.
+Đây không phải hợp đồng API. Muốn biết endpoint nào nhận field gì, trả mã lỗi nào → `api-endpoints.md`. Muốn biết bảng D1 hình dạng ra sao → `db-design.md`. File này trả lời câu khác: **code hiện thực những thứ đó ra sao**.
 
 ---
 
@@ -14,9 +14,9 @@ Route handler của App Router, chạy trong **cùng process** với giao diện
 
 Ba điều quyết định hình dạng thư mục này:
 
-- **Nơi duy nhất cầm credential Firestore.** Không file nào ngoài `app/api/**` được import từ `lib/server/`, và hàng rào là gói `server-only`: kéo một service vào Client Component là **build đỏ ngay** (CLAUDE.md quy tắc 1).
+- **Nơi duy nhất cầm token Cloudflare D1.** Không file nào ngoài `app/api/**` được import từ `lib/server/`, và hàng rào là gói `server-only`: kéo một service vào Client Component là **build đỏ ngay** (CLAUDE.md quy tắc 1).
 - **Không biết gì về React.** Không JSX, không component, không render — kể cả khi giờ nó nằm chung project.
-- **Mọi route đều `runtime = 'nodejs'`.** `firebase-admin` và `AbortSignal.timeout` không chạy được trên Edge runtime. Kèm `dynamic = 'force-dynamic'`: không route nào ở đây được cache tĩnh.
+- **Mọi route đều `runtime = 'nodejs'`.** `node:crypto` và `AbortSignal.timeout` không chạy được trên Edge runtime. Kèm `dynamic = 'force-dynamic'`: không route nào ở đây được cache tĩnh.
 
 ---
 
@@ -24,8 +24,10 @@ Ba điều quyết định hình dạng thư mục này:
 
 ```
 app/api/                            ← tầng HTTP. Tên THƯ MỤC là URL.
-├─ health/route.ts                  GET  /api/health — không chạm Firestore
-├─ events/route.ts                  POST + GET /api/events
+├─ health/route.ts                  GET  /api/health — không chạm D1
+├─ events/route.ts                  POST + GET /api/events (đọc: ANALYTICS_TOKEN tuỳ chọn)
+├─ analytics/[table]/route.ts       GET  /api/analytics/<table> — 11 bảng dim_*/fact_*, phân trang keyset
+├─ auth/{send-code,verify,me,logout}/route.ts
 ├─ places/route.ts                  GET  /api/places
 ├─ reverse/route.ts                 GET  /api/reverse
 ├─ restaurants/route.ts             GET  /api/restaurants — maxDuration = 30
@@ -34,29 +36,31 @@ app/api/                            ← tầng HTTP. Tên THƯ MỤC là URL.
 
 lib/server/                         ← không phụ thuộc HTTP. Mọi file `import 'server-only'`.
 ├─ validators/
-│  ├─ event.validator.ts            whitelist 8 field + validate query
-│  ├─ place.validator.ts            q (2–120 ký tự) + limit (1–8)
-│  └─ route.validator.ts            from/to dạng "lat,lon"
+│  ├─ event.validator.ts            whitelist 8 field + validate query (session/user/flow/from/to/flat/limit)
+│  ├─ analytics.validator.ts        limit (1–5000) + con trỏ `after` + from/to; mã hoá/giải mã cursor
+│  ├─ auth.validator.ts · place.validator.ts · route.validator.ts
 ├─ services/
-│  ├─ event.service.ts              createEvent · listEvents
-│  ├─ photon.service.ts             Photon: tìm địa chỉ + reverse geocode
-│  ├─ overpass.service.ts           Overpass: quán ăn thật theo bán kính
-│  ├─ route.service.ts              OSRM: gọi + chuẩn hoá geometry sang [lat,lon]
-│  ├─ tiles.service.ts              dò tile biển sâu để phát hiện watermark API key
-│  ├─ upstream.ts                   hàng đợi + cache, DÙNG CHUNG cho các cái trên
-│  ├─ query-cache.ts                cache TTL + single-flight + trả bản cũ khi lỗi (đọc Firestore)
+│  ├─ event.service.ts              createEvent · listEvents (SQL tham số hoá, d1Source cho events-sync)
+│  ├─ user.service.ts               recordLogin (upsert users)
+│  ├─ analytics.service.ts          ANALYTICS_TABLES (danh sách trắng 11 bảng) · readAnalyticsTable
+│  ├─ read-auth.ts                  isReadAllowed — ANALYTICS_TOKEN tuỳ chọn cho các route đọc
 │  ├─ events-cache.ts               instance cache của GET /api/events (TTL 5 phút, đối chiếu 24h) + bộ đếm cho /api/health
-│  └─ events-sync.ts                đồng bộ tăng dần theo created_at + đối chiếu count() — không import firebase-admin
+│  ├─ events-sync.ts                đồng bộ tăng dần theo created_at + đối chiếu COUNT(*) — không import lớp DB
+│  ├─ query-cache.ts                cache TTL + single-flight + trả bản cũ khi lỗi
+│  ├─ otp.service.ts · auth-token.ts · sms.service.ts
+│  ├─ photon.service.ts · overpass.service.ts · route.service.ts · tiles.service.ts
+│  └─ upstream.ts                   hàng đợi + cache, DÙNG CHUNG cho các dịch vụ OSM
 └─ db/
-   └─ firebase-admin.ts             getDb() — khởi tạo trễ
+   └─ d1.ts                         d1Query · d1Batch — REST, retry, timeout; cấu hình đọc trễ
 
-.env.local                          FIREBASE_* · NOMINATIM_CONTACT (gitignored)
+migrations/*.sql · wrangler.jsonc   schema D1 (chỉ dùng cho `wrangler d1 migrations`)
+.env.local                          CLOUDFLARE_* · AUTH_SECRET · SMS_* · NOMINATIM_CONTACT (gitignored)
                                     Mẫu ở .env.example
 ```
 
 `event.validator.ts` là file lớn nhất — xem mục 4 để biết vì sao.
 
-> **`app/api/route/route.ts` không phải lỗi gõ.** Tên thư mục là đường dẫn URL, tên file luôn là `route.ts` — nên endpoint `/api/route` bắt buộc trông như vậy.
+> **`app/api/route/route.ts` không phải lỗi gõ.** Tên thư mục là đường dẫn URL, tên file luôn là `route.ts` — nên endpoint `/api/route` nằm ở đúng chỗ đó.
 
 ### Validator nhận thẳng `URLSearchParams` — và đó là lý do việc gộp rẻ
 
@@ -74,7 +78,7 @@ Nominatim và OSRM đều là hạ tầng cộng đồng miễn phí với cùng
 
 ### `places.*` và `route.*` — vì sao BE phải làm trung gian
 
-`GET /api/places` **không chạm Firestore**, nên nó trả lời được cả khi chưa có credential (giống `/api/health`). Nó tồn tại vì ba việc chỉ server làm được:
+`GET /api/places` **không chạm database**, nên nó trả lời được cả khi chưa có credential (giống `/api/health`). Nó tồn tại vì ba việc chỉ server làm được:
 
 1. **`User-Agent` định danh** — điều khoản Nominatim bắt buộc, mà trình duyệt **không cho JavaScript đặt header này**. Đây là lý do chặn cứng.
 2. **Hàng đợi ≥ 1100 ms** giữa hai lần gọi upstream — OSM giới hạn tuyệt đối 1 req/giây. Debounce ở client là gợi ý, không phải bảo đảm.
@@ -92,7 +96,7 @@ Lỗi upstream trả **502** chứ không phải 500: lỗi nằm ở dịch v�
 flowchart LR
   R["app/api/**/route.ts<br/>HTTP"] --> V[lib/server/validators/<br/>kiểm tra dữ liệu]
   R --> S[lib/server/services/<br/>nghiệp vụ]
-  S --> D[lib/server/db/<br/>Firestore]
+  S --> D[lib/server/db/d1.ts<br/>Cloudflare D1 qua REST]
   V -.->|import| SH[["lib/shared"]]
 ```
 
@@ -100,12 +104,12 @@ Ranh giới trách nhiệm — **mỗi lớp không được làm gì** cũng qu
 
 | Lớp | Làm | **Không** làm |
 |---|---|---|
-| `app/api/**/route.ts` | Đọc request, gọi validator, gọi service, chọn mã HTTP | Không tự validate, không tự gọi Firestore |
-| `validators/` | Kiểm tra kiểu và giá trị, whitelist field | Không chạm Firestore, không biết framework |
-| `services/` | Gắn field server, ghi/đọc Firestore, chuẩn hoá kết quả | Không biết `Request`/`Response`, không trả mã HTTP |
-| `db/` | Khởi tạo Admin SDK, trả `Firestore` | Không biết collection nào đang được truy vấn |
+| `app/api/**/route.ts` | Đọc request, gọi validator, gọi service, chọn mã HTTP | Không tự validate, không tự gọi D1 |
+| `validators/` | Kiểm tra kiểu và giá trị, whitelist field | Không chạm D1, không biết framework |
+| `services/` | Gắn field server, viết SQL tham số hoá, chuẩn hoá kết quả | Không biết `Request`/`Response`, không trả mã HTTP |
+| `db/d1.ts` | Gửi câu lệnh qua REST, retry lỗi tạm, timeout | Không biết bảng nào đang được truy vấn, không bao giờ log token |
 
-Lợi ích cụ thể: `validators/` không phụ thuộc framework nên test được bằng cách gọi hàm thẳng, và `services/` không phụ thuộc HTTP nên script Python hay job nền sau này dùng lại được. Đây cũng chính là thứ đã làm việc gộp hai app thành một trở nên rẻ — xem mục 2.
+Lợi ích cụ thể: `validators/` không phụ thuộc framework nên test được bằng cách gọi hàm thẳng, và `services/` không phụ thuộc HTTP nên script `scripts/*.js` hay worker khác có thể tái dùng ý tưởng (chúng dùng bản sao `scripts/lib/d1-rest.js` vì không import được TypeScript có `server-only`).
 
 ---
 
@@ -116,7 +120,7 @@ Lợi ích cụ thể: `validators/` không phụ thuộc framework nên test đ
 Không còn `server.ts` dựng app: App Router tự ghép tên thư mục thành URL. Mỗi file bắt đầu bằng ba khai báo, và cả ba đều bắt buộc:
 
 ```ts
-export const runtime = 'nodejs';        // firebase-admin + AbortSignal.timeout
+export const runtime = 'nodejs';        // node:crypto + AbortSignal.timeout
 export const dynamic = 'force-dynamic'; // không được cache tĩnh
 
 export async function GET(request: NextRequest) {
@@ -140,34 +144,23 @@ Ba thứ mất đi cùng Express, ghi ra đây để không ai đi tìm:
 | 404 JSON `{error:'Not found'}` | Trang 404 của Next |
 
 ### `app/api/health/route.ts` (15 dòng)
-```
-GET /api/health → { "status": "ok" }
-```
-**Không chạm Firestore, và không import gì từ `lib/server/db`.** Nhờ vậy nó trả lời được ngay cả khi chưa có `.env.local` — đúng mục đích: xác nhận app chạy đúng *trước khi* Firebase vào cuộc, để hai loại lỗi không trộn vào nhau.
+**Không chạm D1, và không import gì từ `lib/server/db`.** Nhờ vậy nó trả lời được ngay cả khi chưa có `.env.local` — xác nhận app chạy đúng trước khi credential vào cuộc. Trả thêm bộ đếm cache (`hits`, `misses`, `refreshes`…) của `GET /api/events`.
 
-### `app/api/events/route.ts` (~80 dòng)
+### `app/api/events/route.ts` (~95 dòng)
 ```ts
 export async function POST(request: NextRequest)
 export async function GET(request: NextRequest)
 ```
-Hai handler, cùng một khuôn: validate → sai thì 400 → đúng thì gọi service trong `try/catch` → lỗi thì log đầy đủ phía server và trả JSON gọn cho client.
+Cùng một khuôn: validate → sai thì 400 → đúng thì gọi service trong `try/catch` → lỗi thì log đầy đủ phía server và trả JSON gọn.
 
-`POST` làm thêm hai việc mà Express từng làm hộ:
+`POST` làm thêm:
+- **Giới hạn body** — `content-length > 64 KB` → 413; JSON hỏng → 400.
+- **Danh tính:** có cookie `gsm_auth` hợp lệ → `user_id` bị **ghi đè** bằng số điện thoại; không cookie → chỉ nhận `anon-<id>` (`isAnonUserId`), giá trị khác → 401; `confirm_ride`/`place_order` bắt buộc có cookie (`AUTH_REQUIRED_EVENTS`) → 401. Hợp đồng đầy đủ: `api-endpoints.md` mục 1.
 
-```ts
-const declared = Number(request.headers.get('content-length') ?? 0);
-if (declared > MAX_BODY_BYTES) return Response.json({ error: 'Body quá lớn' }, { status: 413 });
+`GET` kiểm `isReadAllowed(request, userId)` trước khi đọc: bỏ trống `ANALYTICS_TOKEN` thì mở như trước; có giá trị thì cần `Authorization: Bearer`, riêng người đã đăng nhập vẫn đọc được lịch sử **của chính mình** để `/history` không gãy.
 
-let body: unknown;
-try { body = await request.json(); }
-catch { return Response.json({ error: 'Body không phải JSON hợp lệ' }, { status: 400 }); }
-```
-
-`MAX_BODY_BYTES = 64 * 1024` — cùng con số với `express.json({ limit: '64kb' })` trước đây. Một event hợp lệ nặng vài trăm byte, nên ngưỡng này không để tối ưu mà để một body khổng lồ không kịp đi xa hơn vào validator.
-
-**KHÔNG CÓ AUTHENTICATION**, và đó là quyết định có chủ ý chứ không phải thiếu sót — `api-endpoints.md` đã ghi từ đầu. Đã từng có một guard khoá chia sẻ `x-gsm-key` ở đây, dựng cho bản hai process; nó hoạt động được **chỉ nhờ** chặng server→server giữa hai app, nơi header được gắn sau khi request đã rời máy người dùng. Gộp một app thì chặng đó biến mất: trình duyệt gọi thẳng vào route này, nên bất cứ thứ gì `lib/track.ts` gửi được thì người dùng cũng đọc được trong bundle. Giữ lại chỉ là hàng rào hình thức, nên nó đã được gỡ.
-
-Nguyên tắc thay thế, không đổi từ đầu dự án: **sinh xong dữ liệu phân tích rồi hãy deploy công khai.**
+### `app/api/analytics/[table]/route.ts` (40 dòng)
+Tra `getAnalyticsTable(name)` trong **danh sách trắng** 11 bảng (`__proto__`, `constructor`… → 404 nhờ `Object.hasOwn`), validate `limit/after/from/to`, rồi `readAnalyticsTable`. Phân trang keyset theo khoá chính (so sánh bộ `(a, b) > (?, ?)`), cắt thân phản hồi dưới 4 MB (giới hạn hàm Vercel), cột boolean 0/1 → `true/false`. Tên bảng và tên cột trong SQL **chỉ** đến từ bảng trắng, không bao giờ từ request.
 
 ### `validators/event.validator.ts` (162 dòng) — file lớn nhất BE
 ```ts
@@ -189,118 +182,76 @@ Hai điểm thiết kế:
 
 Trả về kiểu union `{ ok: true, value } | { ok: false, error }` nên TypeScript ép route phải xử lý nhánh lỗi trước khi chạm `value`.
 
+### `validators/analytics.validator.ts` (74 dòng)
+`validateAnalyticsQuery(params, { pkLength, hasTimeColumn })`. `after` là `base64url(JSON([pk…]))`, giải mã phải ra đúng độ dài khoá chính và chỉ gồm chuỗi/số hữu hạn, nếu không → 400. `from`/`to` bị từ chối với bảng không có cột thời gian.
+
 ### Đăng nhập: `services/otp.service.ts`, `auth-token.ts`, `sms.service.ts`
 
-- `otp.service.ts` — **không dùng Firestore** (hết quota thì vẫn đăng nhập được). `sendCode` sinh mã bằng `crypto.randomInt`, trả thử thách đã ký HMAC `{phone, hash(mã), hết hạn, nonce}` để route đặt vào cookie httpOnly `gsm_otp` (path `/api/auth`). `verifyCode` kiểm cookie đó. Cooldown 60s và đếm 5 lần sai nằm trong bộ nhớ tiến trình (best effort).
-- `user.service.ts` — `recordLogin` ghi `users/{phone}` **best effort**: Firestore lỗi thì chỉ log, không chặn đăng nhập.
+- `otp.service.ts` — **không dùng database** (D1 hết hạn mức thì vẫn đăng nhập được). `sendCode` sinh mã bằng `crypto.randomInt`, trả thử thách đã ký HMAC `{phone, hash(mã), hết hạn, nonce}` để route đặt vào cookie httpOnly `gsm_otp` (path `/api/auth`). `verifyCode` kiểm cookie đó. Cooldown 60s và đếm 5 lần sai nằm trong bộ nhớ tiến trình (best effort).
+- `user.service.ts` — `recordLogin` upsert bảng `users` (một câu `INSERT … ON CONFLICT DO UPDATE`) **best effort**: D1 lỗi thì chỉ log, không chặn đăng nhập.
 - `auth-token.ts` — ký / kiểm cookie `gsm_auth` bằng HMAC-SHA256 (`AUTH_SECRET`). `readAuth(request)` là thứ `POST /api/events` gọi để lấy `user_id`.
 - `sms.service.ts` — interface `SmsSender`. Đổi mock → SMS thật = thêm một sender dùng `fetch` + đổi `SMS_PROVIDER`; không route nào phải sửa.
 
-### `services/event.service.ts` (53 dòng)
+### `services/event.service.ts` (~250 dòng)
 ```ts
-createEvent(payload): Promise<CreateEventResponse>
-listEvents(query): Promise<Record<string, unknown>[]>
+createEvent(payload: EventPayload): Promise<CreateEventResponse>
+listEvents(query: EventQuery): Promise<{ events; cacheStatus }>
 ```
+- **`createEvent`** sinh `id` 20 ký tự bằng `crypto.randomInt`, `created_at` = `toIsoMicros(new Date())` (UTC, micro-giây cố định độ rộng), gắn `platform = 'web'`, rồi một câu `INSERT` (4 lượt ghi: 1 dòng + 3 index). Chỉ **sau khi** INSERT thành công mới `invalidateEventsFor(session, user)`.
+- **`listEvents`** đọc qua cache (`events-cache.ts`). `whereClause(query)` dựng điều kiện `session_id/user_id/flow/created_at` tham số hoá; `fetchEvents` sắp `step_index, created_at, id` (lọc session) hoặc `created_at, id` (còn lại), `LIMIT` đẩy xuống DB; `?flat=1` trải `properties` thành cột `prop_*` bằng `flatten()` **sau** cache nên chung một lần đọc D1.
+- **`d1Source(query)`** nối `events-sync.ts` với D1: `fetchSince` đọc `created_at >= cursor − 5 giây` (cửa sổ gối đầu vì `created_at` do app gán, không phải giờ commit), `countUpTo` là `COUNT(*)`.
 
-`createEvent` gắn hai field **server-side**, không bao giờ tin client:
+`created_at` trả về là giá trị **thật** app đã ghi (không phải xấp xỉ như thời `serverTimestamp()`), nhưng `Response` của `POST` vẫn chỉ gồm `event_id` + `created_at`.
+
+### `db/d1.ts` (~125 dòng)
 ```ts
-platform: 'web',
-created_at: FieldValue.serverTimestamp(),
+d1Query<T>(sql: string, params?: unknown[]): Promise<{ results: T[]; meta }>
+d1Batch(statements: { sql; params? }[]): Promise<D1Result[]>   // một transaction
+class D1Error
 ```
-
-Response trả `created_at: new Date().toISOString()` — **giá trị xấp xỉ**, lệch vài mili-giây, vì `serverTimestamp()` chưa có giá trị thật lúc `.add()` trả về. Giá trị chuẩn dùng cho phân tích là field trong Firestore. Không đọc lại document sau khi ghi: tốn thêm một read mà client cũng bỏ qua response.
-
-`listEvents` đổi `Timestamp` sang **chuỗi ISO** trước khi trả. Timestamp của Firestore serialize ra JSON thành `{_seconds, _nanoseconds}` mà cả `jq` lẫn pandas đều không đọc được.
-
-### `db/firebase-admin.ts` (56 dòng)
-```ts
-export const EVENTS_COLLECTION = 'events';
-export function getDb(): Firestore
-```
-
-Ba chi tiết bắt buộc, đừng lược bỏ:
-
-- **`getApps()[0] ?? initializeApp(...)`** — hot-reload của `next dev` chạy lại module nhiều lần trong cùng tiến trình; gọi `initializeApp()` thẳng sẽ ném `The default Firebase app already exists` ngay lần sửa file thứ hai.
-- **`.replace(/\\n/g, '\n')`** cho private key — trong `.env` ký tự xuống dòng ở dạng literal `\n`; thiếu bước này sẽ lỗi `error:1E08010C:DECODER routines::unsupported`.
-- **Khởi tạo trễ** — xem mục 8.
-
-Thiếu biến môi trường thì ném lỗi **chỉ rõ thiếu biến nào** và phải làm gì, chứ không để Firebase ném lỗi khó hiểu:
-```
-Thieu bien moi truong Firebase: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY.
-Copy .env.example thanh .env.local roi dien gia tri (xem setup.md Phase 1).
-```
+- Gửi `POST /accounts/{id}/d1/database/{db}/query` với `Authorization: Bearer`. Một câu → `{ sql, params }`; nhiều câu → `{ batch: [...] }` (tất cả hoặc không).
+- **Timeout 15 giây** (`AbortSignal.timeout`), **tối đa 3 lần** cho lỗi tạm (429, 5xx, mạng) với backoff 300 ms → 900 ms; lỗi SQL/quyền ném thẳng — thử lại không sửa được.
+- Thiếu `CLOUDFLARE_*` → `D1Error` chỉ rõ thiếu biến nào. Thông báo không bao giờ chứa token.
+- **Mọi SQL tham số hoá.** Giới hạn D1: ≤ 100 tham số/câu, ≤ 100 KB/câu.
 
 ---
 
 ## 5. Luồng `POST /api/events`
 
-Tiếp nối mục 7 của `fe-structure.md` — request đã rời trình duyệt:
-
 ```
-1. POST /api/events          same-origin, không preflight
-2. app/api/events/route.ts   chặn > 64kb, await request.json()
-3. POST handler              nhận body (kiểu unknown)
-4. validateEventPayload      8 field, whitelist; sai → 400, dừng tại đây
-5. createEvent(value)        gắn platform: 'web' + FieldValue.serverTimestamp()
-6. getDb().collection('events').add(...)   ← lần đầu mới chạy initializeApp
-7. 201 { event_id, created_at }            ← created_at xấp xỉ, xem mục 4
+1. đọc cookie gsm_auth                         (readAuth — không chạm DB)
+2. content-length > 64 KB ?                    → 413
+3. request.json()                              → hỏng: 400
+4. xác định user_id: cookie → ghi đè SĐT; không cookie → phải là anon-…, nếu không 401;
+   confirm_ride / place_order không cookie → 401
+5. validateEventPayload(body)                  → sai: 400 + câu lỗi cụ thể
+6. createEvent(value)                          → INSERT vào D1 (REST) → 201 { event_id, created_at }
+7. lỗi D1                                      → log đầy đủ phía server, 500 { error: "Could not write event" }
 ```
 
-Bước 4 là hàng rào: không gì chạm tới Firestore trước khi qua được nó. Bước 5–6 là nơi duy nhất `platform` và `created_at` được sinh ra — client gửi lên cũng đã bị bước 4 loại.
-
-FE **không đọc response** này (`trackEvent` là `fetch(...).catch(() => {})`). Mã 201 và `event_id` chỉ hữu ích khi debug bằng curl.
+Bước 4–5 là hàng rào: không gì chạm tới D1 trước khi qua được nó. Bước 6 là nơi duy nhất `platform` và `created_at` được gắn.
 
 ## 6. Luồng `GET /api/events`
 
-Năm param đều optional và ghép được với nhau:
+1. `validateEventQuery` → 400 nếu tham số sai. 2. `isReadAllowed` → 401 nếu cần token mà thiếu. 3. `listEvents`: cache hit → trả ngay (`X-Cache: HIT`); miss/hết hạn → `syncEvents` (đọc tăng dần `created_at >= cursor − 5s`, gộp theo id, đối chiếu `COUNT(*)`; lệch → đọc lại toàn bộ). 4. Trả mảng event, `created_at` là chuỗi ISO µs.
 
-```ts
-if (query.sessionId) ref = ref.where('session_id', '==', ...)
-if (query.userId)    ref = ref.where('user_id', '==', ...)
-if (query.flow)      ref = ref.where('flow', '==', ...)
-if (query.from)      ref = ref.where('created_at', '>=', Timestamp.fromDate(...))
-if (query.to)        ref = ref.where('created_at', '<=', Timestamp.fromDate(...))
-```
-
-Cách sắp xếp đổi theo mục đích truy vấn:
-- **Có `session_id`** → `orderBy('step_index')`. Đang xem lại một phiên, muốn thấy đúng thứ tự bước để replay và kiểm chứng tracking.
-- **Có `user_id`** (không kèm `session_id`) → **sắp xếp trong bộ nhớ**, không dùng `orderBy` của Firestore.
-- **Không có cả hai** → `orderBy('created_at')`. Đang kéo dữ liệu nhiều phiên, thứ tự thời gian mới có nghĩa.
-
-> **Vì sao `user_id` không dùng `orderBy`.** Một `where('==')` cộng một `orderBy` trên field **khác** sẽ bị Firestore từ chối và bắt tạo composite index — tức người chạy dự án phải bấm link, đợi index build, rồi mới demo được màn `/history`. Dữ liệu một người dùng chỉ vài trăm document nên sắp trong JS rẻ hơn nhiều so với bắt cấu hình thêm sau khi clone. `created_at` có thể `null` với document vừa ghi (`serverTimestamp()` chưa kết thúc) nên chúng bị đẩy xuống cuối thay vì xen vào giữa.
-
----
+Quy tắc sắp xếp: có `session_id` → theo `step_index`; còn lại → `created_at, id`. **Lọc `user_id` giờ sắp và `LIMIT` thẳng ở DB** (có `idx_events_user_created_at`) — ràng buộc "sắp trong bộ nhớ để tránh composite index" của Firestore đã hết.
 
 ## 7. Xử lý lỗi — ba loại, ba cách
 
-| Loại | Mã | Nguồn | Cách xử lý |
-|---|:--:|---|---|
-| Dữ liệu sai | **400** | `validators/` | Trả đúng câu lỗi trong `api-endpoints.md`. Không log — lỗi của client |
-| Ghi Firestore hỏng | **500** | `createEvent` | Log đầy đủ phía server, trả `{ error: "Could not write event" }` gọn |
-| Đọc Firestore hỏng | **500** | `listEvents` | Log **và** trả nguyên văn message của Firestore |
-| Cổng bị chiếm | — | `server.on('error')` | In thông báo rõ rồi `process.exit(1)` |
+| Lỗi | HTTP | Ở đâu | Cách xử lý |
+|---|---|---|---|
+| Body/query sai | **400** | validator | trả câu lỗi cụ thể (`api-endpoints.md`) |
+| Chưa đăng nhập / thiếu token | **401** | route | `{ error }` ngắn |
+| Ghi D1 hỏng | **500** | `createEvent` | log đầy đủ phía server, trả `{ error: "Could not write event" }` gọn |
+| Đọc D1 hỏng | **500** | `listEvents`, `readAnalyticsTable` | log đầy đủ, trả `{ error: "Could not read events" }` / `"Could not read table"` (**không** còn trả nguyên văn lỗi DB như thời Firestore — lúc đó nó chứa link tạo index, giờ không có chuyện đó) |
+| Dịch vụ OSM ngoài hỏng | **502** | `places`, `restaurants`, `route` | lỗi nằm ở dịch vụ ngoài, FE suy biến êm |
 
-**Vì sao `listEvents` trả nguyên văn message còn `createEvent` thì không:** query kết hợp `where` + `orderBy` trên hai field khác nhau sẽ bị Firestore từ chối **kèm một link tạo index sẵn trong thông báo lỗi**. Nuốt message đi là vứt mất đường dẫn cần đi. Bấm link, đợi index build ~1 phút, chạy lại.
+Đăng nhập **không** phụ thuộc D1 (`recordLogin` best effort), nên D1 hết hạn mức vẫn đăng nhập được; client (`lib/track.ts`) nuốt lỗi gửi event nên UI không bao giờ kẹt.
 
----
+## 8. Vì sao cấu hình D1 đọc trễ
 
-## 8. Vì sao khởi tạo trễ
-
-`getDb()` chỉ chạy `initializeApp` ở request đầu tiên thực sự cần Firestore, thay vì lúc module load:
-
-```ts
-let firestore: Firestore | null = null;
-export function getDb(): Firestore {
-  if (!firestore) firestore = getFirestore(getApp());
-  return firestore;
-}
-```
-
-Nếu khởi tạo ngay lúc load, **route nào import nó cũng đổ** khi chưa có `.env.local` — và `GET /api/health` mất hết ý nghĩa, vì nó sinh ra chính để xác nhận Express sống *trước khi* credential vào cuộc.
-
-Nhờ khởi tạo trễ, trạng thái "chưa có Firebase" vẫn dùng được: app chạy, click hết cả hai luồng được, chỉ `POST /api/events` trả 500. Đó là trạng thái mặc định sau khi clone — xem `setup.md` mục Chạy nhanh.
-
----
+`readConfig()` trong `d1.ts` chỉ chạy ở lần gọi D1 đầu tiên, không phải lúc module load. Nhờ vậy `GET /api/health`, các route OSM và đăng nhập (trừ bước ghi sổ) **chạy được khi chưa có `.env.local`** — trạng thái "chưa có D1" vẫn dùng được: app chạy, click hết cả hai luồng, chỉ là event không lưu (`POST /api/events` → 500 kèm log chỉ rõ thiếu biến nào).
 
 ## 9. Thêm một endpoint mới
 
@@ -333,191 +284,36 @@ BE **không** dùng `mock-data.ts` hay `pricing.ts` — dữ liệu tĩnh và t�
 
 ## 11. Trạng thái: BE đã xong tới đâu
 
-**Không còn `TODO` nào ở phía server** — và từ khi `analysis/metrics.py` được viết đủ 6 nhóm chỉ số, **toàn repo không còn `TODO` nào**.
+**BE chạy thật với Cloudflare D1** (`gsm-db`). Đã kiểm chứng ở `docs/migration-verification.md`:
 
-**BE đã chạy thật với Firestore** — không còn gì để implement.
-
-| Endpoint | Code | Đã kiểm chứng tới đâu |
-|---|:--:|---|
-| `GET /api/health` | xong | ✅ `curl localhost:3000/api/health` |
-| `POST /api/events` — validate | xong | ✅ 6 ca lỗi, đúng từng câu chữ trong `api-endpoints.md` |
-| `POST /api/events` — ghi Firestore | xong | ✅ 201 + `event_id` thật; `platform` và `created_at` do server gắn |
-| `GET /api/events?session_id=` | xong | ✅ Sắp theo `step_index`, `created_at` trả về dạng ISO |
-| `GET /api/events?from=` / `?to=` | xong | ✅ Chạy được, **không cần** composite index (chỉ một field) |
-| `GET /api/events?flow=` | xong | ⏳ Cần composite index `flow` + `created_at` — đang chờ build |
-| 404 cho route lạ | xong | ✅ `{"error":"Not found"}` |
-
-### Composite index — hai cái, tạo bằng link trong thông báo lỗi
-
-| Truy vấn | Index cần | Trạng thái |
-|---|---|:--:|
-| `?session_id=` | `session_id` + `step_index` | ✅ đã build |
-| `?flow=` và `?flow=&from=&to=` | `flow` + `created_at` | ⏳ đang chờ |
-
-Không cần đoán trước index nào: Firestore từ chối kèm **link tạo sẵn** ngay trong `error.message`, và `events.routes.ts` trả nguyên văn message đó chính vì lý do này.
-
-### Đã kiểm chứng xuyên suốt FE → BE → Firestore
-
-Đi trọn một lượt luồng ride trên trình duyệt cho kết quả đúng như `event-taxonomy.md`:
-
-```
-so screen_view : 7            (home + 6 màn ride — KHÔNG bị Strict Mode nhân đôi)
-step di qua    : 0 → 1 → 2 → 3 → 4 → 5 → 6
-previous_screen: null → null → home → home → address_selection → ...
-confirm_ride   : 145000 − 29000 = 116000  ✅ khớp công thức
-```
-
-Phiên có **nhảy luồng** (bấm tab "Đặt đồ ăn" ở sidebar khi đang ở `/ride/address`) đọc như sau — `select_flow` mang `step_index: 0` nhưng `screen_name` là màn thật lúc bấm, còn `previous_screen` vẫn là `home` vì nó chỉ đổi khi có `screen_view` mới:
-
-```
-screen_view  home               step 0  flow none  prev null
-select_flow  home               step 0  flow ride  prev null
-screen_view  address_selection  step 1  flow ride  prev home
-select_flow  address_selection  step 0  flow food  prev home     ← nhảy luồng
-screen_view  food_menu          step 1  flow food  prev address_selection
-```
-
-> **Một lỗi chỉ lộ ra khi click thật.** Bộ test bằng `curl` không bắt được, vì nó tự điền `previous_screen` trong payload còn app thật để `track.ts` suy ra. Dữ liệu thật cho thấy mọi event *hành động* mang `previous_screen` bằng chính màn nó đứng — trái với `event-taxonomy.md` §1. Nguyên nhân: `previousScreen` bị gán bằng màn hiện tại ngay sau khi `screen_view` bắn. Đã sửa bằng cách tách `previousScreen` / `currentScreen` và cập nhật trước khi bắn.
->
-> Bài học cho các bước kiểm chứng sau: **`curl` chứng minh BE đúng, không chứng minh tracking đúng.** Hai việc khác nhau.
-
----
+| Hạng mục | Kết quả |
+|---|---|
+| `POST/GET /api/events` | hợp đồng giữ nguyên so với bản Firestore; `created_at` µs |
+| Đồng bộ tăng dần | log `INCREMENTAL SYNC fetched=3 new=1 cached=9161` — không đọc lại cả bảng |
+| `GET /api/analytics/<table>` | 11 bảng, phân trang keyset, `ANALYTICS_TOKEN` tuỳ chọn |
+| Database | `node scripts/test-d1.js` 29/29 (CRUD, ràng buộc, khoá ngoại, batch nguyên tử, plan dùng index) |
+| Trình duyệt thật | luồng Đặt xe 22/22, Food 16/16 (`scripts/e2e/`) |
+| Lỗi D1 | API 500 gọn, không lộ token, đăng nhập vẫn chạy, UI không vỡ |
 
 ## 12. Bộ lệnh test từng endpoint
 
-Chạy theo thứ tự này: phần không cần Firebase trước, phần cần Firebase sau. Nhờ **khởi tạo trễ** (mục 8), nửa đầu chạy được ngay sau khi clone.
+Phần không cần D1 trước, phần cần D1 sau. Nhờ **cấu hình đọc trễ** (mục 8), nhóm A chạy được ngay khi vừa `npm install`.
 
-Windows PowerShell dùng `curl.exe` thay cho `curl` — xem `setup.md` mục "Lệnh tương đương trên Windows".
-
-### Nhóm A — không cần Firebase
-
-Toàn bộ nhóm này **đã chạy thật**, output dưới đây là kết quả thật chứ không phải ví dụ minh hoạ.
-
+### Nhóm A — không cần D1
 ```bash
-curl localhost:3000/api/health
-# {"status":"ok"}
+curl -s localhost:3000/api/health                        # {"status":"ok","events_cache":{…}}
+# validator chặn trước khi chạm DB (HTTP 400):
+curl -s -X POST localhost:3000/api/events -H 'Content-Type: application/json' -d '{"user_id":"anon-0123456789ab"}'
+curl -s -X POST localhost:3000/api/events -H 'Content-Type: application/json' \
+  -d '{"user_id":"anon-0123456789ab","session_id":"s","flow":"zzz","event_name":"screen_view","screen_name":"home","step_index":0}'
 ```
+Gõ nhầm `event_name` (`select_vehicel`), `screen_name` lạ, `step_index` âm, `session_id` rỗng… đều 400 kèm câu lỗi cụ thể — nhờ `lib/shared` chung nên danh sách hợp lệ ở FE và BE không thể lệch nhau.
 
-Sáu ca validate, mỗi ca nhắm một nhánh khác nhau trong `event.validator.ts`:
-
+### Nhóm B — cần D1 (sau `setup.md` Phase 1)
 ```bash
-post() { curl -s -w " <- HTTP %{http_code}\n" -X POST localhost:3000/api/events \
-           -H 'Content-Type: application/json' -d "$1"; }
-
-# 1. Thiếu field bắt buộc
-post '{"session_id":"s1","user_id":"u1","event_name":"screen_view","screen_name":"home","step_index":0}'
-# {"error":"Missing required field: flow"} <- HTTP 400
-
-# 2. flow không thuộc union
-post '{"session_id":"s1","user_id":"u1","flow":"xe","event_name":"screen_view","screen_name":"home","step_index":0}'
-# {"error":"Invalid value for flow: expected \"ride\" | \"food\" | \"none\""} <- HTTP 400
-
-# 3. event_name gõ nhầm — ca này chứng minh giá trị của lib/shared
-post '{"session_id":"s1","user_id":"u1","flow":"ride","event_name":"select_vehicel","screen_name":"home","step_index":0}'
-# {"error":"Invalid value for event_name: unknown event \"select_vehicel\""} <- HTTP 400
-
-# 4. screen_name không có trong SCREENS
-post '{"session_id":"s1","user_id":"u1","flow":"ride","event_name":"screen_view","screen_name":"checkout","step_index":0}'
-# {"error":"Invalid value for screen_name: unknown screen \"checkout\""} <- HTTP 400
-
-# 5. step_index âm
-post '{"session_id":"s1","user_id":"u1","flow":"ride","event_name":"screen_view","screen_name":"home","step_index":-1}'
-# {"error":"Invalid value for step_index: expected an integer >= 0"} <- HTTP 400
-
-# 6. session_id rỗng (chỉ toàn khoảng trắng)
-post '{"session_id":"  ","user_id":"u1","flow":"ride","event_name":"screen_view","screen_name":"home","step_index":0}'
-# {"error":"Invalid value for session_id: expected a non-empty string"} <- HTTP 400
+node scripts/smoke-production.js http://localhost:3000 --login   # 15 kiểm tra end-to-end (tự dọn dữ liệu thử)
+node scripts/test-d1.js                                          # 29 kiểm tra database
+curl -s "localhost:3000/api/events?flow=food&limit=3" | jq '.[].event_name'
+curl -s "localhost:3000/api/analytics/dim_user?limit=2" | jq '{n: (.rows|length), next: .next_cursor}'
 ```
-
-Ca số 3 đáng chú ý: `select_vehicel` thiếu một chữ cái so với `select_vehicle`. Không có `EVENT_NAMES` nhập từ `lib/shared`, lỗi gõ kiểu này sẽ **lọt xuống Firestore** và chỉ lộ ra ở Tuần 5 khi pandas đếm ra một event name lạ.
-
-Body hợp lệ khi **chưa có** `.env`:
-
-```bash
-post '{"session_id":"s1","user_id":"u1","flow":"none","event_name":"screen_view","screen_name":"home","step_index":0}'
-# {"error":"Could not write event"} <- HTTP 500
-```
-
-500 ở đây là **đúng như mong đợi**, không phải lỗi cần sửa. Log phía server chỉ rõ nguyên nhân:
-
-```
-[api] [POST /api/events] ghi Firestore that bai: Error: Thieu bien moi truong Firebase:
-FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY.
-Copy .env.example thanh .env.local roi dien gia tri (xem setup.md Phase 1).
-```
-
-### Nhóm B — cần Firebase (sau `setup.md` Phase 1)
-
-**Chưa chạy được ở thời điểm viết tài liệu này** — output dưới đây là hình dạng mong đợi theo `api-endpoints.md`, không phải kết quả đã bắt.
-
-```bash
-# Ghi một event thật
-post '{"session_id":"s1","user_id":"u1","flow":"ride","event_name":"select_vehicle","screen_name":"vehicle_selection","step_index":3,"properties":{"vehicle_id":"veh-bike","vehicle_type":"bike","base_price":25000}}'
-# → 201 {"event_id":"<firestore-doc-id>","created_at":"2026-09-16T..."}
-
-# Đọc lại một phiên — sắp theo step_index
-curl "localhost:3000/api/events?session_id=s1"
-
-# Lọc theo luồng và khoảng thời gian — sắp theo created_at
-curl "localhost:3000/api/events?flow=ride&from=2026-09-01&to=2026-09-30"
-```
-
-Kiểm tra query sai định dạng (không cần Firestore, validator chặn trước):
-
-```bash
-curl "localhost:3000/api/events?flow=xe"        # → 400 expected "ride" | "food"
-curl "localhost:3000/api/events?from=hom-qua"   # → 400 expected an ISO date
-curl localhost:3000/api/khong-co-route          # → 404 (trang 404 cua Next, khong con JSON)
-```
-
-> **Tổ hợp `flow` + `from`/`to` sẽ lỗi ở lần chạy đầu.** Firestore từ chối query kết hợp `where` trên hai field khác nhau khi chưa có composite index — nhưng kèm sẵn link tạo index trong thông báo lỗi. Bấm link, đợi ~1 phút, chạy lại. Đây là lý do `listEvents` trả nguyên văn message lỗi (mục 7).
-
-### Kiểm tra xuyên suốt
-
-Lệnh quan trọng nhất sau mỗi thay đổi liên quan tới tracking — đi hết một luồng bằng tay rồi:
-
-```bash
-curl "localhost:3000/api/events?session_id=<id>" | jq '.[] | {event_name, screen_name, step_index}'
-```
-
-Hai điều kiện phải đúng **cùng lúc**:
-- Số `screen_view` **đúng bằng** số màn đã đi qua. Gấp đôi nghĩa là `useRef` chưa chặn được React Strict Mode (lỗi phía FE, xem `fe-structure.md`).
-- `step_index` khớp bảng ở `event-taxonomy.md` mục 2. Sai ở đây nghĩa là sai bảng `SCREENS`, không phải sai một page lẻ.
-
----
-
-## 13. Sửa BE mà không làm hỏng dữ liệu
-
-Ba thứ dưới đây là **hợp đồng dữ liệu**, không phải chi tiết implement. Đụng vào mà không cập nhật `event-taxonomy.md` trước sẽ làm dữ liệu cũ và mới không ghép được — và lỗi kiểu này không có triệu chứng cho tới lúc phân tích.
-
-| Không được tự đổi | Ở đâu | Vì sao |
-|---|---|---|
-| Whitelist 8 field | `event.validator.ts` | Thêm field vào `EventPayload` mà quên whitelist → field bị loại **im lặng**, không báo lỗi gì |
-| `platform` và `created_at` gắn phía server | `event.service.ts` | Tin giờ máy client thì mọi phân tích theo thời gian sai. Document cũ đã dùng giờ server |
-| Danh sách hợp lệ nhập từ `lib/shared` | `event.validator.ts` | Gõ lại danh sách ở BE = hai nguồn sự thật, FE và BE sẽ lệch nhau lúc nào không hay |
-
-### Thêm một field vào event — phải sửa hai chỗ
-
-Đây là cái bẫy dễ mắc nhất khi sửa BE:
-
-1. `lib/shared/types.ts` — thêm vào `EventPayload`.
-2. `lib/server/validators/event.validator.ts` — thêm vào **cả** phần kiểm tra **lẫn** object `value` trả về.
-
-Thiếu bước 2 thì hậu quả **khác nhau tuỳ field bắt buộc hay optional** — đã kiểm chứng bằng cách thêm thử field rồi chạy `tsc`:
-
-| Kiểu field | `npm run typecheck` | Hậu quả |
-|---|---|---|
-| `device_type: string` (bắt buộc) | ❌ Báo lỗi ngay | `error TS2741: Property 'device_type' is missing ... but required in type 'EventPayload'`, chỉ thẳng dòng trong validator |
-| `device_type?: string` (optional) | ✅ **Sạch** | Field **không bao giờ tới Firestore**. Request vẫn trả 201. Không một thông báo nào |
-
-Nói cách khác: TypeScript che lưng cho bạn ở field bắt buộc, nhưng **không** ở field optional. Mà field mới thêm vào một schema đang chạy thường được khai optional để không phá dữ liệu cũ — tức là đúng trường hợp nguy hiểm nhất lại là trường hợp không có ai cảnh báo.
-
-Cách phát hiện: sau khi thêm field optional, ghi một event thật rồi mở document trong Firebase console xem field có mặt không. **Đừng tin mã 201, và đừng tin `tsc` sạch.**
-
-### Thêm một event name mới
-
-Sửa `lib/shared/types.ts`: **cả** union `EventName` **lẫn** mảng `EVENT_NAMES`. Có type assertion `MissingEventNames` bắt lỗi nếu quên mảng — build sẽ đỏ. Nhưng phải cập nhật `event-taxonomy.md` trước cả hai (`CLAUDE.md` quy tắc 6).
-
-### Đổi mã HTTP hay câu lỗi
-
-`api-endpoints.md` quy định chính xác từng câu lỗi. Đổi câu lỗi trong code mà không sửa tài liệu là làm tài liệu thành sai — và tài liệu API sai thì tệ hơn không có.
+Event mới thêm field optional lạ vào body (`device_type`) → **bị whitelist loại im lặng**, request vẫn 201; kiểm bằng `SELECT * FROM events ORDER BY created_at DESC LIMIT 1` (qua `npx wrangler d1 execute gsm-db --remote --command …`) thấy cột/`properties` không có field đó.

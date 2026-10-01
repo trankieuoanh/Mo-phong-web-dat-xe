@@ -1,13 +1,13 @@
 # setup.md — GSM ride-booking simulation
 
-Hướng dẫn chạy dự án + dựng môi trường local. Làm đúng thứ tự: **Phase 0 chạy được app trước khi đụng tới Firebase.**
+Hướng dẫn chạy dự án + dựng môi trường local. Làm đúng thứ tự: **Phase 0 chạy được app trước khi đụng tới database (Cloudflare D1).**
 
 Gặp lỗi khi chạy → nhảy thẳng xuống mục [Gặp lỗi?](#gặp-lỗi) ở gần cuối file.
 
 ## Yêu cầu
 - Node.js **20 LTS trở lên** (Next.js 15 cần ≥ 18.18; 20 là bản an toàn nhất).
 - npm (có sẵn cùng Node).
-- Một tài khoản Google để tạo Firebase project — **chỉ cần từ Phase 1**.
+- Một tài khoản Cloudflare (miễn phí) để tạo database D1 — **chỉ cần từ Phase 1**.
 - Python **3.10+** (chỉ cần từ Tuần 5, cho phần phân tích).
 
 ---
@@ -21,9 +21,9 @@ npm run dev
 
 Mở **http://localhost:3000** → thấy màn Home: panel đặt xe bên trái, bản đồ bên phải, tab "Đặt xe" sáng ở sidebar.
 
-> **Chưa cần Firebase để chạy.** App lên được, click hết cả hai luồng (Đặt xe / Food) được, chỉ là event không lưu xuống đâu cả — `POST /api/events` sẽ trả 500. Muốn lưu event mới cần làm Phase 1.
+> **Chưa cần D1 để chạy.** App lên được, click hết cả hai luồng (Đặt xe / Food) được, chỉ là event không lưu xuống đâu cả — `POST /api/events` sẽ trả 500. Muốn lưu event mới cần làm Phase 1.
 >
-> Nói cách khác: từ lúc clone tới lúc thấy app chạy là **2 lệnh**, không phải cả quy trình Firebase.
+> Nói cách khác: từ lúc clone tới lúc thấy app chạy là **2 lệnh**, không phải cả quy trình cấu hình database.
 
 Luôn vào cổng **3000**. `/api/*` là route handler của chính app này — một process, không có cổng thứ hai.
 
@@ -55,7 +55,7 @@ npm install
 
 ---
 
-## Phase 0 — App chạy được, chưa có Firebase
+## Phase 0 — App chạy được, chưa có database
 
 Khung đã có sẵn trong repo. Chỉ cần:
 
@@ -75,7 +75,7 @@ curl localhost:3000/api/health      # → {"status":"ok"}
 curl.exe localhost:3000/api/health
 ```
 
-Route `/api/health` **không chạm Firestore** và không import gì từ `lib/server/db` (xem `api-endpoints.md`), nên nó xác nhận app chạy đúng trước khi credential vào cuộc. Đừng bỏ qua — nếu bỏ, lỗi Firebase và lỗi khởi động sẽ trộn vào nhau và rất khó tách.
+Route `/api/health` **không chạm D1** và không import gì từ `lib/server/db` (xem `api-endpoints.md`), nên nó xác nhận app chạy đúng trước khi credential vào cuộc. Đừng bỏ qua — nếu bỏ, lỗi D1 và lỗi khởi động sẽ trộn vào nhau và rất khó tách.
 
 > Bản trước tách làm hai process và mục này từng bắt chạy **hai** lệnh curl (`:4000` rồi `:3000`) để tách lỗi Express khỏi lỗi proxy. Giờ không còn proxy nên chỉ còn một lệnh.
 
@@ -83,26 +83,30 @@ Mở `http://localhost:3000` → thấy màn Home: panel đặt xe bên trái, b
 
 ---
 
-## Phase 1 — Firebase
+## Phase 1 — Cloudflare D1
 
-1. [console.firebase.google.com](https://console.firebase.google.com) → **Add project** → đặt tên (ví dụ `gsm-simulation`) → tắt Google Analytics (không cần).
-2. **Build → Firestore Database → Create database** → chọn **Production mode** → region `asia-southeast1` (Singapore, gần Việt Nam nhất).
-3. **Project settings → Service accounts → Generate new private key** → tải file JSON về.
-4. Mở file JSON, lấy 3 giá trị `project_id`, `client_email`, `private_key` đưa vào **`.env.local`** ở gốc repo (copy từ `.env.example`).
+Database là **Cloudflare D1** (SQLite), gọi từ app qua **REST API** (`lib/server/db/d1.ts`) — app chạy trên Vercel nên không dùng được binding của Workers. Thiết kế đầy đủ: `docs/d1-schema-design.md`.
 
-> **Không lưu file JSON trong repo**, kể cả ngoài thư mục `app/`. Chỉ copy 3 giá trị vào biến môi trường.
+1. [dash.cloudflare.com](https://dash.cloudflare.com) → **Storage & Databases → D1 → Create database** → tên `gsm-db` (khớp `wrangler.jsonc`). Chọn location gần nơi deploy.
+2. Lấy **Account ID** (Account Home) và **Database ID** (trang database; cũng là `database_id` trong `wrangler.jsonc`).
+3. **My Profile → API Tokens → Create Token** → quyền **D1 → Edit**, giới hạn đúng account này. Đây là `CLOUDFLARE_API_TOKEN`. (Trên Vercel nên dùng một token **riêng**.)
+4. Điền ba giá trị vào **`.env.local`** (copy từ `.env.example`): `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_D1_DATABASE_ID`, `CLOUDFLARE_API_TOKEN`.
+5. Tạo schema (cần `npx wrangler login` một lần, hoặc đặt `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID` trong môi trường):
 
-### Quy tắc bảo mật Firestore
-Vì client **không bao giờ** nói chuyện trực tiếp với Firestore (xem `ARCHITECTURE.md`), rule có thể khoá hoàn toàn — Admin SDK bỏ qua rule:
-
+```bash
+npx wrangler d1 migrations apply gsm-db --local     # thử trên bản local trước
+npx wrangler d1 migrations apply gsm-db --remote    # D1 thật (chỉ CREATE, không phá dữ liệu)
 ```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /{document=**} { allow read, write: if false; }
-  }
-}
+
+6. Nạp dữ liệu mô phỏng 11 bảng (tập con mock, ~25.000 lượt ghi) và kiểm tra:
+
+```bash
+node scripts/migrate-firebase-to-d1.js --only dim_region,dim_hex,dim_promo,dim_promo_cap_history,dim_date,dim_merchant,dim_user,fact_promo_budget,fact_ride,fact_food,fact_promo_burn
+node scripts/migrate-firebase-to-d1.js --verify --deep
+node scripts/test-d1.js                      # 29 kiểm tra CRUD/ràng buộc/khoá ngoại trên D1 thật
 ```
+
+> **Không lưu token trong repo.** Chỉ đặt vào biến môi trường. **Hạn mức Free: 100.000 dòng ghi/ngày** (mỗi index tính thêm 1 lượt ghi/dòng; một event = 4 lượt) — xem mục "Gặp lỗi?".
 
 ---
 
@@ -111,13 +115,15 @@ service cloud.firestore {
 **Tất cả biến ở một file duy nhất.** `.env.local` ở gốc repo (đã có trong `.gitignore` — kiểm tra lại cho chắc):
 
 ```bash
-FIREBASE_PROJECT_ID=gsm-simulation
-FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@gsm-simulation.iam.gserviceaccount.com
-FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIEv...\n-----END PRIVATE KEY-----\n"
-
 # Tuỳ chọn — địa chỉ liên hệ gắn vào User-Agent khi gọi Photon/Overpass.
 # Có giá trị mặc định nên bỏ trống vẫn chạy được.
 NOMINATIM_CONTACT=ban@example.com
+
+# Database Cloudflare D1 (qua REST) — lấy 3 giá trị ở dash.cloudflare.com, xem .env.example:
+CLOUDFLARE_ACCOUNT_ID=...
+CLOUDFLARE_D1_DATABASE_ID=...
+CLOUDFLARE_API_TOKEN=...        # quyền "D1 Edit" trên đúng account này
+# Tuỳ chọn: ANALYTICS_TOKEN=...  (khoá GET /api/events và /api/analytics/*)
 
 # Đăng nhập SĐT + mã SMS. AUTH_SECRET >= 32 ký tự, sinh bằng:
 #   node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
@@ -127,7 +133,7 @@ SMS_PROVIDER=mock
 
 **Đăng nhập khi dev:** khách duyệt tự do; hộp thoại đăng nhập chỉ hiện khi bấm **Đặt xe** (`/ride/confirm`) hoặc **Đặt đơn** (`/food/confirm`). Nhập số điện thoại **thật hay giả đều được** — với `SMS_PROVIDER=mock` không có tin nào được gửi, mã 6 số hiện ngay trên hộp thoại và in ra console `npm run dev` (`[sms:mock] -> +84…`). Muốn gửi SMS thật: thêm một sender gọi REST API nhà cung cấp bằng `fetch` trong `lib/server/services/sms.service.ts`, rồi đổi `SMS_PROVIDER`. Trên Vercel nhớ thêm `AUTH_SECRET` vào biến môi trường.
 
-Next.js **tự nạp `.env.local`** cho cả `npm run dev` lẫn `npm run build` — không cần cờ, không cần `dotenv`. `scripts/seed-events.js` và `analysis/` cũng đọc đúng file này.
+Next.js **tự nạp `.env.local`** cho cả `npm run dev` lẫn `npm run build` — không cần cờ, không cần `dotenv`. `scripts/*.js` và `analysis/` cũng đọc đúng file này.
 
 File `.env.example` đã commit sẵn với giá trị trống, để người khác clone repo biết cần những biến gì.
 
@@ -179,28 +185,24 @@ Cả bốn là **hạ tầng cộng đồng miễn phí**, chỉ hợp cho demo 
 
 Không có mạng thì app **vẫn chạy hết luồng**: chỉ mất bản đồ nền và độ chính xác của quãng đường.
 
-**Ba lỗi kinh điển với `FIREBASE_PRIVATE_KEY`:**
-1. Phải **có dấu nháy kép** bao quanh — key chứa ký tự xuống dòng.
-2. Trong file `.env` ký tự xuống dòng nằm ở dạng literal `\n`, phải `.replace(/\\n/g, '\n')` khi đọc, nếu không sẽ lỗi `error:1E08010C:DECODER routines::unsupported`. Code trong `lib/server/db/firebase-admin.ts` đã xử lý sẵn.
-3. Không thêm `NEXT_PUBLIC_` vào bất kỳ biến nào ở trên — tiền tố đó nhúng giá trị thẳng vào bundle trình duyệt, tức là **công khai service account key**. Điều này **nguy hiểm hơn trước**: giờ `.env.local` là của chính project Next.js, tức đúng nơi tiền tố đó có hiệu lực thật.
+**Hai điều cần nhớ với biến môi trường:**
+1. Giá trị Cloudflare không có dấu cách/xuống dòng — dán nguyên chuỗi, không cần nháy kép.
+2. Không thêm `NEXT_PUBLIC_` vào bất kỳ biến nào ở trên — tiền tố đó nhúng giá trị thẳng vào bundle trình duyệt, tức là **công khai token Cloudflare**. Điều này **nguy hiểm hơn trước**: giờ `.env.local` là của chính project Next.js, tức đúng nơi tiền tố đó có hiệu lực thật.
 
 ---
 
-## Khởi tạo Firebase Admin SDK
+## Truy cập D1 từ app
 
-Đã có sẵn ở `lib/server/db/firebase-admin.ts`. Ba chi tiết **bắt buộc**, đừng lược bỏ khi sửa:
+Đã có sẵn ở `lib/server/db/d1.ts` (`d1Query`, `d1Batch`). Các chi tiết **bắt buộc**, đừng lược bỏ khi sửa:
 
-- **`getApps()[0] ??`** — hot-reload của `next dev` chạy lại module nhiều lần trong cùng một tiến trình. Gọi `initializeApp()` thẳng sẽ ném `The default Firebase app already exists` ngay lần sửa file thứ hai.
-- **`.replace(/\\n/g, '\n')`** — xem mục biến môi trường ở trên.
-- **Khởi tạo trễ (lazy)** — `getDb()` chỉ chạy `initializeApp` ở request đầu tiên thực sự cần Firestore. Nhờ vậy `GET /api/health` trả lời được ngay cả khi chưa có credential, đúng mục đích của route đó.
+- **`import 'server-only'` ở dòng đầu** — hàng rào chặn token rò xuống trình duyệt. Kéo file này (hoặc bất kỳ service nào trong `lib/server/`) vào một Client Component là **build đỏ ngay**. Xem `CLAUDE.md` quy tắc 1.
+- **Mọi SQL tham số hoá** (`?` + `params`), không bao giờ nối chuỗi.
+- **Cấu hình đọc trễ (lazy)** — `readConfig()` chỉ chạy ở request đầu tiên cần D1. Nhờ vậy `GET /api/health` trả lời được ngay cả khi chưa có credential.
+- **Retry có giới hạn, timeout 15 giây:** chỉ lỗi tạm (429, 5xx, mạng) mới thử lại; lỗi SQL/quyền ném thẳng. Thông báo lỗi trả cho client luôn gọn, chi tiết chỉ ở log server, **không bao giờ lộ token**.
 
-- **`import 'server-only'` ở dòng đầu** — đây là hàng rào chặn credential rò xuống trình duyệt. Kéo file này (hoặc bất kỳ service nào trong `lib/server/`) vào một Client Component là **build đỏ ngay**. Xem `CLAUDE.md` quy tắc 1; đừng gỡ dòng đó ra.
+## Index
 
----
-
-## Composite index
-
-Query kết hợp nhiều điều kiện (ví dụ `where('flow')` + `where('created_at' >=)` + `orderBy`) sẽ bị Firestore từ chối kèm **một link tạo index sẵn trong thông báo lỗi**. Bấm link đó, đợi index build xong (~1 phút), chạy lại. Không cần đoán trước index nào — cứ chạy, lỗi sẽ chỉ đường (xem `db-design.md`).
+D1 **không** tự tạo index. Bảng `events` có 3 index (xem `db-design.md`); mỗi index tăng 1 lượt ghi/dòng trong hạn mức 100.000/ngày. Thêm truy vấn mới thường xuyên → viết migration mới với `CREATE INDEX`, kiểm bằng `EXPLAIN QUERY PLAN`, và tính chi phí ghi.
 
 ---
 
@@ -214,19 +216,18 @@ Không bắt buộc — `techstack.md` đã chốt chạy local là đủ để 
 
 ### Biến môi trường trên Vercel
 
-Y hệt `.env.local` — bốn biến Firebase/OSM **và ba biến đăng nhập** (thiếu `AUTH_SECRET` thì `send-code` trả 500):
+Y hệt `.env.local` — D1, OSM **và các biến đăng nhập** (thiếu `AUTH_SECRET` thì `send-code` trả 500):
 
 | Biến | Ghi chú |
 |---|---|
-| `FIREBASE_PROJECT_ID` | copy từ `.env.local` |
-| `FIREBASE_CLIENT_EMAIL` | copy từ `.env.local` |
-| `FIREBASE_PRIVATE_KEY` | dán dạng có `\n` **literal** — `lib/server/db/firebase-admin.ts` đã `.replace(/\\n/g, '\n')` |
 | `NOMINATIM_CONTACT` | email liên hệ (điều khoản OSM) |
+| `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_D1_DATABASE_ID`, `CLOUDFLARE_API_TOKEN` | **database của app** (D1). Thiếu ba biến này thì `POST /api/events` trả 500. Không tiền tố `NEXT_PUBLIC_`. |
+| `ANALYTICS_TOKEN` | tuỳ chọn — khoá GET `/api/events` và `/api/analytics/*` bằng `Authorization: Bearer` |
 | `AUTH_SECRET` | chuỗi ngẫu nhiên >= 32 ký tự (`node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"`) |
 | `SMS_PROVIDER` | `mock` |
 | `SMS_MOCK_EXPOSE_CODE` | `true` — **bắt buộc** với `mock` trên production, nếu không mã không hiện ra và không ai đăng nhập được. Hệ quả: ai cũng đăng nhập được bằng số bất kỳ (chấp nhận được cho app mô phỏng). **Redeploy** sau khi đặt biến. |
 
-**Tuyệt đối không thêm tiền tố `NEXT_PUBLIC_`** (CLAUDE.md quy tắc 2) — tiền tố đó nhúng giá trị vào bundle trình duyệt, tức công khai service account key.
+**Tuyệt đối không thêm tiền tố `NEXT_PUBLIC_`** (CLAUDE.md quy tắc 2) — tiền tố đó nhúng giá trị vào bundle trình duyệt, tức công khai token Cloudflare.
 
 Không có biến nào khác ngoài các biến trên: không `PORT`, không `API_ORIGIN`, không `WEB_ORIGIN`.
 
@@ -248,18 +249,20 @@ Rồi mở web, đi hết một luồng, và đếm event như mục cuối `CLA
 
 **`POST /api/events` là endpoint mở.** Trình duyệt gọi thẳng vào nó, nên không có chỗ nào giấu được một khoá chia sẻ — xem `api-endpoints.md` mục "Vì sao không còn khoá chia sẻ". Nguyên tắc giữ nguyên: **sinh xong dữ liệu phân tích rồi hãy deploy công khai.**
 
-**Hàng đợi rate-limit yếu đi trên serverless.** `lib/server/services/upstream.ts` giữ hàng đợi và cache trong bộ nhớ một tiến trình; mỗi lambda instance của Vercel có bộ nhớ riêng. Nếu bị Photon/Overpass chặn IP giữa buổi demo thì đây là chỗ đầu tiên nhìn vào, không phải lỗi mạng.
+**Hàng đợi rate-limit yếu đi trên serverless.** `lib/server/services/upstream.ts` giữ hàng đợi và cache trong bộ nhớ một tiến trình; mỗi lambda instance của Vercel có bộ nhớ riêng. Cutover từ Firestore sang D1 trên production: `docs/cutover-runbook.md` (kiểm trước: `node scripts/cutover-check.js`; kiểm sau: `node scripts/smoke-production.js <url> --login`).
+
+Nếu bị Photon/Overpass chặn IP giữa buổi demo thì đây là chỗ đầu tiên nhìn vào, không phải lỗi mạng.
 
 ---
 
 ## Phần phân tích (từ Tuần 5)
 
-`analysis/` **không phải một phần của app Next.js** — nó là project Python riêng, và đọc thẳng Firestore chứ không gọi qua `/api`.
+`analysis/` **không phải một phần của app Next.js** — nó là project Python riêng, và đọc thẳng **D1 qua REST** chứ không gọi qua `/api`.
 
 ```
 analysis/
-  requirements.txt      # firebase-admin, pandas, matplotlib
-  fetch_events.py       # kéo collection events → output/events.csv
+  requirements.txt      # pandas, matplotlib (không cần thư viện gọi D1: dùng urllib của thư viện chuẩn)
+  fetch_events.py       # kéo bảng events từ D1 → output/events.csv (keyset theo (created_at, id), 2.000 dòng/trang)
   metrics.py            # tính chỉ số theo analysis-spec.md
   output/               # .gitignore — CSV và biểu đồ sinh ra
   .env                  # .gitignore — TUỲ CHỌN, xem bên dưới
@@ -270,6 +273,7 @@ analysis/
 cd analysis
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
+python fetch_events.py && python metrics.py
 ```
 ```powershell
 # Windows PowerShell
@@ -282,30 +286,18 @@ pip install -r requirements.txt
 Nếu PowerShell chặn script kích hoạt (`cannot be loaded because running scripts is disabled`), chạy một lần:
 `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`
 
-### Credential cho phần Python — không cần cấu hình gì thêm
+### Cấu hình cho phần Python — không cần gì thêm
 
-`fetch_events.py` thử **ba đường**, theo thứ tự:
-
-| # | Nguồn | Khi nào dùng |
-|---|---|---|
-| 1 | Biến `GOOGLE_APPLICATION_CREDENTIALS` đã export sẵn | Chạy trên CI, hoặc bạn tự export |
-| 2 | `analysis/.env` → cùng biến đó | Khi muốn đọc một project Firebase **khác** |
-| 3 | `.env.local` → 3 biến `FIREBASE_*` | **Mặc định.** Ai chạy được `npm run dev` thì chạy được luôn script này |
-
-Nhờ đường 3 mà **không phải tải thêm service account key JSON nào** — bắt tải là tạo ra file bí mật thứ hai phải quản lý, cho đúng một quyền truy cập.
-
-> **Trước đây đường 2 là thứ tài liệu hứa nhưng code không có.** `fetch_events.py` đọc thẳng `os.environ`, mà không chỗ nào nạp `analysis/.env`, nên làm đúng y hướng dẫn thì script vẫn báo thiếu credential — phải tự `export` ngoài shell. Giờ nó nạp file đó thật.
-
-Script Python dựng credential từ dict (`type`, `project_id`, `client_email`, `private_key`, `token_uri`) thay vì đọc file JSON — cùng ba biến mà `lib/server/db/firebase-admin.ts` dùng, kể cả dòng `.replace('\\n', '\n')` cho private key.
+`fetch_events.py` đọc `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_D1_DATABASE_ID` (mặc định lấy `database_id` trong `wrangler.jsonc`) theo thứ tự: `.env.local` → `analysis/.env` → biến môi trường. Ai chạy được `npm run dev` thì chạy được luôn script này. Token chỉ cần quyền đọc; script không bao giờ in token ra.
 
 ### Seed dữ liệu giả lập
 
-`scripts/seed-events.js` cũng dùng đúng cơ chế đó (thử `serviceAccountKey.json` ở gốc repo trước, không có thì đọc `.env.local`):
+`scripts/seed-events.js` ghi event giả qua REST (cùng cấu hình, `scripts/lib/d1-rest.js`):
 
 ```bash
 node scripts/seed-events.js --dry-run   # xem trước, không cần credential
-node scripts/seed-events.js             # ghi ~7.800 document
-node scripts/seed-events.js --clear     # dọn lại, chỉ xoá document có seed_batch
+node scripts/seed-events.js             # ghi ~9.000 event = ~36.000 lượt ghi D1 (⅓ hạn mức ngày)
+node scripts/seed-events.js --clear     # dọn lại, chỉ xoá event có seed_batch
 ```
 
 ---
@@ -317,9 +309,9 @@ node_modules/
 .next/
 .env
 .env*.local
-serviceAccount*.json
-*.json.key
 analysis/.venv/
+.wrangler/
+scripts/.migrate-d1-state.json
 analysis/output/
 ```
 
@@ -376,26 +368,27 @@ npm run dev
 Từ phía FE, ô tìm địa chỉ giờ **bỏ cuộc sau 6 giây** và hiện cảnh báo kèm 5 gợi ý thay vì quay mãi (`REQUEST_TIMEOUT_MS` trong `lib/use-place-search.ts`) — nhưng đó chỉ là đường lui, upstream vẫn phải hồi.
 
 ### `POST /api/events` trả 500, app vẫn click được bình thường
-Chưa có `.env.local` — đúng như mô tả ở mục [Chạy nhanh](#chạy-nhanh). Xem log của terminal đang chạy `npm run dev`, nó ghi rõ thiếu biến nào:
+Chưa có `.env.local`, hoặc sai/thiếu cấu hình Cloudflare. Xem log của terminal đang chạy `npm run dev`:
 
 ```
-Thieu bien moi truong Firebase: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY.
+Thieu bien moi truong Cloudflare D1: CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_D1_DATABASE_ID, CLOUDFLARE_API_TOKEN.
+D1 tu choi cau lenh: 10000 Authentication error          ← token sai / hết hạn / thiếu quyền D1 Edit
 ```
 
-Làm Phase 1 để sửa. Event bị mất nhưng luồng UI không vỡ — đó là chủ ý của `trackEvent` (`screen-map.md` mục 4), không phải lỗi.
+Làm Phase 1 để sửa. Event bị mất nhưng luồng UI không vỡ — đó là chủ ý của `trackEvent` (`screen-map.md` mục 4), không phải lỗi. Đăng nhập **vẫn chạy** khi D1 lỗi (ghi `users` là best effort).
 
-### `8 RESOURCE_EXHAUSTED: Quota exceeded`
-Project Firebase đã dùng hết hạn mức miễn phí trong ngày (Spark: 50.000 lượt đọc / 20.000 lượt ghi, reset lúc nửa đêm giờ Thái Bình Dương). Không phải lỗi code. Đăng nhập **vẫn chạy** vì OTP không dùng Firestore, nhưng ghi/đọc event sẽ lỗi tới khi reset. Xem lượt dùng ở Firebase Console → Firestore → **Usage**; thủ phạm thường là đọc toàn bộ collection `events` nhiều lần (analysis, Power BI, `?flat=1` không có bộ lọc) — mỗi document đọc về tính 1 lượt. Muốn hết giới hạn cứng: nâng lên gói Blaze (trả theo dùng).
+### D1 từ chối mọi truy vấn: "exceeded daily limit" / hết hạn mức
+Gói Free: **100.000 dòng ghi/ngày** và 5.000.000 dòng đọc/ngày, reset 00:00 UTC (07:00 giờ VN). Khi chạm giới hạn, D1 từ chối **cả đọc lẫn ghi** tới lúc reset. Không phải lỗi code. Mỗi event tốn **4 lượt ghi** (1 dòng + 3 index); `seed-events.js` mặc định ≈ 36.000 lượt; nạp `--all-rows` ≈ 170.000 lượt (cần ≥ 2 ngày). Đừng chạy tác vụ ghi lớn lúc có người dùng. Số lượt đã dùng nằm trong `meta.rows_written` của mỗi phản hồi REST.
 
 ### `POST /api/auth/send-code` trả 500, hoặc trên Vercel không thấy mã
 Thiếu `AUTH_SECRET` (hoặc ngắn hơn 32 ký tự) trong `.env.local` — console server báo `Thieu AUTH_SECRET`. Thêm vào rồi **khởi động lại** `npm run dev`. Đổi `AUTH_SECRET` sẽ làm mọi cookie cũ mất hiệu lực — đăng nhập lại.
 Trên **Vercel**: `SMS_PROVIDER=mock` + production thì mã **không** hiện ra — đặt `SMS_MOCK_EXPOSE_CODE=true` rồi redeploy.
 
-### `error:1E08010C:DECODER routines::unsupported`
-`FIREBASE_PRIVATE_KEY` trong `.env.local` thiếu **dấu nháy kép** bao quanh. Key chứa ký tự xuống dòng nên bắt buộc phải có. Xem mục [Biến môi trường](#biến-môi-trường).
+### `D1 tu choi cau lenh: 10000 Authentication error`
+`CLOUDFLARE_API_TOKEN` sai, đã bị thu hồi, hoặc không có quyền **D1 → Edit** trên đúng account (`CLOUDFLARE_ACCOUNT_ID`). Tạo token mới ở dash.cloudflare.com → My Profile → API Tokens; trên Vercel nhớ redeploy sau khi đổi biến.
 
-### `The default Firebase app already exists`
-Mất `getApps()[0] ??` trong `lib/server/db/firebase-admin.ts`. Hot-reload của `next dev` chạy lại module nhiều lần trong cùng một tiến trình, nên `initializeApp()` gọi thẳng sẽ ném lỗi ngay lần sửa file thứ hai.
+### `no such table: events` / `no such table: dim_user`
+Chưa áp migration lên database đang trỏ tới. Chạy `npx wrangler d1 migrations apply gsm-db --remote` (xem Phase 1). Kiểm tra `CLOUDFLARE_D1_DATABASE_ID` có đúng database `gsm-db` không.
 
 ### Bản đồ hiện chữ "API KEY REQUIRED" chéo trên mọi tile
 
@@ -429,16 +422,17 @@ curl -s https://<app>.vercel.app/api/tiles                                     #
 - `/api/tiles` vẫn còn `stadia` → phép dò đang gửi referer sai. Nó lấy từ `x-forwarded-host` của chính request (`app/api/tiles/route.ts`), nên chuyện này chỉ xảy ra nếu có proxy lạ đứng trước. Lưu ý kết quả được **cache 6 giờ** trong bộ nhớ instance.
 - Tìm địa chỉ chết nhưng `/api/health` `200` → Photon đang chết hoặc chặn IP, không phải lỗi deploy. Xem mục bốn dịch vụ ngoài.
 
-### Event trên bản deploy không vào Firestore, app vẫn click bình thường
+### Event trên bản deploy không vào D1, app vẫn click bình thường
 
 Đúng thiết kế của `lib/track.ts`: lỗi mạng bị nuốt để không bao giờ kẹt UI. Nên mọi hỏng hóc ở đường ghi event đều **im lặng**, phải đi tìm bằng tay:
 
 ```bash
+node scripts/smoke-production.js https://<app>.vercel.app --login   # 15 kiểm tra, gồm "event nằm TRONG D1"
 curl -s -w '\n[%{http_code}]\n' -X POST https://<app>.vercel.app/api/events \
   -H 'Content-Type: application/json' -d '{}'
 ```
 
-`400` kèm `Missing required field: session_id` nghĩa là route sống và validator chạy — vấn đề nằm ở credential Firebase trên Vercel. `500` nghĩa là ghi Firestore hỏng; đọc log function trên Vercel.
+`401` hoặc `400` nghĩa là route sống và validator chạy — vấn đề nằm ở cấu hình Cloudflare trên Vercel (thiếu biến, token sai; **redeploy** sau khi đặt biến). `500` nghĩa là ghi D1 hỏng; đọc log function trên Vercel (thông báo `D1 tu choi cau lenh: …` cho biết lý do, không chứa token).
 
 ### Số `screen_view` nhiều gấp đôi số màn đã đi qua
 `useRef` chưa chặn được lần chạy thứ hai của React Strict Mode trong `next dev`. Nếu không sửa thì **mọi tỉ lệ funnel đều sai gấp đôi** — xem `screen-map.md` mục 4.
@@ -496,3 +490,5 @@ Chạy từ thư mục **gốc**:
 | `curl "localhost:3000/api/events?session_id=..."` | Xem event của một phiên (Windows: `Invoke-RestMethod`) |
 
 Dừng server: `Ctrl+C` ở terminal đang chạy `npm run dev` — tắt cả hai tiến trình cùng lúc.
+
+---
