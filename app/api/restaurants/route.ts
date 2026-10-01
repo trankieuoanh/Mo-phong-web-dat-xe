@@ -5,7 +5,7 @@
  * `amenity=restaurant` tra ve rat thua (6-hoac-0 quan giua Ha Noi), con Overpass
  * truy van thang co so du lieu OSM theo ban kinh — cung toa do do ra ~80 quan.
  *
- * KHONG cham Firestore, KHONG ghi event nao.
+ * KHONG cham database (D1), KHONG ghi event nao.
  */
 import type { NextRequest } from 'next/server';
 import { searchRestaurants } from '@/lib/server/services/overpass.service';

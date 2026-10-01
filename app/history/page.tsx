@@ -177,7 +177,7 @@ export default function HistoryPage() {
       .then(async (res) => {
         const body = await res.json();
         if (!res.ok) {
-          // Route GET co y tra nguyen van thong bao loi cua Firestore vi no
+          // Route GET tra thong bao loi gon (chi tiet o log server); neu co
           // chua LINK TAO INDEX can bam (app/api/events/route.ts).
           throw new Error(body?.error ?? `HTTP ${res.status}`);
         }
@@ -341,10 +341,10 @@ export default function HistoryPage() {
                   <tr>
                     <td colSpan={columns.length} className="px-lg py-3xl text-center">
                       <p className="t-body-md-strong">Không đọc được dữ liệu</p>
-                      {/* Hien nguyen van: thong bao cua Firestore co the chua link tao index. */}
+                      {/* Thong bao tu route GET /api/events (chi tiet loi D1 nam o log server). */}
                       <p className="t-caption mt-xs break-all text-body">{errorMessage}</p>
                       <p className="t-caption mt-md text-mute">
-                        Kiểm tra credential Firebase trong .env.local — xem setup.md.
+                        Kiểm tra cấu hình Cloudflare D1 (CLOUDFLARE_*) trong .env.local — xem setup.md.
                       </p>
                     </td>
                   </tr>
@@ -520,7 +520,7 @@ function MobileHistory({
         <p className="t-body-md-strong">Không đọc được dữ liệu</p>
         <p className="t-caption mt-xs break-all text-body">{errorMessage}</p>
         <p className="t-caption mt-md text-mute">
-          Kiểm tra credential Firebase trong .env.local — xem setup.md.
+          Kiểm tra cấu hình Cloudflare D1 (CLOUDFLARE_*) trong .env.local — xem setup.md.
         </p>
       </div>
     );

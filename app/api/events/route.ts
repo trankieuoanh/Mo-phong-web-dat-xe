@@ -8,10 +8,11 @@
  * tri client gui len (client khong gia mao duoc user). KHONG co cookie -> khach
  * chua dang nhap: chi nhan `user_id` dang `anon-<id>`, gia tri khac bi 401.
  * `confirm_ride` / `place_order` BAT BUOC co cookie — day moi la cho yeu cau dang nhap.
- * GET van mo (analysis / Power BI goi thang) — xem api-endpoints.md.
+ * GET mo (analysis / Power BI goi thang) tru khi dat ANALYTICS_TOKEN — xem read-auth.ts.
  */
 import type { NextRequest } from 'next/server';
 import { readAuth } from '@/lib/server/services/auth-token';
+import { isReadAllowed } from '@/lib/server/services/read-auth';
 import { createEvent, listEvents } from '@/lib/server/services/event.service';
 import { AUTH_REQUIRED_EVENTS, isAnonUserId } from '@/lib/shared';
 import {
@@ -74,7 +75,7 @@ export async function POST(request: NextRequest) {
     return Response.json(created, { status: 201 });
   } catch (error) {
     // Log day du phia server, tra thong bao gon cho client.
-    console.error('[POST /api/events] ghi Firestore that bai:', error);
+    console.error('[POST /api/events] ghi D1 that bai:', error);
     return Response.json({ error: 'Could not write event' }, { status: 500 });
   }
 }
@@ -85,18 +86,17 @@ export async function GET(request: NextRequest) {
     return Response.json({ error: result.error }, { status: 400 });
   }
 
+  if (!isReadAllowed(request, result.value.userId)) {
+    return Response.json({ error: 'Cần Authorization: Bearer <token>' }, { status: 401 });
+  }
+
   try {
     const { events, cacheStatus } = await listEvents(result.value);
     // Body giu nguyen; header chi de kiem tra cache co trung khong (curl -D-).
     return Response.json(events, { headers: { 'X-Cache': cacheStatus } });
   } catch (error) {
-    // Query ket hop where + orderBy tren 2 field khac nhau se bi Firestore tu choi
-    // KEM MOT LINK TAO INDEX san trong thong bao loi. Bam link do, doi ~1 phut, chay lai.
-    // Vi vay message loi that duoc tra ve nguyen van — no chua duong dan can di.
-    console.error('[GET /api/events] doc Firestore that bai:', error);
-    return Response.json(
-      { error: error instanceof Error ? error.message : 'Could not read events' },
-      { status: 500 },
-    );
+    // Log day du phia server tra thong bao gon cho client.
+    console.error('[GET /api/events] doc D1 that bai:', error);
+    return Response.json({ error: 'Could not read events' }, { status: 500 });
   }
 }

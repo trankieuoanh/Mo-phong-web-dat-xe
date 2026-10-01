@@ -75,14 +75,14 @@ export interface EventPayload {
 /** Document trong collection `events` — xem db-design.md. */
 export interface EventDoc extends EventPayload {
   platform: 'web';
-  /** Firestore server timestamp; doc ra thi la chuoi ISO. */
+  /** Thoi diem server ghi event (UTC, micro-giay); doc ra la chuoi ISO. */
   created_at: string;
 }
 
 /** Ket qua tra ve cua POST /api/events. */
 export interface CreateEventResponse {
   event_id: string;
-  /** Xap xi, tinh tai route. Gia tri chuan dung cho phan tich la `created_at` trong Firestore. */
+  /** Xap xi, tinh tai route. Gia tri chuan dung cho phan tich la `created_at` trong D1. */
   created_at: string;
 }
 

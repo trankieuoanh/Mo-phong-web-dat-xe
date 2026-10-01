@@ -1,26 +1,26 @@
 /**
  * Dong bo TANG DAN collection `events` vao cache — chi doc document moi.
  *
- * File nay KHONG import firebase-admin: Firestore duoc tiem vao qua
+ * File nay KHONG import lop truy cap database: D1 duoc tiem vao qua
  * `EventsSource` (hien thuc o event.service.ts), nen logic cursor/merge test
  * duoc bang mot bo du lieu gia.
  *
  * VI SAO `created_at` DU LAM CURSOR — va vi sao KHONG du mot minh:
  *
- *   - Moi lan ghi qua API la `.add()` voi `created_at = serverTimestamp()`.
- *     API KHONG co update, KHONG co delete. Gio cua server Firestore gan dung
- *     thoi diem commit, nen document commit SAU lan doc cua ta luon co
- *     `created_at` >= cursor. Khong co lech gio client.
+ *   - Moi lan ghi qua API la INSERT voi `created_at` = gio cua APP luc ghi (khong con la gio
+ *     commit nhu `serverTimestamp()` cua Firestore cu). API KHONG co update, KHONG co delete.
+ *     Hai request song song co the commit sai thu tu so voi `created_at`, nen doc tang dan
+ *     lui lai mot doan (SYNC_OVERLAP_SECONDS trong event.service.ts); phan doc trung duoc
+ *     gop theo id o duoi.
  *
- *   - Nhung `scripts/seed-events.js` ghi THANG Firestore voi `created_at` LUI VE
- *     QUA KHU (trai 90 ngay), va `--clear` XOA thang. Console Firebase cung
+ *   - Nhung `scripts/seed-events.js` ghi THANG D1 voi `created_at` LUI VE
+ *     QUA KHU (trai 90 ngay), va `--clear` XOA thang. `wrangler d1 execute` cung
  *     sua/xoa duoc. Cursor theo `created_at` khong thay bat ky cai nao.
  *
  *   => Luoi an toan hai lop:
- *      1. Moi lan dong bo tang dan, dem `count()` phia Firestore (~1 luot doc
- *         moi 1.000 document) va so voi cache. Lech = co insert lui ngay hoac
+ *      1. Moi lan dong bo tang dan, dem `COUNT(*)` phia D1 (quet index, rat re) va so voi cache. Lech = co insert lui ngay hoac
  *         co xoa ngoai API → doc lai toan bo.
- *      2. Sua ma KHONG doi so luong (sua tay tren console) thi count khong thay.
+ *      2. Sua ma KHONG doi so luong (sua tay bang wrangler) thi count khong thay.
  *         Cai do chi bat duoc bang doi chieu toan bo dinh ky
  *         (`reconcileMs`, xem events-cache.ts).
  *
@@ -29,7 +29,7 @@
  */
 import 'server-only';
 
-/** Cung hinh voi `Timestamp` cua Firestore — giu nguyen do chinh xac micro-giay. */
+/** Cung hinh voi `Timestamp` cu cua Firestore — giu nguyen do chinh xac micro-giay. */
 export interface SyncTimestamp {
   seconds: number;
   nanoseconds: number;
@@ -63,7 +63,7 @@ export interface EventsSource {
    * do nho, doc lai toan bo nhu truoc.
    */
   incremental: boolean;
-  /** Query hien tai, nguyen thu tu Firestore tra ve. */
+  /** Query hien tai, nguyen thu tu D1 tra ve (ORDER BY). */
   fetchAll(): Promise<SyncedDoc[]>;
   /** Cung bo loc + `created_at >= cursor`. */
   fetchSince(cursor: SyncTimestamp): Promise<SyncedDoc[]>;
@@ -84,7 +84,7 @@ const counters = {
   countMismatches: 0,
   /** Document THAT SU moi (id chua co trong cache) nhan duoc qua dong bo tang dan. */
   changedDocuments: 0,
-  /** Tong document da doc ve tu Firestore — gan dung so luot doc bi tinh (chua ke count()). */
+  /** Tong dong da doc ve tu D1 — gan dung `rows_read` bi tinh (chua ke COUNT(*)). */
   documentsFetched: 0,
 };
 
@@ -97,11 +97,11 @@ export function compareTs(a: SyncTimestamp, b: SyncTimestamp): number {
 }
 
 /**
- * Cung thu tu voi `orderBy('created_at')` cua Firestore: theo thoi gian, hoa
- * nhau thi theo document ID (Firestore ngam them `__name__` tang dan). Nho vay
+ * Cung thu tu voi `ORDER BY created_at, id` cua D1: theo thoi gian, hoa
+ * nhau thi theo id. Nho vay
  * ket qua sau khi ghep tang dan GIONG HET mot lan doc toan bo.
  *
- * `ts === null` len dau: Firestore xep gia tri null truoc Timestamp. Moi document
+ * `ts === null` len dau: SQLite xep NULL truoc gia tri khac. Moi dong
  * ghi qua API hay seed deu co Timestamp, nen nhanh nay chi de phong du lieu tay.
  */
 function compareDocs(a: SyncedDoc, b: SyncedDoc): number {
@@ -194,7 +194,7 @@ export async function syncEvents(
   if (actual !== expected) {
     counters.countMismatches += 1;
     console.warn(
-      `${options.label} COUNT MISMATCH firestore=${actual} cache=${expected} ` +
+      `${options.label} COUNT MISMATCH d1=${actual} cache=${expected} ` +
         '(seed/xoa/them lui ngay ngoai API) — doc lai toan bo',
     );
     return fullLoad(source, options, 'count-mismatch');

@@ -9,7 +9,7 @@
  * Co nut "Huy don" (do).
  */
 
-import { useEffect } from 'react';
+import { useEffect, useRef, type MutableRefObject } from 'react';
 import { useRouter } from 'next/navigation';
 import { FlowGuard } from '@/components/FlowGuard';
 import { Icon } from '@/components/Icon';
@@ -33,17 +33,27 @@ export default function FindingDriverPage() {
       ride.destination &&
       ride.vehicleId &&
       ride.promoId !== undefined &&
-      ride.driverStatus === 'searching',
+      // Chap nhan CA 'assigned': khi tim thay tai xe, man nay goi setRide({driverStatus:'assigned'})
+      // roi router.push('/ride/success'). Neu chi chap nhan 'searching' thi canEnter ngay lap tuc
+      // thanh false va FlowGuard goi router.replace('/ride/address') CHAY DUA voi push — replace thang,
+      // nguoi dung bi day ve dau luong va funnel khong bao gio co `screen_view ride_success`.
+      (ride.driverStatus === 'searching' || ride.driverStatus === 'assigned'),
   );
 
+  // `true` tu luc nguoi dung bam "Huy don": resetAll() xoa draft nen canEnter thanh false, va
+  // FlowGuard se goi router.replace('/ride/address') CHAY DUA voi router.replace('/') cua handleCancel
+  // (guard thang → nguoi dung khong ve duoc trang chu). Ref doc luc render nen cu re-render do resetAll
+  // la guard thay `leaving` va nhuong duong cho handleCancel.
+  const leavingRef = useRef(false);
+
   return (
-    <FlowGuard ready={canEnter} fallback="/ride/address">
-      <FindingDriverContent />
+    <FlowGuard ready={canEnter || leavingRef.current} fallback="/ride/address">
+      <FindingDriverContent leavingRef={leavingRef} />
     </FlowGuard>
   );
 }
 
-function FindingDriverContent() {
+function FindingDriverContent({ leavingRef }: { leavingRef: MutableRefObject<boolean> }) {
   useScreenView('finding_driver');
   const router = useRouter();
   const { ride, setRide, resetAll } = useApp();
@@ -142,6 +152,7 @@ function FindingDriverContent() {
         payment_method: ride.paymentMethod ?? 'cash',
       },
     });
+    leavingRef.current = true;
     resetAll();
     router.replace('/');
   }

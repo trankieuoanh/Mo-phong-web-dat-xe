@@ -7,7 +7,7 @@
  * TRA 200 KEM `null` khi Photon khong biet cho do la dau — KHONG phai loi, va
  * FE giu nhan mac dinh roi di tiep. Dung doi thanh 404.
  *
- * KHONG cham Firestore, KHONG ghi event nao.
+ * KHONG cham database (D1), KHONG ghi event nao.
  */
 import type { NextRequest } from 'next/server';
 import { reversePlace } from '@/lib/server/services/photon.service';

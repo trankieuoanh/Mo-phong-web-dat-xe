@@ -1,10 +1,15 @@
 /**
- * Ghi & doc collection `events`. Xem db-design.md va api-endpoints.md.
+ * Ghi & doc bang `events` tren Cloudflare D1 (qua REST — lib/server/db/d1.ts).
+ * Xem docs/d1-schema-design.md va api-endpoints.md.
+ *
+ * Hop dong cua `GET /api/events` GIU NGUYEN so voi ban Firestore cu: cung tham so loc, cung
+ * thu tu, cung dang JSON (`properties` la object, `created_at` la chuoi ISO). Chi co hai khac
+ * biet nho: `created_at` chinh xac toi micro-giay, va `seed_batch` chi xuat hien o event seed.
  */
 import 'server-only';
-import { FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { randomInt } from 'node:crypto';
 import type { CreateEventResponse, EventPayload } from '@/lib/shared';
-import { EVENTS_COLLECTION, getDb } from '../db/firebase-admin';
+import { d1Query } from '../db/d1';
 import type { EventQuery } from '../validators/event.validator';
 import type { CacheStatus } from './query-cache';
 import {
@@ -16,38 +21,91 @@ import {
 } from './events-cache';
 import { syncEvents, type EventsSource, type SyncedDoc, type SyncTimestamp } from './events-sync';
 
-export async function createEvent(payload: EventPayload): Promise<CreateEventResponse> {
-  const ref = await getDb()
-    .collection(EVENTS_COLLECTION)
-    .add({
-      ...payload,
-      // Hai field nay do SERVER tu gan — client gui len cung da bi validator loai.
-      platform: 'web',
-      created_at: FieldValue.serverTimestamp(),
-    });
+// ─────────────────────────────────────────────────────────────
+// Thoi gian & id
+// ─────────────────────────────────────────────────────────────
 
-  // SAU khi .add() thanh cong: ghi that bai thi da nem o tren, cache giu nguyen.
-  invalidateEventsFor(payload.session_id, payload.user_id);
+const ID_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
-  return {
-    event_id: ref.id,
-    // XAP XI, lech vai mili-giay: serverTimestamp() chua co gia tri that luc .add() tra ve.
-    // Gia tri chuan dung cho phan tich la field `created_at` trong Firestore.
-    // Khong doc lai document — ton them 1 read ma client cung bo qua response.
-    created_at: new Date().toISOString(),
-  };
+/** 20 ky tu `[A-Za-z0-9]` — cung dang voi auto-id cu cua Firestore — id cua event da migrate duoc giu nguyen. */
+function newEventId(): string {
+  let id = '';
+  for (let i = 0; i < 20; i += 1) id += ID_ALPHABET[randomInt(ID_ALPHABET.length)];
+  return id;
+}
+
+/** `YYYY-MM-DDTHH:MM:SS.ffffffZ` — do rong CO DINH nen so sanh chuoi = so sanh thoi gian. */
+function toIsoMicros(date: Date): string {
+  return `${date.toISOString().slice(0, 23)}000Z`;
+}
+
+function syncTsToIso(ts: SyncTimestamp): string {
+  const base = new Date(ts.seconds * 1000).toISOString().slice(0, 19);
+  return `${base}.${String(ts.nanoseconds).padStart(9, '0').slice(0, 6)}Z`;
+}
+
+function isoToSyncTs(iso: string): SyncTimestamp {
+  const seconds = Math.floor(Date.parse(`${iso.slice(0, 19)}Z`) / 1000);
+  const fraction = /\.(\d+)/.exec(iso)?.[1] ?? '0';
+  return { seconds, nanoseconds: Number(fraction.padEnd(9, '0').slice(0, 9)) };
 }
 
 /**
+ * created_at do APP gan truoc khi ghi (khac `serverTimestamp()` cu cua Firestore la gio COMMIT),
+ * nen hai request song song co the commit sai thu tu so voi created_at. Doc tang dan phai lui
+ * lai mot doan de khong sot — phan doc trung duoc gop theo id (events-sync.ts).
+ */
+const SYNC_OVERLAP_SECONDS = 5;
+
+// ─────────────────────────────────────────────────────────────
+// Ghi
+// ─────────────────────────────────────────────────────────────
+
+export async function createEvent(payload: EventPayload): Promise<CreateEventResponse> {
+  const id = newEventId();
+  const createdAt = toIsoMicros(new Date());
+
+  await d1Query(
+    `INSERT INTO events
+       (id, session_id, user_id, flow, event_name, screen_name, previous_screen,
+        step_index, properties, platform, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id,
+      payload.session_id,
+      payload.user_id,
+      payload.flow,
+      payload.event_name,
+      payload.screen_name,
+      payload.previous_screen,
+      payload.step_index,
+      JSON.stringify(payload.properties),
+      // `platform` va `created_at` do SERVER tu gan — client gui len cung da bi validator loai.
+      'web',
+      createdAt,
+    ],
+  );
+
+  // SAU khi INSERT thanh cong: ghi that bai thi da nem o tren, cache giu nguyen.
+  invalidateEventsFor(payload.session_id, payload.user_id);
+
+  return { event_id: id, created_at: createdAt };
+}
+
+// ─────────────────────────────────────────────────────────────
+// Doc
+// ─────────────────────────────────────────────────────────────
+
+/**
  * Doc qua cache — xem events-cache.ts. `flatten` chay SAU cache nen `?flat=1`
- * va dang long nhau dung chung mot lan doc Firestore.
+ * va dang long nhau dung chung mot lan doc D1.
  */
 export async function listEvents(
   query: EventQuery,
 ): Promise<{ events: Record<string, unknown>[]; cacheStatus: CacheStatus }> {
   const key = eventsCacheKey(query);
   const { value, status } = await eventsCache.get(key, (previous) =>
-    syncEvents(previous, firestoreSource(query), {
+    syncEvents(previous, d1Source(query), {
       now: Date.now(),
       reconcileMs: EVENTS_FULL_RECONCILIATION_INTERVAL_MS,
       label: `[events] key=${key}`,
@@ -57,103 +115,108 @@ export async function listEvents(
   return { events: query.flat ? flatten(rows) : rows, cacheStatus: status };
 }
 
-/** Noi events-sync.ts voi Firestore that. Ba ham cung chung MOT bo loc. */
-function firestoreSource(query: EventQuery): EventsSource {
-  const toTimestamp = (ts: SyncTimestamp) => new Timestamp(ts.seconds, ts.nanoseconds);
+/** Noi events-sync.ts voi D1. Ba ham cung chung MOT bo loc (`whereClause`). */
+function d1Source(query: EventQuery): EventsSource {
+  const { where, params } = whereClause(query);
   return {
     incremental: isIncrementalQuery(query),
     fetchAll: () => fetchEvents(query),
-    // Khong orderBy: events-sync.ts tu sap lai sau khi ghep. Bo loc `flow ==`
-    // cong dieu kien khoang tren created_at dung CUNG composite index
-    // (flow, created_at) ma `?flow=` von da can — khong phat sinh index moi.
+    // events-sync.ts tu sap lai sau khi ghep.
     fetchSince: async (cursor) => {
-      const snapshot = await baseQuery(query).where('created_at', '>=', toTimestamp(cursor)).get();
-      return snapshot.docs.map(toSyncedDoc);
+      const since = syncTsToIso({ seconds: cursor.seconds - SYNC_OVERLAP_SECONDS, nanoseconds: cursor.nanoseconds });
+      const { results } = await d1Query<EventRow>(
+        `SELECT * FROM events WHERE ${[...where, 'created_at >= ?'].join(' AND ')} ORDER BY created_at, id`,
+        [...params, since],
+      );
+      return results.map(toSyncedDoc);
     },
-    // Aggregation: tinh ~1 luot doc cho moi 1.000 document khop, khong phai 1/document.
     countUpTo: async (cursor) => {
-      const snapshot = await baseQuery(query)
-        .where('created_at', '<=', toTimestamp(cursor))
-        .count()
-        .get();
-      return snapshot.data().count;
+      const { results } = await d1Query<{ n: number }>(
+        `SELECT COUNT(*) AS n FROM events WHERE ${[...where, 'created_at <= ?'].join(' AND ')}`,
+        [...params, syncTsToIso(cursor)],
+      );
+      return Number(results[0]?.n ?? 0);
     },
   };
 }
 
-/** Cac dieu kien `where` cua GET /api/events — chua co orderBy/limit. */
-function baseQuery(query: EventQuery): FirebaseFirestore.Query {
-  let ref = getDb().collection(EVENTS_COLLECTION) as FirebaseFirestore.Query;
-  if (query.sessionId) ref = ref.where('session_id', '==', query.sessionId);
-  if (query.userId) ref = ref.where('user_id', '==', query.userId);
-  if (query.flow) ref = ref.where('flow', '==', query.flow);
-  if (query.from) ref = ref.where('created_at', '>=', Timestamp.fromDate(query.from));
-  if (query.to) ref = ref.where('created_at', '<=', Timestamp.fromDate(query.to));
-  return ref;
+/** Cac dieu kien cua GET /api/events — chua co ORDER BY/LIMIT. Luon co it nhat `1 = 1`. */
+function whereClause(query: EventQuery): { where: string[]; params: unknown[] } {
+  const where: string[] = ['1 = 1'];
+  const params: unknown[] = [];
+  if (query.sessionId) {
+    where.push('session_id = ?');
+    params.push(query.sessionId);
+  }
+  if (query.userId) {
+    where.push('user_id = ?');
+    params.push(query.userId);
+  }
+  if (query.flow) {
+    where.push('flow = ?');
+    params.push(query.flow);
+  }
+  if (query.from) {
+    where.push('created_at >= ?');
+    params.push(toIsoMicros(query.from));
+  }
+  if (query.to) {
+    where.push('created_at <= ?');
+    params.push(toIsoMicros(query.to));
+  }
+  return { where, params };
 }
 
-function toSyncedDoc(doc: FirebaseFirestore.QueryDocumentSnapshot): SyncedDoc {
-  const data = doc.data();
-  const createdAt = data.created_at;
-  const isTimestamp = createdAt instanceof Timestamp;
+interface EventRow {
+  id: string;
+  session_id: string;
+  user_id: string;
+  flow: string;
+  event_name: string;
+  screen_name: string;
+  previous_screen: string | null;
+  step_index: number;
+  properties: string;
+  platform: string;
+  created_at: string;
+  seed_batch: string | null;
+}
+
+function toSyncedDoc(row: EventRow): SyncedDoc {
+  let properties: unknown = {};
+  try {
+    properties = JSON.parse(row.properties);
+  } catch {
+    // Cot co CHECK json_valid nen khong xay ra; neu co thi tra {} thay vi lam hong ca lan doc.
+  }
+  const { seed_batch: seedBatch, ...rest } = row;
   return {
-    id: doc.id,
-    // Giu Timestamp THO lam cursor: chuoi ISO chi toi mili-giay, cat mat phan
-    // micro-giay ma Firestore dung de so sanh.
-    ts: isTimestamp ? { seconds: createdAt.seconds, nanoseconds: createdAt.nanoseconds } : null,
+    id: row.id,
+    ts: isoToSyncTs(row.created_at),
     row: {
-      id: doc.id,
-      ...data,
-      // Timestamp cua Firestore serialize ra JSON thanh {_seconds, _nanoseconds} —
-      // pandas va jq deu khong doc duoc. Doi sang chuoi ISO ngay tai day.
-      created_at: isTimestamp ? createdAt.toDate().toISOString() : null,
+      ...rest,
+      properties,
+      // Event nguoi that khong co field nay (nhu document Firestore truoc day).
+      ...(seedBatch !== null ? { seed_batch: seedBatch } : {}),
     },
   };
 }
 
 async function fetchEvents(query: EventQuery): Promise<SyncedDoc[]> {
-  let ref = baseQuery(query);
+  const { where, params } = whereClause(query);
 
-  /**
-   * Loc theo session thi sap theo buoc (dung cho replay mot phien);
-   * loc theo user thi sap TRONG BO NHO (xem duoi); con lai sap theo thoi gian.
-   *
-   * Vi sao user_id khong dung orderBy cua Firestore: mot where('==') cong mot
-   * orderBy tren field KHAC se bi Firestore tu choi va bat tao composite index —
-   * tuc nguoi chay du an phai bam link, doi index build, roi moi demo duoc.
-   * Du lieu mot nguoi dung chi vai tram document nen sap trong JS re hon nhieu
-   * so voi bat cau hinh them sau khi clone. Xem api-endpoints.md muc 3.
-   */
-  const sortInMemory = Boolean(query.userId) && !query.sessionId;
-  if (!sortInMemory) {
-    ref = query.sessionId ? ref.orderBy('step_index') : ref.orderBy('created_at');
+  // Loc theo session thi sap theo buoc (dung cho replay mot phien); con lai sap theo thoi gian.
+  // `id` luon di cuoi de thu tu on dinh, cung quy tac voi `compareDocs` cua events-sync.ts.
+  // Khac ban Firestore: loc theo user_id cung sap/limit THANG o DB (co idx_events_user_created_at),
+  // khong con phai sap trong bo nho de tranh composite index.
+  const order = query.sessionId ? 'step_index, created_at, id' : 'created_at, id';
+  let sql = `SELECT * FROM events WHERE ${where.join(' AND ')} ORDER BY ${order}`;
+  if (query.limit !== undefined) {
+    sql += ' LIMIT ?';
+    params.push(query.limit);
   }
-
-  /**
-   * `limit` di vao query Firestore chu khong cat sau khi lay ve: moi document
-   * doc len la MOT LUOT DOC tinh vao han muc (free tier 50.000/ngay), nen cat o
-   * client thi tra tien cho ca nhung dong da vut di.
-   *
-   * Ngoai le: khi dang sap trong bo nho thi khong the limit o Firestore — 200
-   * document dau theo thu tu tuy y khong phai 200 document dau theo thoi gian.
-   * Truong hop do cat sau khi sap, xem duoi.
-   */
-  if (query.limit !== undefined && !sortInMemory) ref = ref.limit(query.limit);
-
-  const snapshot = await ref.get();
-
-  const events = snapshot.docs.map(toSyncedDoc);
-
-  if (sortInMemory) {
-    // created_at co the la null voi document vua ghi (serverTimestamp chua ket
-    // thuc). Day chung xuong cuoi thay vi de String(null) xen vao giua.
-    events.sort((a, b) =>
-      String(a.row.created_at ?? '￿').localeCompare(String(b.row.created_at ?? '￿')),
-    );
-  }
-
-  // Chi nhanh sap-trong-bo-nho moi phai cat o day — xem ghi chu o cho dat limit.
-  return query.limit !== undefined && sortInMemory ? events.slice(0, query.limit) : events;
+  const { results } = await d1Query<EventRow>(sql, params);
+  return results.map(toSyncedDoc);
 }
 
 /**

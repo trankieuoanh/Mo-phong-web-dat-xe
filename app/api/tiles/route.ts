@@ -2,7 +2,7 @@
  * GET /api/tiles — nha cung cap tile nao con dung duoc. Hop dong o
  * api-endpoints.md muc 3d.
  *
- * KHONG cham Firestore, KHONG ghi event nao.
+ * KHONG cham database (D1), KHONG ghi event nao.
  *
  * Khong co validator vi endpoint nay khong nhan tham so nao — nhung no VAN doc
  * mot thu tu request: origin. Xem duoi.

@@ -1,8 +1,8 @@
 /**
- * Ma xac thuc 6 so — KHONG dung Firestore.
+ * Ma xac thuc 6 so — KHONG dung database.
  *
- * Vi sao: gui/xac thuc ma ma phu thuoc Firestore thi het quota free tier
- * (RESOURCE_EXHAUSTED) la KHONG AI dang nhap duoc, ma dang nhap lai bat buoc.
+ * Vi sao: gui/xac thuc ma ma phu thuoc database thi het han muc free tier
+ * cua D1 la KHONG AI dang nhap duoc, ma dang nhap lai bat buoc.
  *
  * Thu thach OTP nam trong cookie httpOnly `gsm_otp` da ky HMAC:
  *   { p: phone, h: hash(ma), e: het han, n: nonce }

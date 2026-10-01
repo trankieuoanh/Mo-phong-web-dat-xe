@@ -4,7 +4,7 @@
  * Thu muc ten `route` chua file ten `route.ts` — trong la lung nhung dung quy
  * uoc App Router: ten THU MUC la duong dan URL, ten FILE luon la `route.ts`.
  *
- * KHONG cham Firestore, KHONG ghi event nao.
+ * KHONG cham database (D1), KHONG ghi event nao.
  */
 import type { NextRequest } from 'next/server';
 import { findRoute } from '@/lib/server/services/route.service';
