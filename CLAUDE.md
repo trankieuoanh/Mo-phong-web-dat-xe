@@ -63,6 +63,7 @@ Không có test tự động — `techstack.md` đã chốt là kiểm thử b�
 9. **Năm route ngoài funnel không được gọi `useScreenView` hay `trackEvent`:** `/history`, `/account`, `/support`, `/terms`, `/login`. Chúng cố ý không có trong `SCREENS` — `/history` chỉ ĐỌC lại event đã có, ba route kia là màn tĩnh của sidebar. Thêm event vào đó là làm bẩn mọi tỉ lệ conversion. Kiểm tra: `grep -rn "trackEvent(\|useScreenView(" app/{history,account,support,terms,login}` → phải rỗng.
 10. **Bản đồ phải giữ dòng ghi công `© OpenStreetMap`.** Điều khoản dùng tile yêu cầu, không phải chi tiết thẩm mỹ. Kiểm tra: `grep -n "OpenStreetMap" components/MapCanvas.tsx`.
 11. **Đăng nhập bắt buộc bằng số điện thoại + mã SMS 6 số** (`api-endpoints.md` mục 5). `user_id` = số điện thoại E.164, **server** gán từ cookie `gsm_auth` ở `POST /api/events` — đừng tin `user_id` client gửi. `middleware.ts` chỉ kiểm tra cookie có mặt và **không được** import `lib/server`. Gửi SMS chỉ qua `getSmsSender()` (`SMS_PROVIDER=mock` mặc định); nhà cung cấp thật gọi bằng `fetch`, không thêm SDK. `AUTH_SECRET` không bao giờ mang tiền tố `NEXT_PUBLIC_`.
+12. **không bao giờ được commit code**
 
 ## Cấu trúc thư mục — MỘT project Next.js
 
