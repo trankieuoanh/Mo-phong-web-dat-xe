@@ -36,7 +36,7 @@ export function BackButton({ from, to, href, icon = 'back' }: BackButtonProps) {
       type="button"
       aria-label="Quay lại"
       // icon-button-circular — tailwind-theme.md muc 4
-      className="grid size-9 shrink-0 place-items-center rounded-full bg-canvas-soft text-ink hover:bg-surface-pressed active:bg-surface-pressed"
+      className="grid size-11 shrink-0 place-items-center rounded-full bg-canvas-soft text-ink hover:bg-surface-pressed active:bg-surface-pressed"
       onClick={() => {
         trackEvent({ eventName: 'back', screenName: from, properties: { to_screen: to } });
         router.push(href);

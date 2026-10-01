@@ -62,7 +62,13 @@ export default function FoodSuccessPage() {
       tabs={['Đặt món', 'Đang diễn ra', 'Đơn đã lưu']}
       maxWidth="max-w-[760px]"
       // KHONG truyen `title` — xem ghi chu cung cho o app/ride/success/page.tsx.
-      footer={<PrimaryButton onClick={backToHome}>Về trang chủ</PrimaryButton>}
+      footer={
+        <div className="w-full min-w-0 pb-[env(safe-area-inset-bottom,0px)] lg:pb-0">
+          <PrimaryButton className="w-full min-w-0 whitespace-normal" onClick={backToHome}>
+            Về trang chủ
+          </PrimaryButton>
+        </div>
+      }
     >
       <div className="flex flex-col items-center py-3xl">
         {/* `primary-dark` chu KHONG phai `primary`: trang tren #00B4B8 chi dat
@@ -76,7 +82,7 @@ export default function FoodSuccessPage() {
         </p>
       </div>
 
-      <div className="rounded-xl bg-canvas-soft p-2xl">
+      <div className="rounded-xl bg-canvas-soft p-lg sm:p-2xl [&>*]:flex-wrap [&>*]:gap-sm [&>*>span]:min-w-0 [&>*>span:last-child]:text-right">
         {/* Trong luc `summary` con null thi day la SKELETON, khong phai chuoi
             '—' tran — mot dau gach ngang trong nhu du lieu that va bi bo trong. */}
         {summary ? (

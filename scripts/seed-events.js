@@ -482,6 +482,7 @@ const SCREENS = {
 
 const ADD_TO_CART_STEP_INDEX = 3;
 const SELECT_FLOW_STEP_INDEX = 0;
+const DIRECT_ENTRY_FLOWS = ['ride', 'food'];
 
 /** 26 gia tri — ban sao cua EVENT_NAMES trong lib/shared/types.ts. */
 const EVENT_NAMES = new Set([
@@ -763,6 +764,30 @@ class Session {
   }
 }
 
+function startFlow(s, flow, directEntry = false) {
+  const screen = flow === 'ride' ? 'address_selection' : 'food_menu';
+  if (directEntry) {
+    s.tick(1, 3);
+    s.think(2, 12);
+    s.emit(
+      'select_flow',
+      screen,
+      { flow_chosen: flow, entry_source: 'direct_url' },
+      { flow, stepIndex: SELECT_FLOW_STEP_INDEX },
+    );
+    s.visit(screen);
+    return;
+  }
+
+  s.visit('home');
+  s.think(2, 12);
+  s.emit('select_flow', 'home', { flow_chosen: flow }, {
+    flow,
+    stepIndex: SELECT_FLOW_STEP_INDEX,
+  });
+  s.visit(screen);
+}
+
 // ─────────────────────────────────────────────────────────────
 // Luong Ride
 // ─────────────────────────────────────────────────────────────
@@ -804,7 +829,7 @@ function emitSelectVehicle(s, vehicle, route) {
   });
 }
 
-function buildRideSession(s) {
+function buildRideSession(s, directEntry = false) {
   const outcome = pickWeighted(['complete', 'cancel', 'abandon'], [55, 12, 33]);
   const abandonAt = outcome === 'abandon' ? pickWeighted(RIDE_ABANDON_STEPS, RIDE_ABANDON_WEIGHTS) : 99;
   // Bam Back o dung mot buoc, o 18% session — cap so lieu cho nhom 4
@@ -812,16 +837,9 @@ function buildRideSession(s) {
   // danh sach: "quay ve doi diem den" da co duong rieng la `change_address`.
   const backAt = chance(0.18) ? pickWeighted([3, 4, 5], [40, 30, 30]) : 0;
 
-  s.visit('home');
-  s.think(2, 12);
-  // select_flow: luon step 0, luon mang flow duoc chon (khong phai 'none').
-  s.emit('select_flow', 'home', { flow_chosen: 'ride' }, {
-    flow: 'ride',
-    stepIndex: SELECT_FLOW_STEP_INDEX,
-  });
+  startFlow(s, 'ride', directEntry);
 
   // ── step 1: chon diem den ──
-  s.visit('address_selection');
   if (abandonAt === 1 && chance(0.45)) return; // roi ngay khi vua nhin thay man
   let destination = randomDestination();
   emitSelectAddress(s, destination);
@@ -1000,20 +1018,14 @@ const cartTotal = (cart) => cart.reduce((sum, l) => sum + l.item.price * l.quant
 const FOOD_ABANDON_STEPS = [1, 2, 3, 4, 5, 6];
 const FOOD_ABANDON_WEIGHTS = [18, 14, 12, 30, 14, 12];
 
-function buildFoodSession(s) {
+function buildFoodSession(s, directEntry = false) {
   const completes = chance(0.5);
   const abandonAt = completes ? 99 : pickWeighted(FOOD_ABANDON_STEPS, FOOD_ABANDON_WEIGHTS);
   const backAt = chance(0.18) ? pickWeighted([5, 6], [50, 50]) : 0;
 
-  s.visit('home');
-  s.think(2, 12);
-  s.emit('select_flow', 'home', { flow_chosen: 'food' }, {
-    flow: 'food',
-    stepIndex: SELECT_FLOW_STEP_INDEX,
-  });
+  startFlow(s, 'food', directEntry);
 
   // ── step 1: thuc don ──
-  s.visit('food_menu');
   if (abandonAt === 1 && chance(0.45)) return;
 
   // `discovery_source` ghi bo loc DANG BAT luc bam mon. Bon bo loc loai tru
@@ -1275,6 +1287,7 @@ function generate(opts, batchId) {
   const users = Array.from({ length: userCount }, () => `mock-user-${seededUuid().slice(0, 8)}`);
 
   const sessions = [];
+  let directEntryCount = 0;
   for (const startAt of starts) {
     const userId = users[Math.floor(rand() ** 1.6 * users.length)];
     const s = new Session(seededUuid(), userId, startAt, batchId);
@@ -1287,7 +1300,16 @@ function generate(opts, batchId) {
       continue;
     }
 
-    if (chance(0.6)) buildRideSession(s);
+    const flowRoll = chance(0.6);
+    const directFlow =
+      directEntryCount < DIRECT_ENTRY_FLOWS.length
+        ? DIRECT_ENTRY_FLOWS[directEntryCount]
+        : null;
+    directEntryCount += directFlow ? 1 : 0;
+
+    if (directFlow === 'ride') buildRideSession(s, true);
+    else if (directFlow === 'food') buildFoodSession(s, true);
+    else if (flowRoll) buildRideSession(s);
     else buildFoodSession(s);
 
     sessions.push(s);

@@ -37,7 +37,7 @@ export function PrimaryButton({
       className={[
         't-button-md rounded-pill px-2xl py-md',
         // Toi thieu 48px chieu cao tren desktop — screen-map.md muc 6.
-        'min-h-[48px] transition-colors',
+        'min-h-12 max-w-full transition-colors',
         'disabled:cursor-not-allowed disabled:opacity-50',
         VARIANTS[variant],
         fullWidth ? 'w-full' : '',

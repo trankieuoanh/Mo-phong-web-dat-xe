@@ -22,17 +22,17 @@ export function SummaryRow({ label, value, emphasis = false }: SummaryRowProps) 
     return (
       // `border-canvas` = duong ke TRANG tren nen `canvas-soft`. Do la thu phap
       // chia o cua du an nay, khong phai loi thieu mau duong ke.
-      <div className="mt-lg flex items-center justify-between border-t border-canvas pt-lg">
-        <span className="t-body-md-strong">{label}</span>
-        <span className="t-display-sm">{value}</span>
+      <div className="mt-lg flex min-w-0 flex-wrap items-center justify-between gap-x-lg gap-y-xs border-t border-canvas pt-lg">
+        <span className="t-body-md-strong min-w-0 break-words">{label}</span>
+        <span className="t-display-sm min-w-0 max-w-full break-words text-right">{value}</span>
       </div>
     );
   }
 
   return (
-    <div className="flex items-center justify-between py-xs">
-      <span className="t-body-sm text-body">{label}</span>
-      <span className="t-body-md-strong">{value}</span>
+    <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-lg gap-y-xs py-xs">
+      <span className="t-body-sm min-w-0 break-words text-body">{label}</span>
+      <span className="t-body-md-strong min-w-0 max-w-full break-words text-right">{value}</span>
     </div>
   );
 }

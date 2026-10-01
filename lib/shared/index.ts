@@ -17,3 +17,4 @@ export * from './pricing';
 export * from './places';
 export * from './route';
 export * from './tiles';
+export * from './phone';

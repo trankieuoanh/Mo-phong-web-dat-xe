@@ -4,10 +4,12 @@
 
 ## Cấu trúc màn hình
 
-### 1. Home
-- 2 nút tính năng chính, kích thước lớn, đặt ngang hàng hoặc xếp chồng rõ ràng:
-  - **Đặt xe** — dẫn vào luồng đặt xe đầy đủ
-  - **Food** — dẫn vào luồng đặt đồ ăn đầy đủ
+### 1. Home — trang chọn luồng
+- `/` là **chooser tập trung, shell-free**: không `AppShell`, `SideRail`, `TopBar` và không mặc định ride.
+- Có đúng hai lựa chọn, kích thước lớn và rõ ràng:
+  - **Đặt xe** — dẫn tới `/ride/address`
+  - **Đặt đồ ăn** — dẫn tới `/food`
+- Màn này giữ nguyên `screen_name: home`, `flow: none`, `step_index: 0`; chọn một nút dùng event `select_flow` trước khi điều hướng.
 
 ### Luồng Đặt xe
 1. **Chọn địa chỉ** — danh sách địa chỉ hard-code sẵn (nhà, công ty, trường...)
@@ -16,7 +18,7 @@
 4. **Chọn khuyến mãi** — danh sách khuyến mãi hard-code sẵn
 5. **Xác nhận đặt xe** — tóm tắt toàn bộ lựa chọn (điểm đón, loại xe, khuyến mãi) + nút xác nhận cuối cùng
 
-### Luồng Food
+### Luồng Đặt đồ ăn
 1. **Danh sách món ăn** — hiển thị các món có thể chọn (dữ liệu hard-code)
 2. **Chọn đồ ăn** — chọn 1 hoặc nhiều món
 3. **Thêm vào giỏ hàng** — hành động thêm món vào giỏ
@@ -26,16 +28,24 @@
 
 ## Sơ đồ luồng
 ```
-Home
- ├─ [Đặt xe] → Chọn địa chỉ → Xác nhận điểm đón → Chọn loại xe → Chọn khuyến mãi → Xác nhận đặt xe
- └─ [Food]   → Danh sách món ăn → Chọn đồ ăn → Thêm vào giỏ hàng → Xem giỏ hàng → Chọn ưu đãi → Đặt đơn
+Home chooser (`/`, shell-free)
+ ├─ [Đặt xe]      → /ride/address → Chọn địa chỉ → Xác nhận điểm đón → Chọn loại xe → Chọn khuyến mãi → Xác nhận đặt xe
+ └─ [Đặt đồ ăn]  → /food         → Danh sách món ăn → Chọn đồ ăn → Thêm vào giỏ hàng → Xem giỏ hàng → Chọn ưu đãi → Đặt đơn
 ```
 
 ## Design tokens
 Khối token đầy đủ nằm ở phần dưới file này (từ mục `version: alpha` trở xuống). Khi code, **không đọc thẳng giá trị từ đó** mà dùng bảng ánh xạ token → class Tailwind ở **`tailwind-theme.md`** — file đó cũng đã chốt cách xử lý 3 chỗ lệch giữa khối YAML và phần văn xuôi, cùng cảnh báo tương phản của màu cyan chủ đạo.
 
 ## Lưu ý phạm vi
-Hiện có **2 luồng đầy đủ** (Đặt xe 5 bước, Food 6 bước) thay vì 1 luồng chính + 1 placeholder như bản trước — tổng cộng 13 màn. Kế hoạch theo tuần và thứ tự cắt giảm nếu chậm tiến độ ở `roadmap.md`.
+Hiện có **2 luồng đầy đủ** (Đặt xe 7 bước, Đặt đồ ăn 7 bước) cùng màn chọn luồng trung lập — tổng cộng 14 màn được tracking. Kế hoạch theo tuần và thứ tự cắt giảm nếu chậm tiến độ ở `roadmap.md`.
+
+## Điều hướng app
+
+- `/` là chooser shell-free với đúng hai nút `Đặt xe` và `Đặt đồ ăn`, dẫn tới `/ride/address` và `/food`; đây không phải một luồng mặc định.
+- Sau khi chọn, desktop từ **1120px** dùng `SideRail`; dưới mốc đó mọi màn trong phạm vi app dùng `TopBar` hai hàng, với control `Đặt xe` / `Đặt đồ ăn` full-width và menu `More` cho `/history`, `/account`, `/support`, `/terms`.
+- Đổi luồng chỉ bật ở màn entry hoặc bốn màn ngoài funnel; control luồng còn lại bị disabled ở giữa funnel. Chọn lại `/` hoặc đổi luồng không xoá draft của luồng đang làm.
+- Mở trực tiếp `/ride/address` hoặc `/food` vẫn phát `select_flow` step 0 trước `screen_view`, với `entry_source: "direct_url"`.
+- Mọi màn sau lựa chọn đều có phạm vi mobile: gutter ngang **16px** và vùng chạm **44-48px**. Bố cục panel/map `split` chỉ tách cạnh nhau từ **1280px**.
 
 ---
 version: alpha
@@ -459,21 +469,22 @@ Card-to-card spacing carries the rhythm — between two stacked promo cards ther
 
 ### Responsive Strategy
 
-#### Breakpoints
+#### App Breakpoints
 
-| Name | Width | Key Changes |
-|---|---|---|
-| Mobile | < 600px | Nav collapses to hamburger; promo cards stack; ride-request form becomes full-width. |
-| Mobile-Large | 600–767px | Same as Mobile; chip rows enable horizontal scroll. |
-| Tablet | 768–1119px | 2-up promo grid at upper widths; nav stays horizontal until ≥ 1120 px. |
-| Desktop | 1120–1135px | Full nav row visible; promo cards 2-up. |
-| Desktop-Large | ≥ 1136px | Container caps at ~1200 px; bands stay edge-to-edge while content centres. |
+| Range | App layout |
+|---|---|
+| `< 1120px` | Mọi màn sau chooser dùng `TopBar` hai hàng, gutter ngang 16px; `split` xếp chồng, không có `SideRail`. |
+| `1120–1279px` | Có `SideRail` và top bar desktop; `split` vẫn xếp chồng để tránh panel/map quá hẹp. |
+| `≥ 1280px` | Có `SideRail` và top bar desktop; bố cục `split` tách panel 480px và map thành hai cột. |
+
+`/` là ngoại lệ shell-free ở mọi kích thước: chỉ hiển thị chooser hai lựa chọn, không có `SideRail`, `TopBar` hoặc bố cục `split`.
 
 #### Touch Targets
-The pill `button-primary` renders at ~44 px tall (10 px vertical padding + 24 px label line-height); the larger `button-large-rounded` at ~56 px. Both meet WCAG AAA at all breakpoints. Category chips inflate to ≥ 44 px tall through extra padding on touch viewports.
+
+Các control của app có vùng chạm **44-48px** ở mọi breakpoint; CTA chính dùng khoảng 48px, chip và control điều hướng không nhỏ hơn 44px. Vùng chạm phải dùng được bằng cả chuột lẫn touch.
 
 #### Collapsing Strategy
-- **Nav**: full link row + Help / Log in / Sign up pills at desktop. Collapses to logo + hamburger at mobile; menu overlays full-screen with the same link list stacked.
+- **App navigation**: `/` không có shell. Sau lựa chọn, từ 1120px dùng `SideRail`; dưới 1120px dùng `TopBar` hai hàng, control luồng `Đặt xe` / `Đặt đồ ăn` full-width và menu `More` cho bốn route ngoài funnel.
 - **Ride-request form card**: at desktop, the form sits inside a max-490-px `{rounded.xl}` card with shadow. At mobile, full-width with edge-to-edge.
 - **Promo cards**: at desktop, image-left + content-right (or alternating). At mobile, image always above content.
 - **Annual showcase card**: scales from a 2:3 desktop frame to a 4:3 mobile frame; date text resizes proportionally.

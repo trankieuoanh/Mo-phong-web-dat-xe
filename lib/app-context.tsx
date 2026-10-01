@@ -21,7 +21,13 @@ import {
   type RouteResult,
   type MockDriver,
 } from '@/lib/shared';
-import { getSessionId, getUserId, resetSession } from './session';
+import {
+  clearUser,
+  getSessionId,
+  getUserId,
+  resetSession,
+  setUserId as storeUserId,
+} from './session';
 import { resetPreviousScreen } from './track';
 
 /**
@@ -106,6 +112,11 @@ interface AppContextValue extends StoredState {
 
   /** Bam "Ve trang chu" o man success: session moi + xoa sach draft. */
   resetAll: () => void;
+
+  /** Man /login goi sau khi xac thuc ma thanh cong. Mo session moi. */
+  signIn: (phone: string) => void;
+  /** Xoa cookie + ban sao SDT, mo session moi, ve /login. */
+  signOut: () => Promise<void>;
 }
 
 /**
@@ -170,6 +181,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setOfferIdState(readJson<string | null | undefined>(OFFER_KEY, undefined));
     setFoodState(readJson<FoodDraft>(FOOD_KEY, {}));
     setHydrated(true);
+  }, []);
+
+  /**
+   * Middleware chi kiem cookie CO MAT; chu ky that kiem o day. Cookie het han /
+   * gia -> xoa ban sao SDT va ve /login. Loi mang thi bo qua: khong duoc lam vo
+   * luong UI chi vi mot request kiem tra (POST /api/events van tu chan 401).
+   */
+  useEffect(() => {
+    if (window.location.pathname === '/login') return;
+    fetch('/api/auth/me')
+      .then(async (res) => {
+        if (res.status === 401) {
+          clearUser();
+          window.location.replace('/login');
+          return;
+        }
+        if (!res.ok) return;
+        const { phone } = (await res.json()) as { phone: string };
+        storeUserId(phone);
+        setUserId(phone);
+      })
+      .catch(() => {});
   }, []);
 
   // Ghi kem sessionStorage de F5 giua luong khong mat lua chon.
@@ -242,6 +275,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setFoodState({});
   }, []);
 
+  const signIn = useCallback(
+    (phone: string) => {
+      storeUserId(phone);
+      setUserId(phone);
+      resetAll();
+    },
+    [resetAll],
+  );
+
+  const signOut = useCallback(async () => {
+    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
+    clearUser();
+    setUserId('');
+    resetAll();
+    window.location.replace('/login');
+  }, [resetAll]);
+
   const value = useMemo<AppContextValue>(
     () => ({
       sessionId,
@@ -260,6 +310,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setFood,
       clearCart,
       resetAll,
+      signIn,
+      signOut,
     }),
     [
       sessionId,
@@ -278,6 +330,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setFood,
       clearCart,
       resetAll,
+      signIn,
+      signOut,
     ],
   );
 

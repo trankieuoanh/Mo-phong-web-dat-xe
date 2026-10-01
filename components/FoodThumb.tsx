@@ -44,7 +44,8 @@ interface FoodThumbProps {
 }
 
 export function FoodThumb({ item, variant = 'cover', className }: FoodThumbProps) {
-  const shape = variant === 'cover' ? 'aspect-[4/3] w-full' : 'size-14 shrink-0';
+  const shape =
+    variant === 'cover' ? 'aspect-[4/3] w-full min-w-0' : 'size-14 min-w-0 shrink-0';
   const glyphSize = variant === 'cover' ? 40 : 22;
 
   if (item.image) {

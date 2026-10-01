@@ -78,24 +78,24 @@ export function PlacePicker({
   const searching = query.trim().length >= MIN_QUERY_LENGTH;
 
   return (
-    <div>
+    <div className="min-w-0">
       {/* text-input — tailwind-theme.md muc 4 */}
-      <div className="flex items-center gap-md rounded-md bg-canvas-soft p-lg">
-        <Icon name="search" size={20} className="text-body" />
+      <div className="flex min-w-0 items-center gap-md rounded-md bg-canvas-soft p-lg">
+        <Icon name="search" size={20} className="shrink-0 text-body" />
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={placeholder}
           aria-label={placeholder}
-          className="t-body-md w-full bg-transparent text-ink outline-none placeholder:text-mute"
+          className="t-body-md w-full min-w-0 flex-1 bg-transparent text-ink outline-none placeholder:text-mute"
         />
         {query ? (
           <button
             type="button"
             aria-label="Xoá ô tìm"
             onClick={() => setQuery('')}
-            className="grid size-6 shrink-0 place-items-center rounded-full text-body hover:bg-surface-pressed"
+            className="grid size-11 shrink-0 place-items-center rounded-full text-body hover:bg-surface-pressed"
           >
             <Icon name="close" size={14} />
           </button>
@@ -105,7 +105,7 @@ export function PlacePicker({
       {leading ? <div className="mt-lg">{leading}</div> : null}
 
       {status === 'error' ? (
-        <p className="t-caption mt-lg rounded-md bg-canvas-soft p-md text-body">
+        <p className="t-caption mt-lg min-w-0 break-words rounded-md bg-canvas-soft p-md text-body">
           Không tìm được địa chỉ lúc này — bạn vẫn chọn được từ danh sách bên dưới.
           <span className="mt-xxs block text-mute">{error}</span>
         </p>
@@ -179,7 +179,7 @@ function PlaceRow({
       <button
         type="button"
         onClick={() => onPick(place)}
-        className={`flex w-full items-center gap-lg rounded-md bg-canvas-soft p-lg text-left text-ink transition-colors hover:bg-surface-pressed ${
+        className={`flex w-full min-w-0 items-center gap-lg rounded-md bg-canvas-soft p-lg text-left text-ink transition-colors hover:bg-surface-pressed ${
           selected ? 'ring-2 ring-primary' : ''
         }`}
       >

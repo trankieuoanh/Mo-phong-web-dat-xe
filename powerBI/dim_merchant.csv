@@ -1,0 +1,401 @@
+﻿merchant_id,merchant_name,cuisine,hex_id,region_id,avg_rating,avg_prep_min
+M0001,Quán Món Nhật - Hàn 001,Món Nhật - Hàn,86415cb4fffffff,HN,4.6,19
+M0002,Quán Pizza & Mì Ý 002,Pizza & Mì Ý,8641436a7ffffff,HN,4.5,18
+M0003,Quán Pizza & Mì Ý 003,Pizza & Mì Ý,86415ca6fffffff,HN,4.2,21
+M0004,Quán Phở & Bún 004,Phở & Bún,86415ca67ffffff,HN,4.4,12
+M0005,Quán Phở & Bún 005,Phở & Bún,86415ca2fffffff,HN,4.7,10
+M0006,Quán Phở & Bún 006,Phở & Bún,86414379fffffff,HN,4.1,12
+M0007,Quán Trà sữa & Cà phê 007,Trà sữa & Cà phê,864143697ffffff,HN,4.0,9
+M0008,Quán Phở & Bún 008,Phở & Bún,86415cb5fffffff,HN,4.0,8
+M0009,Quán Món Nhật - Hàn 009,Món Nhật - Hàn,8641436a7ffffff,HN,4.0,18
+M0010,Quán Trà sữa & Cà phê 010,Trà sữa & Cà phê,864143687ffffff,HN,4.5,6
+M0011,Quán Bánh mì & Xôi 011,Bánh mì & Xôi,86415cb4fffffff,HN,4.5,5
+M0012,Quán Bánh mì & Xôi 012,Bánh mì & Xôi,86415cb67ffffff,HN,4.2,6
+M0013,Quán Bánh mì & Xôi 013,Bánh mì & Xôi,864143697ffffff,HN,4.4,5
+M0014,Quán Lẩu & Nướng 014,Lẩu & Nướng,864143697ffffff,HN,4.6,28
+M0015,Quán Phở & Bún 015,Phở & Bún,864143697ffffff,HN,4.2,11
+M0016,Quán Gà rán & Burger 016,Gà rán & Burger,86415cb5fffffff,HN,5.0,15
+M0017,Quán Món Nhật - Hàn 017,Món Nhật - Hàn,86415cb5fffffff,HN,4.4,16
+M0018,Quán Trà sữa & Cà phê 018,Trà sữa & Cà phê,864143687ffffff,HN,4.7,6
+M0019,Quán Cơm 019,Cơm,8641436a7ffffff,HN,4.9,14
+M0020,Quán Phở & Bún 020,Phở & Bún,86415cb4fffffff,HN,4.4,11
+M0021,Quán Cơm 021,Cơm,8641436a7ffffff,HN,4.0,11
+M0022,Quán Món Nhật - Hàn 022,Món Nhật - Hàn,86415cb67ffffff,HN,4.1,16
+M0023,Quán Gà rán & Burger 023,Gà rán & Burger,864143697ffffff,HN,4.1,16
+M0024,Quán Trà sữa & Cà phê 024,Trà sữa & Cà phê,8641436a7ffffff,HN,4.6,7
+M0025,Quán Món Nhật - Hàn 025,Món Nhật - Hàn,86415ca67ffffff,HN,4.5,15
+M0026,Quán Món Nhật - Hàn 026,Món Nhật - Hàn,86415cb77ffffff,HN,4.7,17
+M0027,Quán Cơm 027,Cơm,86415cb4fffffff,HN,4.4,10
+M0028,Quán Món Nhật - Hàn 028,Món Nhật - Hàn,86415cb5fffffff,HN,4.3,19
+M0029,Quán Gà rán & Burger 029,Gà rán & Burger,864143697ffffff,HN,4.4,17
+M0030,Quán Trà sữa & Cà phê 030,Trà sữa & Cà phê,86415cb5fffffff,HN,4.3,6
+M0031,Quán Ăn vặt 031,Ăn vặt,86415cb6fffffff,HN,3.8,10
+M0032,Quán Bánh mì & Xôi 032,Bánh mì & Xôi,8641436a7ffffff,HN,4.7,7
+M0033,Quán Bánh mì & Xôi 033,Bánh mì & Xôi,86414379fffffff,HN,4.3,5
+M0034,Quán Cơm 034,Cơm,86415cb67ffffff,HN,3.9,10
+M0035,Quán Cơm 035,Cơm,8641436a7ffffff,HN,4.5,12
+M0036,Quán Trà sữa & Cà phê 036,Trà sữa & Cà phê,86415cb77ffffff,HN,4.0,8
+M0037,Quán Phở & Bún 037,Phở & Bún,864143697ffffff,HN,4.6,11
+M0038,Quán Trà sữa & Cà phê 038,Trà sữa & Cà phê,864143697ffffff,HN,4.5,6
+M0039,Quán Món Nhật - Hàn 039,Món Nhật - Hàn,86415cb4fffffff,HN,4.4,18
+M0040,Quán Bánh mì & Xôi 040,Bánh mì & Xôi,86415cb5fffffff,HN,4.0,6
+M0041,Quán Món Nhật - Hàn 041,Món Nhật - Hàn,86415cb57ffffff,HN,4.3,14
+M0042,Quán Trà sữa & Cà phê 042,Trà sữa & Cà phê,86415cb6fffffff,HN,4.7,6
+M0043,Quán Phở & Bún 043,Phở & Bún,86415cb5fffffff,HN,4.9,12
+M0044,Quán Lẩu & Nướng 044,Lẩu & Nướng,86415cb6fffffff,HN,4.4,21
+M0045,Quán Bánh mì & Xôi 045,Bánh mì & Xôi,86415ca67ffffff,HN,4.2,7
+M0046,Quán Món Nhật - Hàn 046,Món Nhật - Hàn,86415cb5fffffff,HN,4.9,15
+M0047,Quán Trà sữa & Cà phê 047,Trà sữa & Cà phê,86415cb47ffffff,HN,4.3,9
+M0048,Quán Trà sữa & Cà phê 048,Trà sữa & Cà phê,86415cb47ffffff,HN,4.7,8
+M0049,Quán Phở & Bún 049,Phở & Bún,8641436b7ffffff,HN,4.7,11
+M0050,Quán Bánh mì & Xôi 050,Bánh mì & Xôi,86415ca2fffffff,HN,4.4,6
+M0051,Quán Cơm 051,Cơm,86415cb67ffffff,HN,4.6,10
+M0052,Quán Cơm 052,Cơm,86415ca67ffffff,HN,4.6,12
+M0053,Quán Phở & Bún 053,Phở & Bún,86415ca6fffffff,HN,4.5,12
+M0054,Quán Gà rán & Burger 054,Gà rán & Burger,86415ca67ffffff,HN,4.5,12
+M0055,Quán Gà rán & Burger 055,Gà rán & Burger,86414379fffffff,HN,3.7,14
+M0056,Quán Cơm 056,Cơm,8641436b7ffffff,HN,4.5,13
+M0057,Quán Cơm 057,Cơm,8641436b7ffffff,HN,4.5,13
+M0058,Quán Phở & Bún 058,Phở & Bún,86415cb5fffffff,HN,4.3,10
+M0059,Quán Ăn vặt 059,Ăn vặt,86415ca67ffffff,HN,4.2,8
+M0060,Quán Gà rán & Burger 060,Gà rán & Burger,864143697ffffff,HN,4.3,12
+M0061,Quán Phở & Bún 061,Phở & Bún,86415cb5fffffff,HN,3.9,9
+M0062,Quán Ăn vặt 062,Ăn vặt,86415ca67ffffff,HN,4.6,10
+M0063,Quán Món Nhật - Hàn 063,Món Nhật - Hàn,86415cb5fffffff,HN,4.8,18
+M0064,Quán Cơm 064,Cơm,86415cb6fffffff,HN,4.7,15
+M0065,Quán Cơm 065,Cơm,86415cb4fffffff,HN,4.0,14
+M0066,Quán Gà rán & Burger 066,Gà rán & Burger,86415cb4fffffff,HN,4.4,12
+M0067,Quán Phở & Bún 067,Phở & Bún,864143697ffffff,HN,4.6,12
+M0068,Quán Ăn vặt 068,Ăn vặt,86415cb6fffffff,HN,4.5,8
+M0069,Quán Cơm 069,Cơm,86415ca67ffffff,HN,4.3,10
+M0070,Quán Phở & Bún 070,Phở & Bún,8641436b7ffffff,HN,4.6,10
+M0071,Quán Lẩu & Nướng 071,Lẩu & Nướng,864143697ffffff,HN,4.7,30
+M0072,Quán Phở & Bún 072,Phở & Bún,86415ca67ffffff,HN,4.4,11
+M0073,Quán Món chay 073,Món chay,864143697ffffff,HN,4.5,14
+M0074,Quán Phở & Bún 074,Phở & Bún,86415cb4fffffff,HN,4.4,12
+M0075,Quán Món Nhật - Hàn 075,Món Nhật - Hàn,86415cb5fffffff,HN,4.5,14
+M0076,Quán Món Nhật - Hàn 076,Món Nhật - Hàn,86415cb5fffffff,HN,5.0,17
+M0077,Quán Cơm 077,Cơm,86415cb4fffffff,HN,4.2,15
+M0078,Quán Gà rán & Burger 078,Gà rán & Burger,86415cb5fffffff,HN,4.6,12
+M0079,Quán Gà rán & Burger 079,Gà rán & Burger,86415ca67ffffff,HN,4.4,15
+M0080,Quán Cơm 080,Cơm,86415cb4fffffff,HN,4.5,10
+M0081,Quán Phở & Bún 081,Phở & Bún,86415cb6fffffff,HN,4.5,9
+M0082,Quán Món Nhật - Hàn 082,Món Nhật - Hàn,86415cb5fffffff,HN,4.4,13
+M0083,Quán Cơm 083,Cơm,86414379fffffff,HN,4.8,11
+M0084,Quán Phở & Bún 084,Phở & Bún,86415cb4fffffff,HN,4.4,12
+M0085,Quán Bánh mì & Xôi 085,Bánh mì & Xôi,86415ca67ffffff,HN,4.3,6
+M0086,Quán Lẩu & Nướng 086,Lẩu & Nướng,86415cb47ffffff,HN,4.7,28
+M0087,Quán Món Nhật - Hàn 087,Món Nhật - Hàn,86415cb5fffffff,HN,3.9,18
+M0088,Quán Phở & Bún 088,Phở & Bún,86415cb5fffffff,HN,4.1,12
+M0089,Quán Món Nhật - Hàn 089,Món Nhật - Hàn,864143697ffffff,HN,4.8,13
+M0090,Quán Cơm 090,Cơm,86415cb6fffffff,HN,4.5,12
+M0091,Quán Cơm 091,Cơm,8641436a7ffffff,HN,4.4,12
+M0092,Quán Phở & Bún 092,Phở & Bún,86415cb5fffffff,HN,4.7,9
+M0093,Quán Cơm 093,Cơm,86415ca6fffffff,HN,4.4,11
+M0094,Quán Cơm 094,Cơm,86415cb6fffffff,HN,4.7,13
+M0095,Quán Trà sữa & Cà phê 095,Trà sữa & Cà phê,8641436a7ffffff,HN,4.5,9
+M0096,Quán Phở & Bún 096,Phở & Bún,86415cb47ffffff,HN,4.4,11
+M0097,Quán Món Nhật - Hàn 097,Món Nhật - Hàn,8641436a7ffffff,HN,4.5,13
+M0098,Quán Cơm 098,Cơm,86415cb5fffffff,HN,4.1,14
+M0099,Quán Ăn vặt 099,Ăn vặt,86415cb6fffffff,HN,4.5,10
+M0100,Quán Phở & Bún 100,Phở & Bún,86415cb6fffffff,HN,4.3,8
+M0101,Quán Trà sữa & Cà phê 101,Trà sữa & Cà phê,86415cb47ffffff,HN,4.0,7
+M0102,Quán Phở & Bún 102,Phở & Bún,86415cb4fffffff,HN,4.8,9
+M0103,Quán Bánh mì & Xôi 103,Bánh mì & Xôi,864143697ffffff,HN,4.1,7
+M0104,Quán Trà sữa & Cà phê 104,Trà sữa & Cà phê,86415cb4fffffff,HN,4.5,7
+M0105,Quán Phở & Bún 105,Phở & Bún,86415ca67ffffff,HN,4.8,9
+M0106,Quán Cơm 106,Cơm,864143697ffffff,HN,4.3,12
+M0107,Quán Bánh mì & Xôi 107,Bánh mì & Xôi,86415cb6fffffff,HN,4.6,5
+M0108,Quán Cơm 108,Cơm,86415cb47ffffff,HN,4.3,10
+M0109,Quán Phở & Bún 109,Phở & Bún,86415ca67ffffff,HN,4.4,12
+M0110,Quán Bánh mì & Xôi 110,Bánh mì & Xôi,86415cb47ffffff,HN,3.9,5
+M0111,Quán Pizza & Mì Ý 111,Pizza & Mì Ý,86415cb6fffffff,HN,4.5,17
+M0112,Quán Món chay 112,Món chay,864143697ffffff,HN,4.4,12
+M0113,Quán Trà sữa & Cà phê 113,Trà sữa & Cà phê,86415cb47ffffff,HN,4.7,6
+M0114,Quán Ăn vặt 114,Ăn vặt,8641436a7ffffff,HN,4.6,7
+M0115,Quán Bánh mì & Xôi 115,Bánh mì & Xôi,86415cb6fffffff,HN,3.9,6
+M0116,Quán Cơm 116,Cơm,864143697ffffff,HN,4.2,14
+M0117,Quán Pizza & Mì Ý 117,Pizza & Mì Ý,8641436a7ffffff,HN,3.9,21
+M0118,Quán Trà sữa & Cà phê 118,Trà sữa & Cà phê,86415ca6fffffff,HN,4.2,8
+M0119,Quán Ăn vặt 119,Ăn vặt,86415cb57ffffff,HN,4.5,10
+M0120,Quán Bánh mì & Xôi 120,Bánh mì & Xôi,864143697ffffff,HN,4.7,7
+M0121,Quán Trà sữa & Cà phê 121,Trà sữa & Cà phê,8641436b7ffffff,HN,4.5,8
+M0122,Quán Ăn vặt 122,Ăn vặt,86415cb4fffffff,HN,4.0,9
+M0123,Quán Ăn vặt 123,Ăn vặt,86415cb4fffffff,HN,4.4,8
+M0124,Quán Trà sữa & Cà phê 124,Trà sữa & Cà phê,86415cb6fffffff,HN,4.5,7
+M0125,Quán Cơm 125,Cơm,86415ca6fffffff,HN,4.0,15
+M0126,Quán Trà sữa & Cà phê 126,Trà sữa & Cà phê,86415cb4fffffff,HN,4.3,6
+M0127,Quán Phở & Bún 127,Phở & Bún,86415ca6fffffff,HN,4.3,12
+M0128,Quán Gà rán & Burger 128,Gà rán & Burger,86415cb67ffffff,HN,4.5,14
+M0129,Quán Trà sữa & Cà phê 129,Trà sữa & Cà phê,86415ca67ffffff,HN,4.6,7
+M0130,Quán Trà sữa & Cà phê 130,Trà sữa & Cà phê,86415ca6fffffff,HN,4.0,7
+M0131,Quán Lẩu & Nướng 131,Lẩu & Nướng,86415cb5fffffff,HN,4.4,26
+M0132,Quán Món Nhật - Hàn 132,Món Nhật - Hàn,8641436a7ffffff,HN,4.5,13
+M0133,Quán Phở & Bún 133,Phở & Bún,86415cb77ffffff,HN,4.4,11
+M0134,Quán Phở & Bún 134,Phở & Bún,86415cb5fffffff,HN,4.5,9
+M0135,Quán Phở & Bún 135,Phở & Bún,86415cb57ffffff,HN,4.4,12
+M0136,Quán Ăn vặt 136,Ăn vặt,86415cb5fffffff,HN,4.0,11
+M0137,Quán Bánh mì & Xôi 137,Bánh mì & Xôi,86415cb67ffffff,HN,4.0,7
+M0138,Quán Cơm 138,Cơm,864143697ffffff,HN,4.2,12
+M0139,Quán Bánh mì & Xôi 139,Bánh mì & Xôi,86415ca2fffffff,HN,4.8,5
+M0140,Quán Trà sữa & Cà phê 140,Trà sữa & Cà phê,86415ca67ffffff,HN,4.2,7
+M0141,Quán Phở & Bún 141,Phở & Bún,86415ca2fffffff,HN,4.0,11
+M0142,Quán Cơm 142,Cơm,86415cb6fffffff,HN,4.2,12
+M0143,Quán Món Nhật - Hàn 143,Món Nhật - Hàn,864143697ffffff,HN,3.9,13
+M0144,Quán Món chay 144,Món chay,86415cb4fffffff,HN,4.8,14
+M0145,Quán Trà sữa & Cà phê 145,Trà sữa & Cà phê,8641436b7ffffff,HN,4.2,8
+M0146,Quán Ăn vặt 146,Ăn vặt,86415ca77ffffff,HN,4.8,10
+M0147,Quán Món Nhật - Hàn 147,Món Nhật - Hàn,864143687ffffff,HN,4.9,15
+M0148,Quán Gà rán & Burger 148,Gà rán & Burger,86415cb5fffffff,HN,4.1,12
+M0149,Quán Trà sữa & Cà phê 149,Trà sữa & Cà phê,86415ca2fffffff,HN,4.4,8
+M0150,Quán Phở & Bún 150,Phở & Bún,86415ca6fffffff,HN,4.9,12
+M0151,Quán Pizza & Mì Ý 151,Pizza & Mì Ý,864143697ffffff,HN,4.4,24
+M0152,Quán Bánh mì & Xôi 152,Bánh mì & Xôi,86415cb6fffffff,HN,4.6,6
+M0153,Quán Cơm 153,Cơm,8641436a7ffffff,HN,4.0,15
+M0154,Quán Món chay 154,Món chay,86415cb4fffffff,HN,4.1,15
+M0155,Quán Bánh mì & Xôi 155,Bánh mì & Xôi,86415ca67ffffff,HN,3.7,7
+M0156,Quán Trà sữa & Cà phê 156,Trà sữa & Cà phê,86415ca6fffffff,HN,4.5,6
+M0157,Quán Gà rán & Burger 157,Gà rán & Burger,86415cb4fffffff,HN,4.3,12
+M0158,Quán Trà sữa & Cà phê 158,Trà sữa & Cà phê,864143697ffffff,HN,4.4,7
+M0159,Quán Trà sữa & Cà phê 159,Trà sữa & Cà phê,86415ca67ffffff,HN,4.3,8
+M0160,Quán Bánh mì & Xôi 160,Bánh mì & Xôi,86415cb47ffffff,HN,3.9,5
+M0161,Quán Ăn vặt 161,Ăn vặt,864143697ffffff,HN,4.5,9
+M0162,Quán Bánh mì & Xôi 162,Bánh mì & Xôi,86415cb6fffffff,HN,4.5,7
+M0163,Quán Gà rán & Burger 163,Gà rán & Burger,86415cb5fffffff,HN,4.7,15
+M0164,Quán Ăn vặt 164,Ăn vặt,864143697ffffff,HN,4.5,11
+M0165,Quán Cơm 165,Cơm,86415cb5fffffff,HN,4.6,11
+M0166,Quán Bánh mì & Xôi 166,Bánh mì & Xôi,86415cb6fffffff,HN,4.6,5
+M0167,Quán Ăn vặt 167,Ăn vặt,86415ca2fffffff,HN,4.8,10
+M0168,Quán Gà rán & Burger 168,Gà rán & Burger,86415ca47ffffff,HN,4.6,11
+M0169,Quán Pizza & Mì Ý 169,Pizza & Mì Ý,86415cb4fffffff,HN,3.6,24
+M0170,Quán Bánh mì & Xôi 170,Bánh mì & Xôi,86415cb6fffffff,HN,4.1,7
+M0171,Quán Gà rán & Burger 171,Gà rán & Burger,86415cb6fffffff,HN,4.7,17
+M0172,Quán Phở & Bún 172,Phở & Bún,86415ca67ffffff,HN,4.7,12
+M0173,Quán Món Nhật - Hàn 173,Món Nhật - Hàn,86415ca77ffffff,HN,4.4,16
+M0174,Quán Món Nhật - Hàn 174,Món Nhật - Hàn,86415cb77ffffff,HN,4.6,18
+M0175,Quán Cơm 175,Cơm,864143697ffffff,HN,4.6,10
+M0176,Quán Gà rán & Burger 176,Gà rán & Burger,86415ca67ffffff,HN,4.5,17
+M0177,Quán Gà rán & Burger 177,Gà rán & Burger,86415ca47ffffff,HN,4.3,12
+M0178,Quán Cơm 178,Cơm,864143697ffffff,HN,4.7,14
+M0179,Quán Ăn vặt 179,Ăn vặt,86415cb4fffffff,HN,4.5,8
+M0180,Quán Trà sữa & Cà phê 180,Trà sữa & Cà phê,86414369fffffff,HN,4.4,8
+M0181,Quán Gà rán & Burger 181,Gà rán & Burger,86415ca67ffffff,HN,4.3,15
+M0182,Quán Lẩu & Nướng 182,Lẩu & Nướng,86415ca6fffffff,HN,4.8,25
+M0183,Quán Cơm 183,Cơm,86415ca6fffffff,HN,4.5,10
+M0184,Quán Trà sữa & Cà phê 184,Trà sữa & Cà phê,86415ca2fffffff,HN,4.4,7
+M0185,Quán Cơm 185,Cơm,86415cb6fffffff,HN,4.4,13
+M0186,Quán Cơm 186,Cơm,8641436b7ffffff,HN,4.1,11
+M0187,Quán Phở & Bún 187,Phở & Bún,86415cb67ffffff,HN,5.0,9
+M0188,Quán Trà sữa & Cà phê 188,Trà sữa & Cà phê,86415cb47ffffff,HN,4.3,8
+M0189,Quán Lẩu & Nướng 189,Lẩu & Nướng,86415ca77ffffff,HN,4.5,31
+M0190,Quán Ăn vặt 190,Ăn vặt,86415cb47ffffff,HN,4.3,8
+M0191,Quán Gà rán & Burger 191,Gà rán & Burger,86415cb5fffffff,HN,3.8,13
+M0192,Quán Cơm 192,Cơm,86415ca47ffffff,HN,4.3,14
+M0193,Quán Phở & Bún 193,Phở & Bún,86415ca2fffffff,HN,4.5,10
+M0194,Quán Lẩu & Nướng 194,Lẩu & Nướng,86415cb5fffffff,HN,4.3,24
+M0195,Quán Phở & Bún 195,Phở & Bún,864143697ffffff,HN,4.3,12
+M0196,Quán Món Nhật - Hàn 196,Món Nhật - Hàn,864143697ffffff,HN,4.3,18
+M0197,Quán Phở & Bún 197,Phở & Bún,86415cb4fffffff,HN,4.5,9
+M0198,Quán Món Nhật - Hàn 198,Món Nhật - Hàn,86414369fffffff,HN,4.5,16
+M0199,Quán Cơm 199,Cơm,86415ca67ffffff,HN,3.8,10
+M0200,Quán Món chay 200,Món chay,86415cb5fffffff,HN,4.2,14
+M0201,Quán Trà sữa & Cà phê 201,Trà sữa & Cà phê,86415cb5fffffff,HN,4.7,7
+M0202,Quán Bánh mì & Xôi 202,Bánh mì & Xôi,864143697ffffff,HN,4.1,7
+M0203,Quán Lẩu & Nướng 203,Lẩu & Nướng,864143697ffffff,HN,4.0,28
+M0204,Quán Trà sữa & Cà phê 204,Trà sữa & Cà phê,86415ca6fffffff,HN,4.5,6
+M0205,Quán Ăn vặt 205,Ăn vặt,86415cb47ffffff,HN,4.4,10
+M0206,Quán Cơm 206,Cơm,86415cb4fffffff,HN,4.4,14
+M0207,Quán Cơm 207,Cơm,86415cb5fffffff,HN,4.3,15
+M0208,Quán Pizza & Mì Ý 208,Pizza & Mì Ý,86415cb6fffffff,HN,4.5,16
+M0209,Quán Món Nhật - Hàn 209,Món Nhật - Hàn,864143697ffffff,HN,4.9,14
+M0210,Quán Cơm 210,Cơm,864143697ffffff,HN,4.3,12
+M0211,Quán Lẩu & Nướng 211,Lẩu & Nướng,86415cb6fffffff,HN,3.7,30
+M0212,Quán Món Nhật - Hàn 212,Món Nhật - Hàn,86415cb6fffffff,HN,4.5,15
+M0213,Quán Lẩu & Nướng 213,Lẩu & Nướng,86415cb67ffffff,HN,4.4,31
+M0214,Quán Trà sữa & Cà phê 214,Trà sữa & Cà phê,86415cb67ffffff,HN,4.3,7
+M0215,Quán Bánh mì & Xôi 215,Bánh mì & Xôi,86415cb4fffffff,HN,3.7,6
+M0216,Quán Cơm 216,Cơm,86415cb4fffffff,HN,4.6,12
+M0217,Quán Món Nhật - Hàn 217,Món Nhật - Hàn,86414369fffffff,HN,4.6,16
+M0218,Quán Bánh mì & Xôi 218,Bánh mì & Xôi,86414369fffffff,HN,4.2,6
+M0219,Quán Món chay 219,Món chay,86415cb77ffffff,HN,4.5,13
+M0220,Quán Gà rán & Burger 220,Gà rán & Burger,86415ca6fffffff,HN,4.9,15
+M0221,Quán Cơm 221,Cơm,864143697ffffff,HN,4.0,10
+M0222,Quán Bánh mì & Xôi 222,Bánh mì & Xôi,86415cb5fffffff,HN,4.1,5
+M0223,Quán Trà sữa & Cà phê 223,Trà sữa & Cà phê,86415cb47ffffff,HN,5.0,6
+M0224,Quán Cơm 224,Cơm,86415cb5fffffff,HN,4.5,12
+M0225,Quán Trà sữa & Cà phê 225,Trà sữa & Cà phê,86415cb57ffffff,HN,4.2,8
+M0226,Quán Cơm 226,Cơm,86415cb5fffffff,HN,4.2,11
+M0227,Quán Trà sữa & Cà phê 227,Trà sữa & Cà phê,864143697ffffff,HN,4.2,7
+M0228,Quán Cơm 228,Cơm,8641436b7ffffff,HN,4.5,11
+M0229,Quán Món chay 229,Món chay,86415ca6fffffff,HN,3.8,11
+M0230,Quán Pizza & Mì Ý 230,Pizza & Mì Ý,86415cb67ffffff,HN,4.5,19
+M0231,Quán Cơm 231,Cơm,86415cb4fffffff,HN,5.0,14
+M0232,Quán Cơm 232,Cơm,86415ca67ffffff,HN,4.1,12
+M0233,Quán Món Nhật - Hàn 233,Món Nhật - Hàn,86415cb4fffffff,HN,4.5,20
+M0234,Quán Bánh mì & Xôi 234,Bánh mì & Xôi,8641436b7ffffff,HN,4.7,7
+M0235,Quán Cơm 235,Cơm,86414379fffffff,HN,4.5,10
+M0236,Quán Lẩu & Nướng 236,Lẩu & Nướng,86415cb4fffffff,HN,4.9,25
+M0237,Quán Cơm 237,Cơm,86415cb4fffffff,HN,4.4,10
+M0238,Quán Bánh mì & Xôi 238,Bánh mì & Xôi,86414379fffffff,HN,4.7,5
+M0239,Quán Pizza & Mì Ý 239,Pizza & Mì Ý,86415ca77ffffff,HN,4.1,19
+M0240,Quán Pizza & Mì Ý 240,Pizza & Mì Ý,86415cb5fffffff,HN,4.0,19
+M0241,Quán Cơm 241,Cơm,86415cb57ffffff,HN,4.8,13
+M0242,Quán Phở & Bún 242,Phở & Bún,86415cb4fffffff,HN,4.4,8
+M0243,Quán Gà rán & Burger 243,Gà rán & Burger,864143687ffffff,HN,5.0,13
+M0244,Quán Bánh mì & Xôi 244,Bánh mì & Xôi,86415cb4fffffff,HN,4.5,6
+M0245,Quán Trà sữa & Cà phê 245,Trà sữa & Cà phê,86415cb6fffffff,HN,4.7,6
+M0246,Quán Cơm 246,Cơm,86415ca67ffffff,HN,4.1,13
+M0247,Quán Gà rán & Burger 247,Gà rán & Burger,86415cb6fffffff,HN,4.2,12
+M0248,Quán Phở & Bún 248,Phở & Bún,864143687ffffff,HN,3.9,11
+M0249,Quán Bánh mì & Xôi 249,Bánh mì & Xôi,86415cb6fffffff,HN,4.4,7
+M0250,Quán Cơm 250,Cơm,86415cb67ffffff,HN,4.1,14
+M0251,Quán Món Nhật - Hàn 251,Món Nhật - Hàn,8641436a7ffffff,HN,4.7,16
+M0252,Quán Phở & Bún 252,Phở & Bún,86415cb5fffffff,HN,4.4,10
+M0253,Quán Món Nhật - Hàn 253,Món Nhật - Hàn,864143687ffffff,HN,4.7,15
+M0254,Quán Gà rán & Burger 254,Gà rán & Burger,86415ca67ffffff,HN,4.4,16
+M0255,Quán Cơm 255,Cơm,86415cb4fffffff,HN,4.4,15
+M0256,Quán Ăn vặt 256,Ăn vặt,86415cb6fffffff,HN,4.2,11
+M0257,Quán Bánh mì & Xôi 257,Bánh mì & Xôi,86415cb5fffffff,HN,5.0,7
+M0258,Quán Phở & Bún 258,Phở & Bún,86414379fffffff,HN,3.8,11
+M0259,Quán Trà sữa & Cà phê 259,Trà sữa & Cà phê,86415ca77ffffff,HN,4.4,7
+M0260,Quán Bánh mì & Xôi 260,Bánh mì & Xôi,86415cb5fffffff,HN,4.7,7
+M0261,Quán Trà sữa & Cà phê 261,Trà sữa & Cà phê,86415ca67ffffff,HN,5.0,8
+M0262,Quán Ăn vặt 262,Ăn vặt,86415cb4fffffff,HN,4.5,9
+M0263,Quán Phở & Bún 263,Phở & Bún,86415cb4fffffff,HN,4.4,12
+M0264,Quán Cơm 264,Cơm,86415cb47ffffff,HN,4.0,12
+M0265,Quán Món Nhật - Hàn 265,Món Nhật - Hàn,864143697ffffff,HN,5.0,18
+M0266,Quán Ăn vặt 266,Ăn vặt,86415cb77ffffff,HN,4.0,10
+M0267,Quán Cơm 267,Cơm,864143697ffffff,HN,4.8,14
+M0268,Quán Lẩu & Nướng 268,Lẩu & Nướng,86415cb67ffffff,HN,3.5,28
+M0269,Quán Phở & Bún 269,Phở & Bún,86415cb5fffffff,HN,4.1,10
+M0270,Quán Pizza & Mì Ý 270,Pizza & Mì Ý,86415ca67ffffff,HN,4.3,20
+M0271,Quán Gà rán & Burger 271,Gà rán & Burger,8641436b7ffffff,HN,4.6,12
+M0272,Quán Trà sữa & Cà phê 272,Trà sữa & Cà phê,86415ca67ffffff,HN,4.7,7
+M0273,Quán Pizza & Mì Ý 273,Pizza & Mì Ý,8641436a7ffffff,HN,4.2,23
+M0274,Quán Gà rán & Burger 274,Gà rán & Burger,86415cb6fffffff,HN,4.5,17
+M0275,Quán Trà sữa & Cà phê 275,Trà sữa & Cà phê,86415cb5fffffff,HN,4.8,6
+M0276,Quán Trà sữa & Cà phê 276,Trà sữa & Cà phê,86414369fffffff,HN,4.9,6
+M0277,Quán Lẩu & Nướng 277,Lẩu & Nướng,86415ca6fffffff,HN,5.0,25
+M0278,Quán Món Nhật - Hàn 278,Món Nhật - Hàn,864143697ffffff,HN,4.5,18
+M0279,Quán Phở & Bún 279,Phở & Bún,86415cb57ffffff,HN,4.9,11
+M0280,Quán Ăn vặt 280,Ăn vặt,86415ca67ffffff,HN,4.4,9
+M0281,Quán Gà rán & Burger 281,Gà rán & Burger,86415ca6fffffff,HN,4.3,13
+M0282,Quán Gà rán & Burger 282,Gà rán & Burger,8641436a7ffffff,HN,4.9,13
+M0283,Quán Gà rán & Burger 283,Gà rán & Burger,86415cb57ffffff,HN,4.3,11
+M0284,Quán Lẩu & Nướng 284,Lẩu & Nướng,86415cb4fffffff,HN,4.2,29
+M0285,Quán Phở & Bún 285,Phở & Bún,86415ca67ffffff,HN,4.3,11
+M0286,Quán Phở & Bún 286,Phở & Bún,86415ca2fffffff,HN,4.5,8
+M0287,Quán Pizza & Mì Ý 287,Pizza & Mì Ý,86415ca77ffffff,HN,3.9,23
+M0288,Quán Ăn vặt 288,Ăn vặt,86415ca67ffffff,HN,4.1,10
+M0289,Quán Món Nhật - Hàn 289,Món Nhật - Hàn,86415cb6fffffff,HN,5.0,16
+M0290,Quán Cơm 290,Cơm,86415ca47ffffff,HN,3.9,14
+M0291,Quán Pizza & Mì Ý 291,Pizza & Mì Ý,86415cb5fffffff,HN,4.8,18
+M0292,Quán Gà rán & Burger 292,Gà rán & Burger,86415cb6fffffff,HN,4.3,13
+M0293,Quán Lẩu & Nướng 293,Lẩu & Nướng,86415cb5fffffff,HN,4.4,28
+M0294,Quán Lẩu & Nướng 294,Lẩu & Nướng,86415cb5fffffff,HN,5.0,22
+M0295,Quán Pizza & Mì Ý 295,Pizza & Mì Ý,86415cb5fffffff,HN,5.0,21
+M0296,Quán Phở & Bún 296,Phở & Bún,86415cb57ffffff,HN,4.4,8
+M0297,Quán Món chay 297,Món chay,86415cb47ffffff,HN,4.4,14
+M0298,Quán Phở & Bún 298,Phở & Bún,86415ca6fffffff,HN,4.5,12
+M0299,Quán Trà sữa & Cà phê 299,Trà sữa & Cà phê,86415cb6fffffff,HN,4.4,9
+M0300,Quán Lẩu & Nướng 300,Lẩu & Nướng,86414369fffffff,HN,4.4,30
+M0301,Quán Phở & Bún 301,Phở & Bún,864143687ffffff,HN,4.7,10
+M0302,Quán Bánh mì & Xôi 302,Bánh mì & Xôi,864143697ffffff,HN,4.8,6
+M0303,Quán Cơm 303,Cơm,86415ca67ffffff,HN,4.5,11
+M0304,Quán Trà sữa & Cà phê 304,Trà sữa & Cà phê,8641436b7ffffff,HN,4.4,6
+M0305,Quán Bánh mì & Xôi 305,Bánh mì & Xôi,864143697ffffff,HN,4.0,6
+M0306,Quán Phở & Bún 306,Phở & Bún,86415cb5fffffff,HN,3.7,11
+M0307,Quán Pizza & Mì Ý 307,Pizza & Mì Ý,86415cb5fffffff,HN,4.7,20
+M0308,Quán Trà sữa & Cà phê 308,Trà sữa & Cà phê,86415cb5fffffff,HN,4.5,7
+M0309,Quán Cơm 309,Cơm,8641436a7ffffff,HN,4.3,12
+M0310,Quán Pizza & Mì Ý 310,Pizza & Mì Ý,864143697ffffff,HN,4.2,20
+M0311,Quán Trà sữa & Cà phê 311,Trà sữa & Cà phê,8641436a7ffffff,HN,4.0,7
+M0312,Quán Phở & Bún 312,Phở & Bún,86415ca47ffffff,HN,4.6,9
+M0313,Quán Phở & Bún 313,Phở & Bún,86415cb4fffffff,HN,4.3,10
+M0314,Quán Ăn vặt 314,Ăn vặt,86415ca6fffffff,HN,4.6,11
+M0315,Quán Phở & Bún 315,Phở & Bún,86415cb67ffffff,HN,4.5,11
+M0316,Quán Gà rán & Burger 316,Gà rán & Burger,864143697ffffff,HN,4.4,13
+M0317,Quán Cơm 317,Cơm,86415ca67ffffff,HN,4.7,13
+M0318,Quán Món Nhật - Hàn 318,Món Nhật - Hàn,86414379fffffff,HN,3.8,16
+M0319,Quán Bánh mì & Xôi 319,Bánh mì & Xôi,86415ca47ffffff,HN,4.3,5
+M0320,Quán Gà rán & Burger 320,Gà rán & Burger,86415cb6fffffff,HN,3.9,15
+M0321,Quán Trà sữa & Cà phê 321,Trà sữa & Cà phê,86414369fffffff,HN,5.0,8
+M0322,Quán Gà rán & Burger 322,Gà rán & Burger,86415cb77ffffff,HN,4.3,15
+M0323,Quán Cơm 323,Cơm,86415cb6fffffff,HN,4.3,11
+M0324,Quán Phở & Bún 324,Phở & Bún,86415cb6fffffff,HN,4.3,9
+M0325,Quán Pizza & Mì Ý 325,Pizza & Mì Ý,86415cb4fffffff,HN,4.8,19
+M0326,Quán Trà sữa & Cà phê 326,Trà sữa & Cà phê,86415ca6fffffff,HN,4.4,6
+M0327,Quán Trà sữa & Cà phê 327,Trà sữa & Cà phê,86415ca67ffffff,HN,4.3,6
+M0328,Quán Ăn vặt 328,Ăn vặt,86415cb4fffffff,HN,4.6,8
+M0329,Quán Món Nhật - Hàn 329,Món Nhật - Hàn,864143697ffffff,HN,4.6,19
+M0330,Quán Món Nhật - Hàn 330,Món Nhật - Hàn,864143697ffffff,HN,4.5,16
+M0331,Quán Bánh mì & Xôi 331,Bánh mì & Xôi,86414379fffffff,HN,3.4,7
+M0332,Quán Trà sữa & Cà phê 332,Trà sữa & Cà phê,86415cb4fffffff,HN,4.4,8
+M0333,Quán Pizza & Mì Ý 333,Pizza & Mì Ý,86415cb5fffffff,HN,5.0,23
+M0334,Quán Trà sữa & Cà phê 334,Trà sữa & Cà phê,864143697ffffff,HN,4.9,7
+M0335,Quán Cơm 335,Cơm,86415cb6fffffff,HN,4.3,12
+M0336,Quán Gà rán & Burger 336,Gà rán & Burger,86415ca67ffffff,HN,4.4,17
+M0337,Quán Gà rán & Burger 337,Gà rán & Burger,864143697ffffff,HN,4.6,16
+M0338,Quán Phở & Bún 338,Phở & Bún,86415ca67ffffff,HN,4.7,11
+M0339,Quán Cơm 339,Cơm,86415cb47ffffff,HN,4.3,11
+M0340,Quán Gà rán & Burger 340,Gà rán & Burger,86415cb4fffffff,HN,4.2,17
+M0341,Quán Món Nhật - Hàn 341,Món Nhật - Hàn,86415cb5fffffff,HN,4.3,18
+M0342,Quán Trà sữa & Cà phê 342,Trà sữa & Cà phê,86415ca2fffffff,HN,3.9,8
+M0343,Quán Cơm 343,Cơm,86415ca67ffffff,HN,4.2,12
+M0344,Quán Phở & Bún 344,Phở & Bún,864143697ffffff,HN,4.3,9
+M0345,Quán Món Nhật - Hàn 345,Món Nhật - Hàn,86415cb5fffffff,HN,4.2,16
+M0346,Quán Bánh mì & Xôi 346,Bánh mì & Xôi,8641436a7ffffff,HN,4.7,5
+M0347,Quán Món Nhật - Hàn 347,Món Nhật - Hàn,86415cb47ffffff,HN,4.3,19
+M0348,Quán Pizza & Mì Ý 348,Pizza & Mì Ý,86415cb6fffffff,HN,4.8,21
+M0349,Quán Trà sữa & Cà phê 349,Trà sữa & Cà phê,86415ca67ffffff,HN,4.4,8
+M0350,Quán Phở & Bún 350,Phở & Bún,8641436b7ffffff,HN,4.6,12
+M0351,Quán Bánh mì & Xôi 351,Bánh mì & Xôi,86415cb5fffffff,HN,4.3,7
+M0352,Quán Ăn vặt 352,Ăn vặt,86415cb5fffffff,HN,4.6,8
+M0353,Quán Cơm 353,Cơm,86415cb4fffffff,HN,4.3,15
+M0354,Quán Lẩu & Nướng 354,Lẩu & Nướng,864143697ffffff,HN,4.5,21
+M0355,Quán Trà sữa & Cà phê 355,Trà sữa & Cà phê,86415cb6fffffff,HN,4.1,7
+M0356,Quán Ăn vặt 356,Ăn vặt,86415cb5fffffff,HN,4.6,9
+M0357,Quán Phở & Bún 357,Phở & Bún,86415cb6fffffff,HN,4.3,12
+M0358,Quán Cơm 358,Cơm,86415ca67ffffff,HN,4.5,11
+M0359,Quán Ăn vặt 359,Ăn vặt,86415ca67ffffff,HN,4.6,9
+M0360,Quán Ăn vặt 360,Ăn vặt,86415ca6fffffff,HN,4.6,9
+M0361,Quán Gà rán & Burger 361,Gà rán & Burger,86415cb67ffffff,HN,4.3,14
+M0362,Quán Gà rán & Burger 362,Gà rán & Burger,864143697ffffff,HN,4.7,12
+M0363,Quán Cơm 363,Cơm,86415cb6fffffff,HN,4.8,11
+M0364,Quán Gà rán & Burger 364,Gà rán & Burger,86415ca2fffffff,HN,4.9,14
+M0365,Quán Ăn vặt 365,Ăn vặt,86415cb5fffffff,HN,4.8,9
+M0366,Quán Món chay 366,Món chay,86415ca67ffffff,HN,4.1,12
+M0367,Quán Pizza & Mì Ý 367,Pizza & Mì Ý,86415cb4fffffff,HN,4.1,20
+M0368,Quán Cơm 368,Cơm,86415cb4fffffff,HN,4.3,10
+M0369,Quán Ăn vặt 369,Ăn vặt,86415ca67ffffff,HN,4.0,9
+M0370,Quán Phở & Bún 370,Phở & Bún,864143697ffffff,HN,4.0,10
+M0371,Quán Lẩu & Nướng 371,Lẩu & Nướng,86414369fffffff,HN,4.0,26
+M0372,Quán Ăn vặt 372,Ăn vặt,864143687ffffff,HN,4.3,10
+M0373,Quán Pizza & Mì Ý 373,Pizza & Mì Ý,86415cb6fffffff,HN,4.8,17
+M0374,Quán Phở & Bún 374,Phở & Bún,864143697ffffff,HN,3.9,12
+M0375,Quán Trà sữa & Cà phê 375,Trà sữa & Cà phê,86415cb67ffffff,HN,4.4,6
+M0376,Quán Gà rán & Burger 376,Gà rán & Burger,86415ca67ffffff,HN,4.4,16
+M0377,Quán Ăn vặt 377,Ăn vặt,86415cb6fffffff,HN,4.0,9
+M0378,Quán Phở & Bún 378,Phở & Bún,86415cb6fffffff,HN,4.5,12
+M0379,Quán Cơm 379,Cơm,864143697ffffff,HN,4.3,14
+M0380,Quán Bánh mì & Xôi 380,Bánh mì & Xôi,86415ca47ffffff,HN,4.7,7
+M0381,Quán Phở & Bún 381,Phở & Bún,86415ca6fffffff,HN,5.0,8
+M0382,Quán Món Nhật - Hàn 382,Món Nhật - Hàn,864143687ffffff,HN,4.2,18
+M0383,Quán Ăn vặt 383,Ăn vặt,864143697ffffff,HN,3.8,8
+M0384,Quán Bánh mì & Xôi 384,Bánh mì & Xôi,86415cb5fffffff,HN,3.8,7
+M0385,Quán Cơm 385,Cơm,86415ca6fffffff,HN,4.9,12
+M0386,Quán Phở & Bún 386,Phở & Bún,8641436b7ffffff,HN,4.2,9
+M0387,Quán Phở & Bún 387,Phở & Bún,8641436b7ffffff,HN,4.6,9
+M0388,Quán Trà sữa & Cà phê 388,Trà sữa & Cà phê,86415cb4fffffff,HN,4.3,7
+M0389,Quán Pizza & Mì Ý 389,Pizza & Mì Ý,86415cb6fffffff,HN,4.1,19
+M0390,Quán Bánh mì & Xôi 390,Bánh mì & Xôi,864143697ffffff,HN,4.5,5
+M0391,Quán Lẩu & Nướng 391,Lẩu & Nướng,86415ca67ffffff,HN,4.0,23
+M0392,Quán Trà sữa & Cà phê 392,Trà sữa & Cà phê,86415ca67ffffff,HN,4.6,8
+M0393,Quán Món chay 393,Món chay,86415cb6fffffff,HN,4.4,12
+M0394,Quán Cơm 394,Cơm,86414369fffffff,HN,4.1,10
+M0395,Quán Pizza & Mì Ý 395,Pizza & Mì Ý,86415cb5fffffff,HN,4.3,20
+M0396,Quán Món chay 396,Món chay,86415cb5fffffff,HN,4.3,11
+M0397,Quán Trà sữa & Cà phê 397,Trà sữa & Cà phê,8641436a7ffffff,HN,4.1,6
+M0398,Quán Món Nhật - Hàn 398,Món Nhật - Hàn,86415cb5fffffff,HN,4.3,17
+M0399,Quán Ăn vặt 399,Ăn vặt,86415cb5fffffff,HN,4.8,10
+M0400,Quán Trà sữa & Cà phê 400,Trà sữa & Cà phê,86415cb67ffffff,HN,4.4,7

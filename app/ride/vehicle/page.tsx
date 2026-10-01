@@ -31,7 +31,7 @@ const ICONS: Record<Vehicle['type'], IconName> = { bike: 'bike', car: 'car' };
 export default function VehiclePage() {
   const { ride } = useApp();
   return (
-    <FlowGuard ready={Boolean(ride.destination)} fallback="/">
+    <FlowGuard ready={Boolean(ride.destination)} fallback="/ride/address">
       <VehicleContent />
     </FlowGuard>
   );
@@ -99,24 +99,26 @@ function VehicleContent() {
             <button
               type="button"
               onClick={() => selectVehicle(vehicle.id, vehicle.type, fare)}
-              className={`flex w-full items-center gap-lg rounded-md bg-canvas-soft p-lg text-left text-ink transition-colors hover:bg-surface-pressed ${
+              className={`grid w-full grid-cols-[auto_minmax(0,1fr)] items-start gap-md rounded-md bg-canvas-soft p-lg text-left text-ink transition-colors hover:bg-surface-pressed sm:flex sm:items-center sm:gap-lg ${
                 vehicle.id === ride.vehicleId ? 'ring-2 ring-primary' : ''
               }`}
             >
               {/* O vuong chua phuong tien, giong o chon Taxi/San bay trong anh mau. */}
-              <span className="grid size-14 shrink-0 place-items-center rounded-xl bg-canvas text-primary-dark">
+              <span className="col-start-1 row-start-1 grid size-11 shrink-0 place-items-center rounded-xl bg-canvas text-primary-dark sm:size-14">
                 <Icon name={ICONS[vehicle.type]} size={28} />
               </span>
 
-              <span className="min-w-0 flex-1">
-                <span className="t-body-md-strong block">{vehicle.name}</span>
-                <span className="t-body-sm mt-xxs block text-body">{vehicle.description}</span>
-                <span className="t-caption mt-xxs block text-mute">
+              <span className="order-3 col-span-2 row-start-2 min-w-0 sm:order-2 sm:col-auto sm:row-auto sm:flex-1">
+                <span className="t-body-md-strong block break-words">{vehicle.name}</span>
+                <span className="t-body-sm mt-xxs block break-words text-body">{vehicle.description}</span>
+                <span className="t-caption mt-xxs block break-words text-mute">
                   Đón trong {vehicle.etaMinutes} phút · {vehicle.seats} chỗ
                 </span>
               </span>
 
-              <span className="t-body-md-strong shrink-0">{formatVnd(fare)}</span>
+              <span className="order-2 col-start-2 row-start-1 justify-self-end text-right break-words sm:order-3">
+                {formatVnd(fare)}
+              </span>
             </button>
           </li>
           );
@@ -128,9 +130,9 @@ function VehicleContent() {
         <span className="grid size-11 shrink-0 place-items-center rounded-full bg-canvas text-primary-dark">
           <Icon name="bolt" size={22} />
         </span>
-        <span>
-          <span className="t-body-md-strong block">Boost</span>
-          <span className="t-body-sm mt-xxs block text-body">Tăng phí để có xe nhanh hơn</span>
+        <span className="min-w-0">
+          <span className="t-body-md-strong block break-words">Boost</span>
+          <span className="t-body-sm mt-xxs block break-words text-body">Tăng phí để có xe nhanh hơn</span>
         </span>
       </div>
 

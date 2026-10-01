@@ -42,16 +42,26 @@ export function getSessionId(): string {
 }
 
 /**
- * Ben qua nhieu session, nhieu ngay — de phan biet nguoi dung quay lai.
+ * So dien thoai da dang nhap (E.164, vd `+84912345678`) — chinh la `user_id`.
+ *
+ * Chi la BAN SAO de giao dien hien thi / loc /history: nguon that la cookie
+ * httpOnly `gsm_auth`, va POST /api/events ghi de `user_id` bang cookie do.
+ * Chua dang nhap thi tra chuoi rong — KHONG con sinh `mock-user-*` nua.
  */
 export function getUserId(): string {
   if (!isBrowser()) return '';
-  let id = localStorage.getItem(USER_KEY);
-  if (!id) {
-    id = `mock-user-${crypto.randomUUID().slice(0, 8)}`;
-    localStorage.setItem(USER_KEY, id);
-  }
-  return id;
+  return localStorage.getItem(USER_KEY) ?? '';
+}
+
+export function setUserId(phone: string): void {
+  if (!isBrowser()) return;
+  localStorage.setItem(USER_KEY, phone);
+}
+
+/** Goi khi dang xuat hoac khi cookie khong con hop le. */
+export function clearUser(): void {
+  if (!isBrowser()) return;
+  localStorage.removeItem(USER_KEY);
 }
 
 /**

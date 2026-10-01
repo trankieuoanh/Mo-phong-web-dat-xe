@@ -43,7 +43,10 @@ lib/server/                         ← không phụ thuộc HTTP. Mọi file `i
 │  ├─ overpass.service.ts           Overpass: quán ăn thật theo bán kính
 │  ├─ route.service.ts              OSRM: gọi + chuẩn hoá geometry sang [lat,lon]
 │  ├─ tiles.service.ts              dò tile biển sâu để phát hiện watermark API key
-│  └─ upstream.ts                   hàng đợi + cache, DÙNG CHUNG cho các cái trên
+│  ├─ upstream.ts                   hàng đợi + cache, DÙNG CHUNG cho các cái trên
+│  ├─ query-cache.ts                cache TTL + single-flight + trả bản cũ khi lỗi (đọc Firestore)
+│  ├─ events-cache.ts               instance cache của GET /api/events (TTL 5 phút, đối chiếu 24h) + bộ đếm cho /api/health
+│  └─ events-sync.ts                đồng bộ tăng dần theo created_at + đối chiếu count() — không import firebase-admin
 └─ db/
    └─ firebase-admin.ts             getDb() — khởi tạo trễ
 
@@ -185,6 +188,13 @@ Hai điểm thiết kế:
 - **Danh sách hợp lệ nhập từ `lib/shared`**, không gõ lại: `isEventName`, `isFlowValue`, `isScreenName`. Đây là lý do danh sách `event_name`/`screen_name` ở FE và BE **không thể lệch nhau** — thêm một event chỉ phải sửa một chỗ.
 
 Trả về kiểu union `{ ok: true, value } | { ok: false, error }` nên TypeScript ép route phải xử lý nhánh lỗi trước khi chạm `value`.
+
+### Đăng nhập: `services/otp.service.ts`, `auth-token.ts`, `sms.service.ts`
+
+- `otp.service.ts` — **không dùng Firestore** (hết quota thì vẫn đăng nhập được). `sendCode` sinh mã bằng `crypto.randomInt`, trả thử thách đã ký HMAC `{phone, hash(mã), hết hạn, nonce}` để route đặt vào cookie httpOnly `gsm_otp` (path `/api/auth`). `verifyCode` kiểm cookie đó. Cooldown 60s và đếm 5 lần sai nằm trong bộ nhớ tiến trình (best effort).
+- `user.service.ts` — `recordLogin` ghi `users/{phone}` **best effort**: Firestore lỗi thì chỉ log, không chặn đăng nhập.
+- `auth-token.ts` — ký / kiểm cookie `gsm_auth` bằng HMAC-SHA256 (`AUTH_SECRET`). `readAuth(request)` là thứ `POST /api/events` gọi để lấy `user_id`.
+- `sms.service.ts` — interface `SmsSender`. Đổi mock → SMS thật = thêm một sender dùng `fetch` + đổi `SMS_PROVIDER`; không route nào phải sửa.
 
 ### `services/event.service.ts` (53 dòng)
 ```ts

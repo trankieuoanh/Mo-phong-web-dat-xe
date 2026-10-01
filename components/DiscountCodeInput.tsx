@@ -63,7 +63,7 @@ export function DiscountCodeInput({
 
   return (
     <>
-      <div className="flex items-center gap-md">
+      <div className="flex flex-col items-stretch gap-md sm:flex-row sm:items-center">
         {/* text-input — tailwind-theme.md muc 4 */}
         <input
           type="text"
@@ -77,13 +77,18 @@ export function DiscountCodeInput({
           }}
           placeholder={placeholder}
           aria-label="Mã ưu đãi"
-          className="t-body-md min-w-0 flex-1 rounded-md bg-canvas-soft p-lg text-ink outline-none placeholder:text-mute"
+          className="t-body-md w-full min-w-0 flex-1 rounded-md bg-canvas-soft p-lg text-ink outline-none placeholder:text-mute"
         />
-        <PrimaryButton variant="subtle" fullWidth={false} onClick={apply}>
+        <PrimaryButton
+          variant="subtle"
+          fullWidth={false}
+          onClick={apply}
+          className="w-full sm:w-auto"
+        >
           Áp dụng
         </PrimaryButton>
       </div>
-      {error ? <p className="t-caption mt-xs text-mute">{error}</p> : null}
+      {error ? <p className="t-caption mt-xs break-words text-mute">{error}</p> : null}
     </>
   );
 }

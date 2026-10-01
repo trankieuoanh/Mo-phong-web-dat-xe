@@ -38,6 +38,52 @@ let previousScreen: ScreenName | null = null;
  */
 let currentScreen: ScreenName | null = null;
 
+const SELECTED_FLOWS_KEY_PREFIX = 'gsm_selected_flows:';
+const selectedFlowsInMemory = new Map<string, Set<Flow>>();
+
+function selectedFlowsKey(sessionId: string): string {
+  return `${SELECTED_FLOWS_KEY_PREFIX}${sessionId}`;
+}
+
+function selectedFlowsFor(sessionId: string): Set<Flow> {
+  const selected = new Set<Flow>(selectedFlowsInMemory.get(sessionId));
+
+  if (typeof window !== 'undefined') {
+    try {
+      const stored: unknown = JSON.parse(
+        window.sessionStorage.getItem(selectedFlowsKey(sessionId)) ?? '[]',
+      );
+
+      if (Array.isArray(stored)) {
+        for (const flow of stored) {
+          if (flow === 'ride' || flow === 'food') selected.add(flow);
+        }
+      }
+    } catch {}
+  }
+
+  selectedFlowsInMemory.set(sessionId, selected);
+  return selected;
+}
+
+function markSelectedFlow(sessionId: string, flow: Flow): void {
+  const selected = selectedFlowsFor(sessionId);
+  selected.add(flow);
+
+  if (typeof window !== 'undefined') {
+    try {
+      window.sessionStorage.setItem(
+        selectedFlowsKey(sessionId),
+        JSON.stringify(Array.from(selected)),
+      );
+    } catch {}
+  }
+}
+
+function hasSelectedFlow(sessionId: string, flow: Flow): boolean {
+  return selectedFlowsFor(sessionId).has(flow);
+}
+
 /** Goi khi reset session — man ke tiep phai co previous_screen = null. */
 export function resetPreviousScreen(): void {
   previousScreen = null;
@@ -123,6 +169,7 @@ export type FlowEntryScreen = Extract<ScreenName, 'home' | 'address_selection' |
  * khong co trieu chung tren UI.
  */
 export function trackSelectFlow(screenName: FlowEntryScreen, flow: Flow): void {
+  markSelectedFlow(getSessionId(), flow);
   trackEvent({
     eventName: 'select_flow',
     screenName,
@@ -130,6 +177,12 @@ export function trackSelectFlow(screenName: FlowEntryScreen, flow: Flow): void {
     stepIndex: SELECT_FLOW_STEP_INDEX,
     properties: { flow_chosen: flow },
   });
+}
+
+function trackScreenView(screenName: ScreenName): void {
+  previousScreen = currentScreen;
+  currentScreen = screenName;
+  trackEvent({ eventName: 'screen_view', screenName });
 }
 
 /**
@@ -150,9 +203,39 @@ export function useScreenView(screenName: ScreenName): void {
     // man nay tro thanh `currentScreen`. Nho vay `screen_view` VA moi event
     // hanh dong bat sau do tren cung man deu mang cung mot `previous_screen`
     // — dung quy tac o event-taxonomy.md muc 1.
-    previousScreen = currentScreen;
-    currentScreen = screenName;
+    trackScreenView(screenName);
+  }, [screenName]);
+}
 
-    trackEvent({ eventName: 'screen_view', screenName });
+export function useFlowEntryView(
+  screenName: Exclude<FlowEntryScreen, 'home'>,
+): void {
+  const hasFired = useRef(false);
+
+  useEffect(() => {
+    if (hasFired.current) return;
+    hasFired.current = true;
+
+    const flow = SCREENS[screenName].flow;
+    if (flow === 'none') {
+      throw new Error('Flow entry screen phai thuoc mot funnel');
+    }
+
+    const sessionId = getSessionId();
+    if (!hasSelectedFlow(sessionId, flow)) {
+      markSelectedFlow(sessionId, flow);
+      trackEvent({
+        eventName: 'select_flow',
+        screenName,
+        flow,
+        stepIndex: SCREENS.home.stepIndex,
+        properties: {
+          flow_chosen: flow,
+          entry_source: 'direct_url',
+        },
+      });
+    }
+
+    trackScreenView(screenName);
   }, [screenName]);
 }

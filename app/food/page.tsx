@@ -59,7 +59,7 @@ import { useApp } from '@/lib/app-context';
 import { formatVnd } from '@/lib/format';
 import { useCurrentPlace } from '@/lib/use-current-place';
 import { useRestaurants } from '@/lib/use-restaurants';
-import { trackAddToCart, trackEvent, useScreenView } from '@/lib/track';
+import { trackAddToCart, trackEvent, useFlowEntryView } from '@/lib/track';
 
 /**
  * Bon bo loc gom vao MOT state thay vi bon state roi rac — nho vay khong bao gio
@@ -131,7 +131,7 @@ function sourceOf(filter: Filter): DiscoverySource {
 }
 
 export default function FoodMenuPage() {
-  useScreenView('food_menu');
+  useFlowEntryView('food_menu');
   const router = useRouter();
   const { cart, addToCart, food, setFood } = useApp();
   const toast = useToast();
@@ -361,7 +361,7 @@ export default function FoodMenuPage() {
           <button
             type="button"
             onClick={() => setPickingOrigin(false)}
-            className="t-body-sm-strong rounded-pill bg-canvas-soft px-lg py-sm text-ink transition-colors hover:bg-surface-pressed"
+            className="t-body-sm-strong min-h-11 rounded-pill bg-canvas-soft px-lg py-sm text-ink transition-colors hover:bg-surface-pressed"
           >
             Huỷ
           </button>
@@ -382,7 +382,11 @@ export default function FoodMenuPage() {
     <ScreenShell
       {...shell}
       title="Đặt đồ ăn"
-      leading={<BackButton from="food_menu" to="home" href="/" />}
+      leading={
+        <span className="[&_button]:size-11">
+          <BackButton from="food_menu" to="home" href="/" />
+        </span>
+      }
       footer={
         totals.itemCount > 0 ? (
           <PrimaryButton onClick={() => router.push('/food/cart')}>
@@ -391,8 +395,9 @@ export default function FoodMenuPage() {
         ) : undefined
       }
     >
+      <div className="flex flex-col">
       {/* Giao tới — Pattern I cua /ride/pickup. */}
-      <div className="flex items-center gap-lg rounded-xl bg-canvas-soft p-lg">
+      <div className="order-1 flex items-center gap-lg rounded-xl bg-canvas-soft p-lg">
         <span className="grid size-11 shrink-0 place-items-center rounded-full bg-canvas text-primary-dark">
           <Icon name="pin" size={22} />
         </span>
@@ -410,14 +415,14 @@ export default function FoodMenuPage() {
         <button
           type="button"
           onClick={() => setPickingOrigin(true)}
-          className="t-body-sm-strong shrink-0 rounded-pill bg-canvas px-lg py-sm text-primary-dark transition-colors hover:bg-surface-pressed"
+          className="t-body-sm-strong min-h-11 shrink-0 rounded-pill bg-canvas px-lg py-sm text-primary-dark transition-colors hover:bg-surface-pressed"
         >
           Đổi
         </button>
       </div>
 
       {/* Ô tìm — cùng thủ pháp với PlacePicker (text-input, tailwind-theme.md mục 4). */}
-      <div className="mt-lg flex items-center gap-md rounded-md bg-canvas-soft p-lg">
+      <div className="order-2 mt-lg flex items-center gap-md rounded-md bg-canvas-soft p-lg">
         <Icon name="search" size={20} className="text-body" />
         <input
           type="text"
@@ -432,7 +437,7 @@ export default function FoodMenuPage() {
             type="button"
             aria-label="Xoá ô tìm"
             onClick={() => changeQuery('')}
-            className="grid size-6 shrink-0 place-items-center rounded-full bg-canvas text-body hover:bg-surface-pressed"
+            className="grid size-11 shrink-0 place-items-center rounded-full bg-canvas text-body hover:bg-surface-pressed"
           >
             <Icon name="close" size={14} />
           </button>
@@ -440,7 +445,7 @@ export default function FoodMenuPage() {
       </div>
 
       {/* Gợi ý theo bữa. Chip khớp giờ hiện tại có thêm dòng "gợi ý cho bạn". */}
-      <div className="mt-lg flex flex-wrap items-center gap-sm">
+      <div className="order-3 mt-lg flex flex-wrap items-center gap-sm">
         <span className="t-body-sm mr-xxs text-body">Gợi ý bữa</span>
         {MEALS.map((meal) => (
           <Chip
@@ -459,7 +464,7 @@ export default function FoodMenuPage() {
       {/* Nhà hàng THẬT quanh địa chỉ giao, sắp theo khoảng cách tăng dần.
           Ba trạng thái tách bạch: đang tải / lỗi / có dữ liệu. Bản cũ gộp cả ba
           thành "không render gì", nên hạ tầng lỗi trông y hệt "không có quán". */}
-      <div className="mt-lg">
+      <div className="order-7 mt-lg md:order-4">
         <p className="t-body-sm mb-sm text-body">
           {searching ? 'Quán ăn khớp từ khoá' : 'Gần bạn'}
         </p>
@@ -499,7 +504,7 @@ export default function FoodMenuPage() {
       </div>
 
       {/* category-button — tailwind-theme.md muc 4 */}
-      <div className="mb-lg mt-lg flex gap-sm overflow-x-auto pb-xxs">
+      <div className="order-4 mb-lg mt-lg flex gap-sm overflow-x-auto pb-xxs md:order-5">
         <Chip active={filter.kind === 'all'} onClick={() => chooseCategory('all')}>
           Tất cả
         </Chip>
@@ -515,13 +520,14 @@ export default function FoodMenuPage() {
       </div>
 
       {pickedRestaurant ? (
-        <p className="t-body-sm mb-lg text-body">
+        <p className="t-body-sm order-5 mb-lg text-body md:order-6">
           Món tại <span className="t-body-sm-strong text-ink">{pickedRestaurant.label}</span>
           {cuisineLabelOf(pickedRestaurant) ? ` · ${cuisineLabelOf(pickedRestaurant)}` : ''}
           {pickedRestaurant.phone ? ` · ${pickedRestaurant.phone}` : ''}
         </p>
       ) : null}
 
+      <div className="order-6 md:order-7">
       {items.length === 0 ? (
         <EmptyState
           icon="search"
@@ -541,16 +547,14 @@ export default function FoodMenuPage() {
           }
         />
       ) : (
-        /* Luoi nhieu cot — tan dung chieu rong cua web desktop.
-           Ban mobile cu la mot cot doc (screen-map.md muc 6). */
-        <ul className="grid gap-md sm:grid-cols-2 xl:grid-cols-3">
+        <ul className="flex snap-x snap-mandatory gap-md overflow-x-auto pb-xxs sm:grid sm:grid-cols-2 sm:overflow-x-visible sm:pb-0 xl:grid-cols-3">
           {items.map((item) => (
             /* CA THE la mot nut. Ban cu de hang gia nam NGOAI nut, nen hover
                sang len ca the nhung nua duoi bam khong an. Nut "+" dat chong
                len goc thay vi long trong nut kia — HTML khong cho long button. */
             <li
               key={item.id}
-              className="relative flex flex-col overflow-hidden rounded-xl bg-canvas-soft transition-colors hover:bg-surface-pressed focus-within:bg-surface-pressed"
+              className="relative flex w-[240px] shrink-0 snap-start flex-col overflow-hidden rounded-xl bg-canvas-soft transition-colors hover:bg-surface-pressed focus-within:bg-surface-pressed sm:w-auto"
             >
               <button
                 type="button"
@@ -588,6 +592,8 @@ export default function FoodMenuPage() {
           ))}
         </ul>
       )}
+      </div>
+    </div>
     </ScreenShell>
   );
 }
@@ -606,7 +612,7 @@ function Chip({
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`t-body-sm-strong shrink-0 rounded-pill bg-canvas-soft px-lg py-sm text-ink transition-colors hover:bg-surface-pressed ${
+      className={`t-body-sm-strong min-h-11 shrink-0 rounded-pill bg-canvas-soft px-lg py-sm text-ink transition-colors hover:bg-surface-pressed ${
         active ? 'ring-2 ring-primary' : ''
       }`}
     >

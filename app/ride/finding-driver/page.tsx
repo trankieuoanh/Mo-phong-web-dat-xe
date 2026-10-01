@@ -11,6 +11,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { FlowGuard } from '@/components/FlowGuard';
 import { Icon } from '@/components/Icon';
 import { ScreenShell } from '@/components/ScreenShell';
 import { useApp } from '@/lib/app-context';
@@ -26,33 +27,44 @@ import {
 } from '@/lib/shared';
 
 export default function FindingDriverPage() {
+  const { ride, hydrated } = useApp();
+  const canEnter = Boolean(
+    hydrated &&
+      ride.destination &&
+      ride.vehicleId &&
+      ride.promoId !== undefined &&
+      ride.driverStatus === 'searching',
+  );
+
+  return (
+    <FlowGuard ready={canEnter} fallback="/ride/address">
+      <FindingDriverContent />
+    </FlowGuard>
+  );
+}
+
+function FindingDriverContent() {
   useScreenView('finding_driver');
   const router = useRouter();
-  const { ride, setRide, resetAll, hydrated } = useApp();
-
-  // FlowGuard: can vao khi da confirm_ride (driverStatus = 'searching')
-  const canEnter = hydrated && ride.destination && ride.vehicleId && ride.promoId !== undefined && ride.driverStatus === 'searching';
+  const { ride, setRide, resetAll } = useApp();
 
   // Ban driver_searching khi mount (chi khi canEnter)
   useEffect(() => {
-    if (!canEnter) return;
     trackEvent({ eventName: 'driver_searching', screenName: 'finding_driver' });
-  }, [canEnter]);
+  }, []);
 
   // Vo hieu hoa Back browser — giong app that
   useEffect(() => {
-    if (!canEnter) return;
     const blockPopstate = () => {
       history.pushState(null, '');
     };
     history.pushState(null, '');
     window.addEventListener('popstate', blockPopstate);
     return () => window.removeEventListener('popstate', blockPopstate);
-  }, [canEnter]);
+  }, []);
 
   // Tu dong tim thay tai xe sau 2-3s
   useEffect(() => {
-    if (!canEnter) return;
     const timer = setTimeout(() => {
       const driver = getRandomDriver();
       const etaMin = Math.floor(Math.random() * 6) + 3; // 3-8 phut
@@ -85,12 +97,7 @@ export default function FindingDriverPage() {
     }, 2000 + Math.random() * 1000); // 2-3 giay random
 
     return () => clearTimeout(timer);
-  }, [canEnter, setRide, router]);
-
-  // Redirect neu chua du dieu kien (FlowGuard logic)
-  if (!canEnter) {
-    return null;
-  }
+  }, [setRide, router]);
 
   function handleCancel() {
     // `canEnter` o tren da bao dam `destination` va `vehicleId`; `pickup` luon
@@ -150,28 +157,24 @@ export default function FindingDriverPage() {
         <button
           type="button"
           onClick={handleCancel}
-          // `text-error` cu la CLASS CHET: khong co token --color-error nen Tailwind
-          // khong sinh ra gi, nut thua huong mau cua cha. DESIGN.md muc "Colour" noi
-          // ro he mau nay co y khong co bang error/success/warning, nen dung
-          // `text-body` — mot hanh dong phu, mau truy duoc ve token (CLAUDE.md qt 4).
-          className="t-body-md-strong w-full text-center text-body hover:underline"
+          className="t-body-md-strong inline-flex min-h-12 w-full items-center justify-center rounded-pill px-lg text-center text-body hover:underline"
         >
           Hủy đơn
         </button>
       }
     >
-      <div className="flex flex-col items-center py-4xl">
+      <div className="flex flex-col items-center py-3xl">
         <div className="relative">
-          <div className="size-24 rounded-full bg-primary-soft flex items-center justify-center">
-            <Icon name="car" size={32} className="text-primary" />
+          <div className="flex size-24 items-center justify-center rounded-full bg-canvas-soft">
+            <Icon name="car" size={32} className="text-primary-dark" />
           </div>
           <div className="absolute inset-0 rounded-full border-4 border-primary border-t-transparent animate-spin" />
         </div>
-        <h2 className="t-display-md mt-lg text-center">Đang tìm tài xế...</h2>
-        <p className="t-body-md mt-xs text-center text-body">
+        <h2 className="t-display-md mt-lg max-w-full break-words text-center">Đang tìm tài xế...</h2>
+        <p className="t-body-md mt-xs max-w-full break-words text-center text-body">
           Chúng tôi đang tìm tài xế phù hợp cho chuyến đi của bạn
         </p>
-        <p className="t-body-sm mt-md text-center text-mute">Thời gian trung bình: 1-2 phút</p>
+        <p className="t-body-sm mt-md max-w-full break-words text-center text-mute">Thời gian trung bình: 1-2 phút</p>
       </div>
     </ScreenShell>
   );

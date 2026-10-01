@@ -31,7 +31,7 @@ const ITEMS: InfoCard[] = [
 export default function TermsPage() {
   return (
     <AppShell section="Điều khoản & Chính sách">
-      <div className="mx-auto w-full max-w-[1280px]">
+      <div className="mx-auto w-full min-w-0 max-w-[1280px] break-words px-lg desktop:px-0 [&_li>span:last-child]:min-w-0">
         <InfoCardGrid items={ITEMS} />
       </div>
     </AppShell>

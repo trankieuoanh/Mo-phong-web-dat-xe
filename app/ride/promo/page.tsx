@@ -38,7 +38,7 @@ export default function PromoPage() {
   return (
     <FlowGuard
       ready={Boolean(ride.destination && ride.vehicleId)}
-      fallback="/"
+      fallback="/ride/address"
     >
       <PromoContent />
     </FlowGuard>
@@ -145,15 +145,15 @@ function PromoContent() {
         <span className="grid size-11 shrink-0 place-items-center rounded-full bg-canvas text-primary-dark">
           <Icon name="crown" size={22} />
         </span>
-        <span>
-          <span className="t-body-md-strong block">Gói hội viên GSM</span>
-          <span className="t-body-sm mt-xxs block text-body">
+        <span className="min-w-0">
+          <span className="t-body-md-strong block break-words">Gói hội viên GSM</span>
+          <span className="t-body-sm mt-xxs block break-words text-body">
             Ưu đãi mỗi chuyến, huỷ bất cứ lúc nào
           </span>
         </span>
       </div>
 
-      <ul className="mt-lg flex flex-col gap-md">
+      <ul className="mt-lg grid w-full grid-cols-1 gap-md">
         {PROMOS.map((promo) => {
           const block = ruleBlock(promo, basePrice, ctx);
           const available = block === null;
@@ -165,18 +165,18 @@ function PromoContent() {
                 type="button"
                 disabled={!available}
                 onClick={() => setPicked((prev) => (prev === promo.id ? null : promo.id))}
-                className={`flex w-full items-center gap-lg rounded-md bg-canvas-soft p-lg text-left text-ink transition-colors enabled:hover:bg-surface-pressed disabled:cursor-not-allowed disabled:opacity-50 ${
+                className={`flex min-h-12 w-full items-start gap-lg rounded-md bg-canvas-soft p-lg text-left text-ink transition-colors enabled:hover:bg-surface-pressed disabled:cursor-not-allowed disabled:opacity-50 ${
                   promo.id === picked ? 'ring-2 ring-primary' : ''
                 }`}
               >
-                <span className="flex-1">
-                  <span className="t-body-md-strong block">{promo.title}</span>
-                  <span className="t-body-sm mt-xxs block text-body">{promo.description}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="t-body-md-strong block break-words">{promo.title}</span>
+                  <span className="t-body-sm mt-xxs block break-words text-body">{promo.description}</span>
                   {/* Hien thi nhung disable, KEM DONG GIAI THICH — nguoi dung thay duoc
                       ly do, va ta khong ghi event cho lua chon bi disable.
                       `formatRuleBlock` noi dung dieu kien nao chua thoa, khong
                       con gan cung "Can don toi thieu" cho moi truong hop. */}
-                  <span className="t-caption mt-xxs block text-mute">
+                  <span className="t-caption mt-xxs block break-words text-mute">
                     {block ? formatRuleBlock(block) : `Giảm ${formatVnd(discount)}`}
                   </span>
                 </span>

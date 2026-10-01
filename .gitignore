@@ -26,3 +26,11 @@ analysis/.env
 Thumbs.db
 *.log
 .vercel
+
+# tien do nap powerBI -> Firestore
+scripts/.import-powerbi-state.json
+
+# key service account BigQuery neu lo tai ve thu muc repo
+bigquery*.json
+*-key.json
+*-firebase-adminsdk-*.json

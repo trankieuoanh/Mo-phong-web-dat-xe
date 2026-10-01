@@ -14,7 +14,7 @@ Luồng ride hiện tại chạy đúng nhưng nhìn như một bản wireframe:
 
 Nguyên tắc xuyên suốt: *giao diện bám app thật, dữ liệu bám taxonomy đã chốt.* Chỗ nào hai bên không thoả hiệp được thì dữ liệu thắng, và lý do được ghi lại ngay tại chỗ.
 
-**Ngoài phạm vi:** luồng Food (không đổi), backend (không đổi), `lib/shared/types.ts` và `screens.ts` (không đổi một dòng nào).
+**Ngoài phạm vi:** thay đổi nghiệp vụ riêng của luồng Food, backend (không đổi), `lib/shared/types.ts` và `screens.ts` (không đổi một dòng nào). Các quy tắc shell/responsive chung trong `screen-map.md` vẫn áp dụng cho màn entry và các màn ride sau khi chọn.
 
 ---
 
@@ -72,7 +72,7 @@ Các khoá mới, ghi vào `event-taxonomy.md` §3:
 
 Class viết theo bảng ánh xạ ở `tailwind-theme.md` §4. Không giá trị nào nằm ngoài token (`CLAUDE.md` quy tắc 4).
 
-Khung chung: `ScreenShell` — rail trái + top bar, rồi một trong hai bố cục desktop (`screen-map.md` §6):
+Khung chung sau khi chọn: `ScreenShell` trong shell chung (`screen-map.md` §6). `/` là chooser shell-free riêng, không thuộc một trong hai bố cục này; các màn ride sau đó dùng `SideRail` từ 1120px và `TopBar` hai hàng dưới 1120px. `split` chỉ tách panel/map từ 1280px, còn dưới mốc đó các cột xếp chồng:
 
 | Màn | `variant` | Cột phải (`aside`) |
 |---|---|---|
@@ -102,6 +102,8 @@ Nút hành động chính nằm ở footer của `Panel`, dính đáy panel ch�
 | Ô tìm kiếm | `<PlacePicker>` — input + icon kính lúp | `text-input`: `bg-canvas-soft rounded-md p-lg t-body-md` | — *(chỉ tra cứu)* |
 | Danh sách | Kết quả `GET /api/places`, hoặc 5 gợi ý từ `ADDRESSES` khi ô trống | `request-form-input-row` | `select_address` |
 | Footer | "Địa chỉ đã lưu" · "Tìm trên bản đồ" · toggle sáp nhập tỉnh | `category-button` | — *(trang trí)* |
+
+Màn này là entry đầu tiên sau chooser `/`. Bấm Back đưa về chooser shell-free và **không xoá draft**; đây cũng là nơi duy nhất trong luồng ride được phép đổi sang flow còn lại. Mở trực tiếp `/ride/address` phải bắn `select_flow` step 0 với `entry_source: "direct_url"` trước `screen_view` entry.
 
 **Một dòng địa chỉ** gồm: icon tròn (`icon-button-circular`) · `label` (`.t-body-md-strong`) · khoảng cách (`.t-caption text-mute`, **chỉ có với địa chỉ gợi ý**) · `address` đầy đủ (`.t-body-sm text-body`). Dòng đang chọn có `ring-2 ring-primary`.
 
@@ -370,7 +372,7 @@ Những khối dưới đây **render tĩnh hoặc `disabled`, không bắn even
 | 2 | Nút re-center GPS · dòng "bán kính 10 m" |
 | 3 | Nút "Đặt hộ" · banner "Boost" · thanh thanh toán · "Hẹn giờ" · "GreenNow" |
 | 4 | Tab "VPoint" · banner gói hội viên |
-| mọi màn | **`SideRail`** — bốn mục "Tài khoản phụ" / "Trung tâm hỗ trợ" / "Điều khoản" / "Thu gọn menu", cùng hai mục luồng khi KHÔNG ở màn đầu luồng (`/`, `/ride/address`, `/food`). Tab trong `TopBar`. Chip người dùng trong `UserMenu` (trừ "Đăng xuất") |
+| mọi màn sau khi chọn | **`SideRail` desktop** — hai luồng `Đặt xe` / `Đặt đồ ăn` và bốn mục ngoài funnel; **mobile** dùng `TopBar` hai hàng, control luồng full-width và menu `More` cho `/history`, `/account`, `/support`, `/terms`. `/` là ngoại lệ shell-free với đúng hai nút chọn. Ở entry/outside thì đổi luồng được, giữa funnel thì control luồng còn lại disabled. |
 | mọi màn có bản đồ | Cụm nút `+`/`−`, nút re-center, tooltip địa chỉ trong `MapCanvas` |
 
 Lý do — và đây là điều quan trọng nhất trong tài liệu này:
@@ -389,7 +391,7 @@ Ngoại lệ duy nhất: **ô tìm kiếm ở Màn 1** có lọc được danh s
 - **Không cho kéo/pan bản đồ.** Zoom và re-center là đủ; kéo thả cần quản lý trạng thái con trỏ và tải tile động — nhiều code cho thứ không ai dùng trong một luồng 6 bước.
 - **Không định tuyến nhiều chặng, không giao thông thời gian thực.**
 - **Không thêm màn thất bại.** App mô phỏng luôn thành công (`screen-map.md` §5).
-- ~~**Không đổi `max-width` xuống 430px.**~~ Không còn áp dụng: `screen-map.md` §6 đã chuyển sang desktop-first theo `sample_ui/`. Panel trái của bố cục `split` rộng 480px; bố cục `wide` đặt bề ngang qua prop `maxWidth`.
+- **Responsive là phạm vi đầy đủ cho mọi màn ride sau khi chọn.** Desktop navigation bắt đầu ở `1120px`; bố cục `split` panel/map chỉ tách cạnh nhau từ `1280px`. Mobile dùng gutter ngang `16px` và vùng chạm `44-48px`; không có màn ride nào bị loại khỏi phạm vi mobile.
 
 ## 10. Cần mentor chốt
 
@@ -415,6 +417,9 @@ curl "localhost:3000/api/events?session_id=<id>" | jq '.[] | {event_name, screen
 - [ ] `final_price` trong `confirm_ride` **khớp đúng** số hiển thị ở Màn 5
 
 **Giao diện**
+- [ ] `/` là chooser shell-free với đúng hai nhãn `Đặt xe` và `Đặt đồ ăn`; bấm mỗi nhãn bắn `select_flow` rồi vào đúng entry.
+- [ ] Sau khi chọn, desktop dùng `SideRail`; mobile dùng `TopBar` hai hàng với control luồng full-width và menu `More` cho bốn route ngoài funnel.
+- [ ] Ở `/ride/address` có thể đổi luồng; từ `/ride/pickup` trở đi control luồng còn lại disabled, và draft không bị mất khi quay lại `/`.
 - [ ] Màn 1 hỏi **"Bạn muốn đi đến đâu?"**, ô tìm kiếm lọc được 5 điểm đến
 - [ ] Màn 2 hiện **Điểm đón = "Vị trí hiện tại"** (không đổi theo lựa chọn) và **Điểm đến = địa chỉ vừa chọn**; bấm "Đổi điểm đến" quay về Màn 1 và vẫn bắn `change_address`
 - [ ] Màn 5 hiện đủ hai hàng Điểm đón / Điểm đến; Màn 6 hiện "Điểm đến"

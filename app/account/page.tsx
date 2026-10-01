@@ -26,8 +26,9 @@ export default function AccountPage() {
       {/* `flex-1 justify-center` de khoi rong canh giua theo CHIEU DOC nhu anh
           mau, thay vi dinh len sat top bar. `main` cua AppShell da la flex-col
           co chieu cao, nen chi can nhan phan con lai. */}
-      <div className="mx-auto flex w-full max-w-[1280px] flex-1 flex-col justify-center">
+      <div className="mx-auto flex min-h-0 w-full min-w-0 max-w-[1280px] flex-1 flex-col justify-center">
         <EmptyState
+          className="w-full min-w-0 break-words"
           icon="users"
           title="Chưa có tài khoản phụ nào"
           description="Thêm thành viên mới làm tài khoản phụ của bạn để bắt đầu"

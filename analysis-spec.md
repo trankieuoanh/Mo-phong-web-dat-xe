@@ -14,6 +14,8 @@ props = pd.json_normalize(df['properties'])     # properties.vehicle_type → c�
 df = pd.concat([df.drop(columns=['properties']), props.add_prefix('prop_')], axis=1)
 ```
 
+`properties.entry_source` được đọc thành cột phẳng `prop_entry_source`. Cột này có thể vắng ở dữ liệu cũ; khi đó các `select_flow` tiếp tục dùng quy tắc legacy để phân biệt flow switch. Seed mặc định bao gồm các phiên direct cho cả Ride và Food, đồng thời giữ các phiên chọn luồng từ `/` để so sánh.
+
 Tách bước tải và bước tính: `fetch_events.py` chạm mạng, `metrics.py` chỉ đọc CSV. Nhờ vậy sửa công thức không phải gọi lại Firestore mỗi lần.
 
 **Lọc trước khi tính** — bỏ các session rác:
@@ -36,7 +38,7 @@ funnel = (df[df.flow == 'ride']
 |---|---|
 | `reach` | số session chạm tới bước n |
 | `step_conversion` | `reach(n) / reach(n-1)` — tỉ lệ đi tiếp từ bước ngay trước |
-| `overall_conversion` | `reach(n) / reach(0)` — tỉ lệ so với số session **chọn luồng này** (bước 0 = `select_flow`) |
+| `overall_conversion` | `reach(n) / reach(0)` — tỉ lệ so với số session **chọn luồng này** (bước 0 = `select_flow`; `entry_source == 'direct_url'` vẫn là entry hợp lệ, không tạo thêm bước) |
 | `drop_off` | `1 - step_conversion` |
 
 Kết quả cần đọc được thành câu kiểu: *"68% người chọn xong địa chỉ tiếp tục xác nhận điểm đón; tụt mạnh nhất ở bước chọn khuyến mãi (chỉ 41% đi tiếp)."*
@@ -53,7 +55,7 @@ Kết quả cần đọc được thành câu kiểu: *"68% người chọn xong
 
 > **Bước 0 là event `select_flow`, không phải màn `home`.** Nó luôn mang `step_index: 0` kể cả khi bắn ở `address_selection` hay `food_menu` (người dùng bấm tab đổi luồng ở sidebar) — xem `event-taxonomy.md` mục 1.
 >
-> **Hệ quả cho `completion_rate`:** đổi luồng giờ chỉ tốn một click, nên một phiên ride ghé tab "Đặt đồ ăn" một cái vẫn nằm trong mẫu số của food và bị tính là bỏ dở. Muốn loại chúng ra, lọc session có `select_flow` với `screen_name != 'home'` — đó chính là dấu hiệu nhảy luồng.
+> **Phân biệt flow switch và direct entry:** `completion_rate` loại session có `select_flow` ở `screen_name != 'home'` khỏi mẫu số của luồng, vì đó là dấu hiệu nhảy luồng. Nếu event có `prop_entry_source == 'direct_url'`, đây là bước 0 hợp lệ của luồng được mở bằng URL trực tiếp và session vẫn được giữ trong cohort. Event cũ không có `entry_source` tiếp tục dùng quy tắc `screen_name != 'home'`; các bước funnel không đổi.
 
 ## Nhóm 3 — Thời gian
 
@@ -114,6 +116,14 @@ Với một `session_id` bất kỳ, in ra dòng thời gian đầy đủ để 
 02.3s  home                 select_flow          {flow_chosen: ride}     # step 0
 02.4s  address_selection    screen_view
 07.8s  address_selection    select_address       {address_id: addr-home}
+...
+```
+
+Khi mở trực tiếp `/ride/address` hoặc `/food`, thứ tự hợp đồng là:
+
+```
+00.0s  address_selection    select_flow          {flow_chosen: ride, entry_source: direct_url}  # step 0
+00.1s  address_selection    screen_view
 ...
 ```
 

@@ -219,16 +219,17 @@ export default function HistoryPage() {
 
   return (
     <AppShell section="Hoạt động">
-      <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-lg">
+      <div className="mx-auto flex w-full min-w-0 max-w-[1280px] flex-col gap-lg px-lg desktop:px-0">
         <div>
-          <h1 className="t-display-sm">Lịch sử chuyến đi</h1>
+          <h1 className="t-display-sm break-words">Lịch sử chuyến đi</h1>
           <p className="t-caption mt-xxs text-mute">
-            Người dùng: <span className="font-medium text-body">{userId || '—'}</span>
+            Người dùng:{' '}
+            <span className="break-all font-medium text-body">{userId || '—'}</span>
           </p>
         </div>
 
         {/* Tab — o day BAM DUOC that (khac tab trang tri o top bar). */}
-        <div className="flex gap-2xl border-b border-surface-pressed">
+        <div className="flex min-w-0 flex-wrap gap-2xl border-b border-surface-pressed">
           {(
             [
               ['ride', 'Di chuyển'],
@@ -239,7 +240,7 @@ export default function HistoryPage() {
               key={id}
               type="button"
               onClick={() => setTab(id)}
-              className={`t-body-md-strong border-b-2 pb-md transition-colors ${
+              className={`t-body-md-strong min-h-11 border-b-2 pb-md transition-colors ${
                 tab === id ? 'border-primary text-ink' : 'border-transparent text-body'
               }`}
             >
@@ -248,8 +249,8 @@ export default function HistoryPage() {
           ))}
         </div>
 
-        <div className="flex flex-wrap items-center gap-md">
-          <div className="flex min-w-[280px] flex-1 items-center gap-md rounded-md bg-canvas px-lg py-md">
+        <div className="flex min-w-0 flex-wrap items-center gap-md">
+          <div className="flex min-w-0 flex-1 items-center gap-md rounded-md bg-canvas px-lg py-md sm:min-w-[280px]">
             <Icon name="search" size={20} className="text-body" />
             <input
               type="text"
@@ -257,13 +258,13 @@ export default function HistoryPage() {
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Tìm bằng mã đơn hoặc địa chỉ"
               aria-label="Tìm bằng mã đơn hoặc địa chỉ"
-              className="t-body-md w-full bg-transparent text-ink outline-none placeholder:text-mute"
+              className="t-body-md w-full min-w-0 bg-transparent text-ink outline-none placeholder:text-mute"
             />
           </div>
         </div>
 
         {/* The tong ket — dung nhu history.png, them mot the "Da huy" o tab ride. */}
-        <div className={`grid gap-lg ${tab === 'ride' ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+        <div className={`grid min-w-0 gap-lg ${tab === 'ride' ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
           <StatCard
             label={tab === 'ride' ? 'Tổng số chuyến' : 'Tổng số đơn'}
             value={status === 'ready' ? String(trips.length) : '--'}
@@ -280,8 +281,12 @@ export default function HistoryPage() {
           />
         </div>
 
-        <div className="overflow-hidden rounded-xl bg-canvas">
-          <div className="scroll-thin overflow-x-auto">
+        <div className="min-w-0 sm:hidden">
+          <MobileHistory status={status} errorMessage={errorMessage} trips={trips} tab={tab} />
+        </div>
+
+        <div className="hidden w-full min-w-0 overflow-hidden rounded-xl bg-canvas sm:block">
+          <div className="scroll-thin w-full min-w-0 overflow-x-auto">
             {/* 960 chu khong phai 840: tab ride da co them cot TRANG THAI. */}
             <table className="w-full min-w-[960px] border-collapse text-left">
               <thead>
@@ -394,6 +399,118 @@ function StatCard({ label, value }: { label: string; value: string }) {
     <div className="rounded-xl bg-canvas-soft p-2xl">
       <p className="t-body-sm text-body">{label}</p>
       <p className="t-display-md mt-xxs">{value}</p>
+    </div>
+  );
+}
+
+function HistoryDetail({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <p className="t-caption text-mute">{label}</p>
+      <p className="t-body-sm mt-xxs break-words text-body">{value}</p>
+    </div>
+  );
+}
+
+function TripCard({ trip, tab }: { trip: Trip; tab: Tab }) {
+  return (
+    <article className="min-w-0 rounded-xl bg-canvas-soft p-2xl">
+      <div className="flex min-w-0 items-start justify-between gap-md">
+        <div className="min-w-0">
+          <p className="t-caption text-mute">MÃ ĐƠN</p>
+          <p className="t-body-sm-strong mt-xxs break-words">{trip.code}</p>
+        </div>
+        {tab === 'ride' ? <StatusPill cancelled={trip.cancelled} /> : null}
+      </div>
+      <div className="mt-lg grid min-w-0 gap-md">
+        {tab === 'ride' ? (
+          <>
+            <HistoryDetail label="ĐIỂM ĐÓN" value={trip.pickup ?? '—'} />
+            <HistoryDetail label="ĐIỂM ĐẾN" value={trip.destination ?? '—'} />
+            <HistoryDetail label="LOẠI XE" value={trip.vehicle ?? '—'} />
+            <HistoryDetail label="QUÃNG ĐƯỜNG" value={trip.distance ?? '—'} />
+            <HistoryDetail label="THANH TOÁN" value={trip.payment ?? '—'} />
+          </>
+        ) : (
+          <>
+            <HistoryDetail label="SỐ MÓN" value={`${trip.itemCount ?? 0} món`} />
+            <HistoryDetail label="ƯU ĐÃI" value={trip.offer ?? '—'} />
+          </>
+        )}
+      </div>
+      <div className="mt-lg flex min-w-0 flex-wrap items-end justify-between gap-md border-t border-surface-pressed pt-md">
+        <div className="min-w-0">
+          <p className="t-caption text-mute">{tab === 'ride' ? 'CƯỚC PHÍ' : 'TỔNG TIỀN'}</p>
+          <p
+            className={`t-body-md-strong mt-xxs ${trip.cancelled ? 'text-mute line-through' : ''}`}
+          >
+            {formatVnd(trip.total)}
+          </p>
+        </div>
+        <div className="min-w-0">
+          <p className="t-caption text-mute">THỜI GIAN</p>
+          <p className="t-body-sm mt-xxs break-words text-body">{trip.at}</p>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function MobileHistory({
+  status,
+  errorMessage,
+  trips,
+  tab,
+}: {
+  status: Status;
+  errorMessage: string;
+  trips: Trip[];
+  tab: Tab;
+}) {
+  if (status === 'loading') {
+    return (
+      <div className="grid gap-lg">
+        {Array.from({ length: 4 }, (_, index) => (
+          <div key={index} className="rounded-xl bg-canvas-soft p-2xl">
+            <div className="flex items-center justify-between gap-md">
+              <span className="block h-4 w-2/5 animate-pulse rounded-pill bg-canvas" />
+              <span className="block h-6 w-1/4 animate-pulse rounded-pill bg-canvas" />
+            </div>
+            <div className="mt-lg grid gap-md">
+              <span className="block h-4 w-full animate-pulse rounded-pill bg-canvas" />
+              <span className="block h-4 w-4/5 animate-pulse rounded-pill bg-canvas" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (status === 'error') {
+    return (
+      <div className="rounded-xl bg-canvas-soft px-lg py-3xl text-center">
+        <p className="t-body-md-strong">Không đọc được dữ liệu</p>
+        <p className="t-caption mt-xs break-all text-body">{errorMessage}</p>
+        <p className="t-caption mt-md text-mute">
+          Kiểm tra credential Firebase trong .env.local — xem setup.md.
+        </p>
+      </div>
+    );
+  }
+
+  if (trips.length === 0) {
+    return (
+      <div className="rounded-xl bg-canvas-soft px-lg py-3xl text-center">
+        <p className="t-body-md text-body">Không có kết quả nào</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-lg">
+      {trips.map((trip, index) => (
+        <TripCard key={`${trip.code}-${index}`} trip={trip} tab={tab} />
+      ))}
     </div>
   );
 }

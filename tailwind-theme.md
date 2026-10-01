@@ -114,7 +114,7 @@ Tailwind v4 không sinh sẵn class cho typography token, nên khai báo thành 
 | Vai trò trong app | Class |
 |---|---|
 | Tiêu đề màn hình ("Bạn muốn đón ở đâu?") | `.t-display-md` (24px) |
-| Tiêu đề panel ở Home | `.t-display-sm` (20px) |
+| Tiêu đề màn chọn luồng ở `/` | `.t-display-md` (24px) |
 | Tên địa chỉ / tên món / tên khuyến mãi | `.t-body-md-strong` |
 | Địa chỉ đầy đủ, mô tả món, điều kiện khuyến mãi | `.t-body-sm` + màu `body` |
 | Giá tiền trong dòng | `.t-body-md-strong` |
@@ -138,15 +138,25 @@ Tailwind v4 không sinh sẵn class cho typography token, nên khai báo thành 
 | `icon-button-circular` | Nút Back ở góc, nút +/− số lượng | `bg-canvas-soft text-ink rounded-full` |
 | `nav-bar` | Header của `Panel` — tiêu đề màn | `bg-canvas text-ink t-display-sm px-2xl py-lg border-b border-surface-pressed` |
 
-### Khung desktop — bổ sung khi dựng lại UI theo `sample_ui/`
+### Khung app — desktop và mobile
 
 | Token component | Dùng ở đâu | Class |
 |---|---|---|
-| `app-shell` | `components/shell/AppShell.tsx` | `flex min-h-dvh bg-canvas-softer` |
-| `side-rail` | Rail icon dọc bên trái, ẩn dưới `lg` | `bg-canvas border-r border-surface-pressed py-lg` — mỗi mục `size-11 rounded-xl`, mục active `bg-canvas-soft text-primary-dark`, mục thường `text-body` |
-| `top-bar` | `components/shell/TopBar.tsx` | `bg-canvas border-b border-surface-pressed px-3xl` — tên mục `t-display-lg`, tab active `border-b-2 border-primary text-ink`, tab mờ `text-body` |
+| `app-shell` | `components/shell/AppShell.tsx` — mọi màn sau khi chọn, không dùng cho `/` | `flex min-h-dvh bg-canvas-softer` |
+| `side-rail` | Rail icon dọc bên trái ở desktop từ 1120px; ẩn hoàn toàn dưới 1120px | `bg-canvas border-r border-surface-pressed py-lg` — mỗi mục `size-11 rounded-xl`, mục active `bg-canvas-soft text-primary-dark`, mục thường `text-body` |
+| `top-bar` | `components/shell/TopBar.tsx` — desktop và mobile | `bg-canvas border-b border-surface-pressed px-lg` (mobile), chuyển sang padding desktop từ 1120px — mobile là hai hàng; tên mục `t-display-lg`, control luồng full-width, menu `More` cho bốn route ngoài funnel |
+| `flow-switcher` | Control `Đặt xe` / `Đặt đồ ăn` ở entry hoặc ngoài funnel | `grid grid-cols-2 w-full` với mỗi nút `min-h-11` hoặc `min-h-12`; control đổi luồng disabled ở giữa funnel |
+| `more-menu` | Menu mobile cho `/history`, `/account`, `/support`, `/terms` | Menu ngang trong hàng trên của `top-bar`; item có vùng chạm tối thiểu 44px |
 | `panel` | `components/Panel.tsx` — card trắng chứa nội dung màn | `bg-canvas rounded-xl` + header/body/footer ngăn bằng `border-surface-pressed` |
 | `user-chip` | `components/shell/UserMenu.tsx` | `rounded-pill hover:bg-canvas-soft` — avatar `size-9 rounded-full bg-canvas-soft text-primary-dark` |
+
+### App shell, breakpoint và touch
+
+- `/` là chooser shell-free: không dùng `app-shell`, `side-rail`, `top-bar` hay bố cục `split`; chỉ có hai lựa chọn `Đặt xe` và `Đặt đồ ăn`.
+- Từ **1120px**, các màn sau khi chọn dùng `SideRail`. Dưới 1120px, tất cả màn trong phạm vi app dùng `TopBar` hai hàng: control luồng `Đặt xe` / `Đặt đồ ăn` full-width và menu `More` cho `/history`, `/account`, `/support`, `/terms`.
+- Bố cục `split` chỉ tách panel/map từ **1280px**; từ 1120px đến dưới 1280px và ở mobile, các cột xếp chồng. `home` không nằm trong danh sách `split`.
+- Gutter ngang mobile là **16px**, dùng `p-lg` theo token `{spacing.lg}`. Vùng chạm là **44-48px** (`min-h-11` đến `min-h-12`); không thêm spacing token mới.
+- Ở entry và bốn màn ngoài funnel, control đổi luồng còn lại được bật; ở giữa funnel control đó disabled. Điều hướng hợp lệ giữ nguyên draft của cả hai luồng.
 
 **Card lồng trong `Panel` dùng `bg-canvas-soft`, không dùng `bg-canvas`.** Panel đã là nền trắng; card trắng trên nền trắng thì tàng hình. Đây là đảo ngược so với bản mobile cũ (nền màn là `canvas-softer`, card là `canvas`).
 
