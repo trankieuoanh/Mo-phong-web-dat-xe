@@ -20,6 +20,7 @@
 | Gọi API từ client | **`fetch` có sẵn của trình duyệt** | Không cần cài thêm axios cho vài endpoint đơn giản |
 | Package manager | **npm** | Một `package.json` duy nhất. Từng dùng npm workspaces cho bản hai app; gộp lại thì không còn gì để workspace |
 | Hosting (nếu cần deploy) | **Vercel** | Tự nhận Next.js ở gốc repo, không cần `vercel.json`. Một project = **một nơi deploy**, và đó chính là thứ sửa được lỗi bản deploy cũ |
+| Phân tích BI | **BigQuery** (sink bổ sung, Firestore không đổi) | Power BI đọc SQL thay vì gọi API; sync tăng dần bằng `scripts/bigquery/sync-events.js` + GitHub Actions. Thư viện `@google-cloud/bigquery` là `devDependency` chỉ script dùng, app không import. Xem `docs/BIGQUERY_SETUP.md` |
 | Testing framework | **Không cần** | Quy mô 6 tuần, tự test bằng cách click tay qua từng luồng là đủ, không cần viết test tự động |
 
 Lưu ý: không bắt buộc phải deploy public trong 6 tuần này — chạy local (`next dev`) để demo cho mentor là đủ. Chỉ cần deploy khi muốn có link truy cập từ xa; các bước và biến môi trường ở `setup.md` mục "Deploy".

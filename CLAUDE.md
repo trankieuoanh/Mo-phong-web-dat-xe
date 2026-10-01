@@ -24,6 +24,7 @@ Không có backend thật, không đặt xe thật, không thanh toán. Mọi l�
 | Cấu trúc document Firestore | `db-design.md` |
 | **Chạy dự án**, cài Firebase, biến môi trường, **tra lỗi** | `setup.md` |
 | Viết script Python | `analysis-spec.md` |
+| Đẩy event sang BigQuery / nối Power BI | `docs/BIGQUERY_SETUP.md`, `docs/POWERBI_BIGQUERY.md` |
 | Không biết nên làm gì tiếp | `roadmap.md` |
 | Lý do chọn công nghệ | `techstack.md`, `ARCHITECTURE.md` |
 
@@ -58,7 +59,7 @@ Không có test tự động — `techstack.md` đã chốt là kiểm thử b�
 5. **Không đổi `id` trong `mock-data.md`** (`addr-home`, `banh-mi-01`, `veh-bike`…). Chúng đi thẳng vào `properties` của event; đổi id làm dữ liệu cũ và mới không ghép được.
 6. **Thêm event mới phải cập nhật `event-taxonomy.md` trước khi code**, kèm `lib/shared/types.ts` (union + mảng `EVENT_NAMES`) và `lib/shared/screens.ts` nếu là màn mới.
 7. **Không tự gõ `step_index` trong page.** `trackEvent` tra bảng `SCREENS` ở `lib/shared/screens.ts`. Chỉ hai ngoại lệ được truyền tay, và cả hai đã gói sẵn thành helper trong `lib/track.ts`: `trackAddToCart` (`step_index` luôn = 3) và `trackSelectFlow` (`step_index` luôn = 0, `flow` = luồng vừa chọn — `screen_name` là `home`, `address_selection` hoặc `food_menu`). Bấm tab luồng từ một màn **ngoài funnel** cũng bắn event này, khi đó `screen_name` là màn **đích** vì màn đang đứng không có tên nào để ghi — luật đầy đủ ở `selectFlowScreenFor()` trong `components/shell/flow-nav.ts`.
-8. **Không thêm thư viện** ngoài những gì `techstack.md` đã chốt: Next.js, React, Tailwind, firebase-admin, server-only. (Express, cors, tsx và concurrently đã bị gỡ cùng lúc với việc gộp — nếu thấy chúng ở đâu thì đó là tàn dư.) Không Redux/Zustand (dùng Context), không axios (dùng `fetch`), không thư viện UI component, **không thư viện icon** (dùng `components/Icon.tsx`), **không thư viện bản đồ** — `MapCanvas.tsx` render tile OpenStreetMap bằng thẻ `<img>`, gọi OSRM bằng `fetch`, và tự viết cả phép chiếu Web Mercator hai chiều lẫn thao tác kéo/bấm-chọn-vị-trí, nên không cần Leaflet.
+8. **Không thêm thư viện** ngoài những gì `techstack.md` đã chốt: Next.js, React, Tailwind, firebase-admin, server-only. (Express, cors, tsx và concurrently đã bị gỡ cùng lúc với việc gộp — nếu thấy chúng ở đâu thì đó là tàn dư.) **Ngoại lệ duy nhất: `@google-cloud/bigquery`**, là `devDependency` chỉ `scripts/bigquery/` dùng — tuyệt đối không import từ `app/`, `components/`, `lib/`. Không Redux/Zustand (dùng Context), không axios (dùng `fetch`), không thư viện UI component, **không thư viện icon** (dùng `components/Icon.tsx`), **không thư viện bản đồ** — `MapCanvas.tsx` render tile OpenStreetMap bằng thẻ `<img>`, gọi OSRM bằng `fetch`, và tự viết cả phép chiếu Web Mercator hai chiều lẫn thao tác kéo/bấm-chọn-vị-trí, nên không cần Leaflet.
 9. **Năm route ngoài funnel không được gọi `useScreenView` hay `trackEvent`:** `/history`, `/account`, `/support`, `/terms`, `/login`. Chúng cố ý không có trong `SCREENS` — `/history` chỉ ĐỌC lại event đã có, ba route kia là màn tĩnh của sidebar. Thêm event vào đó là làm bẩn mọi tỉ lệ conversion. Kiểm tra: `grep -rn "trackEvent(\|useScreenView(" app/{history,account,support,terms,login}` → phải rỗng.
 10. **Bản đồ phải giữ dòng ghi công `© OpenStreetMap`.** Điều khoản dùng tile yêu cầu, không phải chi tiết thẩm mỹ. Kiểm tra: `grep -n "OpenStreetMap" components/MapCanvas.tsx`.
 11. **Đăng nhập bắt buộc bằng số điện thoại + mã SMS 6 số** (`api-endpoints.md` mục 5). `user_id` = số điện thoại E.164, **server** gán từ cookie `gsm_auth` ở `POST /api/events` — đừng tin `user_id` client gửi. `middleware.ts` chỉ kiểm tra cookie có mặt và **không được** import `lib/server`. Gửi SMS chỉ qua `getSmsSender()` (`SMS_PROVIDER=mock` mặc định); nhà cung cấp thật gọi bằng `fetch`, không thêm SDK. `AUTH_SECRET` không bao giờ mang tiền tố `NEXT_PUBLIC_`.
@@ -147,7 +148,9 @@ sample_ui/                7 ảnh chụp web Green SM thật — tham chiếu kh
                           (dieu_khoan_va_chinh_sach.png là trang MARKETING, không
                           phải màn trong app — chỉ lấy nội dung, bỏ vỏ)
 analysis/                 Python — đọc THẲNG Firestore, không gọi qua app
-scripts/                  seed-events.js — chạy tay, không phải code của app
+scripts/                  seed-events.js, import-powerbi.js — chạy tay, không phải code của app
+  bigquery/               sync-events.js (Firestore → BigQuery, tăng dần) + *.sql — chạy tay hoặc
+                          .github/workflows/sync-bigquery.yml mỗi 15 phút. docs/BIGQUERY_SETUP.md
 ```
 
 Vì cả giao diện lẫn route handler đều nhập `EventName` và `SCREENS` từ `lib/shared`, danh sách hợp lệ ở hai phía **không thể lệch nhau**.

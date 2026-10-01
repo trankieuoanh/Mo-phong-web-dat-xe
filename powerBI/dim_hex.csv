@@ -1,0 +1,19 @@
+﻿hex_id,region_id,nearest_district,center_lat,center_lng,hex_tier,h3_resolution
+864143687ffffff,HN,Hà Đông,20.97882,105.71863,Outer,6
+864143697ffffff,HN,Nam Từ Liêm,21.0268,105.75696,Inner,6
+86414369fffffff,HN,Nam Từ Liêm,21.03501,105.69201,Outer,6
+8641436a7ffffff,HN,Hà Đông,20.92263,105.74523,Outer,6
+8641436b7ffffff,HN,Hà Đông,20.97061,105.78356,Inner,6
+86414379fffffff,HN,Hà Đông,20.91441,105.81014,Outer,6
+86415ca2fffffff,HN,Long Biên,21.11437,105.89856,Outer,6
+86415ca47ffffff,HN,Tây Hồ,21.13089,105.7687,Outer,6
+86415ca67ffffff,HN,Tây Hồ,21.07474,105.7953,Inner,6
+86415ca6fffffff,HN,Nam Từ Liêm,21.08296,105.73036,Outer,6
+86415ca77ffffff,HN,Tây Hồ,21.12264,105.83364,Outer,6
+86415cb47ffffff,HN,Hai Bà Trưng,21.01031,105.88678,Inner,6
+86415cb4fffffff,HN,Đống Đa,21.01857,105.82189,Core,6
+86415cb57ffffff,HN,Long Biên,21.05821,105.92511,Outer,6
+86415cb5fffffff,HN,Tây Hồ,21.06649,105.86022,Inner,6
+86415cb67ffffff,HN,Hai Bà Trưng,20.95412,105.91333,Outer,6
+86415cb6fffffff,HN,Hai Bà Trưng,20.96238,105.84846,Inner,6
+86415cb77ffffff,HN,Long Biên,21.00204,105.95165,Outer,6

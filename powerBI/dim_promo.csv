@@ -1,0 +1,13 @@
+﻿promo_code,promo_name,service,vehicle_scope,discount_type,discount_target,discount_value,max_discount,min_order_value,start_date,end_date,has_cap_change
+WELCOME30,Chào bạn mới -30%,Ride,All,Percent,Fare,0.3,30000,40000,2026-06-01,2026-08-31,False
+SUMMER20,Hè sôi động -20%,Ride,All,Percent,Fare,0.2,20000,50000,2026-06-01,2026-08-31,True
+BIKE10K,Xe máy giảm 10K,Ride,Bike,Fixed,Fare,10000.0,10000,30000,2026-06-15,2026-07-31,False
+WEEKEND15,Cuối tuần -15%,Ride,All,Percent,Fare,0.15,20000,40000,2026-06-01,2026-08-31,False
+RAINY25,Ngày mưa -25%,Ride,All,Percent,Fare,0.25,30000,40000,2026-07-01,2026-08-31,False
+LOYAL50K,Khách thân thiết giảm 50K,Ride,Car,Fixed,Fare,50000.0,50000,150000,2026-07-01,2026-08-31,False
+NEWFOOD50,Bạn mới giảm 50%,Food,All,Percent,Food,0.5,40000,60000,2026-06-01,2026-08-31,True
+FOOD30,Giảm 30% đơn từ 100K,Food,All,Percent,Food,0.3,30000,100000,2026-06-01,2026-08-31,True
+FOODWEEKEND20,Cuối tuần giảm 20%,Food,All,Percent,Food,0.2,30000,80000,2026-06-01,2026-08-31,False
+FOODRAINY25,Ngày mưa giảm 25%,Food,All,Percent,Food,0.25,35000,70000,2026-07-01,2026-08-31,False
+LUNCH15K,Bữa trưa giảm 15K,Food,All,Fixed,Food,15000.0,15000,60000,2026-06-15,2026-08-31,False
+FREESHIP,Miễn phí giao hàng,Food,All,Percent,Delivery,1.0,25000,80000,2026-06-01,2026-08-31,False

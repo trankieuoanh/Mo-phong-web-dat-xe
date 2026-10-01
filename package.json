@@ -9,7 +9,10 @@
     "start": "next start --port 3000",
     "seed": "node scripts/seed-events.js",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "bigquery:init": "node scripts/bigquery/sync-events.js --init",
+    "sync:bigquery": "node scripts/bigquery/sync-events.js",
+    "sync:bigquery:backfill": "node scripts/bigquery/sync-events.js --backfill"
   },
   "dependencies": {
     "firebase-admin": "^13.0.2",
@@ -20,6 +23,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
+    "@google-cloud/bigquery": "^9.1.0",
     "@tailwindcss/postcss": "^4.0.0",
     "@types/node": "^22.10.5",
     "@types/react": "^19.0.7",
