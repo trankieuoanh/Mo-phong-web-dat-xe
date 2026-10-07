@@ -73,7 +73,8 @@ function readChallenge(token: string | undefined): Challenge | null {
 
 export type SendCodeResult =
   | { ok: true; challenge: string; devCode?: string }
-  | { ok: false; retryAfterMs: number };
+  | { ok: false; retryAfterMs: number }
+  | { ok: false; notConfigured: true };
 
 export async function sendCode(phone: string): Promise<SendCodeResult> {
   const now = Date.now();
@@ -84,11 +85,18 @@ export async function sendCode(phone: string): Promise<SendCodeResult> {
     return { ok: false, retryAfterMs: RESEND_COOLDOWN_MS - (now - lastSent) };
   }
 
+  // Mock ma KHONG hien ma (production thieu SMS_MOCK_EXPOSE_CODE) = khong tin nhan nao den va ma
+  // cung khong hien. Bao loi ro rang thay vi tra `ok:true` ("da gui") lam nguoi dung ket.
+  const sender = getSmsSender();
+  const exposeCode =
+    sender.isMock &&
+    (process.env.NODE_ENV !== 'production' || process.env.SMS_MOCK_EXPOSE_CODE === 'true');
+  if (sender.isMock && !exposeCode) return { ok: false, notConfigured: true };
+
   const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
   const nonce = randomBytes(12).toString('base64url');
   const expiresAt = now + CODE_TTL_MS;
 
-  const sender = getSmsSender();
   await sender.send(phone, `Ma xac thuc Green SM cua ban la ${code}. Het han sau 5 phut.`);
   // Chi tinh cooldown khi gui THANH CONG — gui loi thi cho thu lai ngay.
   state.lastSent.set(phone, now);
@@ -102,9 +110,6 @@ export async function sendCode(phone: string): Promise<SendCodeResult> {
   // no thi production + mock = khong tin nhan nao den va ma cung khong hien => khong ai
   // dang nhap duoc. Bat no nghia la AI CUNG dang nhap duoc bang so bat ky — chap nhan
   // duoc cho app mo phong khong co du lieu that; can chat hon thi viet sender SMS that.
-  const exposeCode =
-    sender.isMock &&
-    (process.env.NODE_ENV !== 'production' || process.env.SMS_MOCK_EXPOSE_CODE === 'true');
   return { ok: true, challenge, devCode: exposeCode ? code : undefined };
 }
 

@@ -382,7 +382,7 @@ Gói Free: **100.000 dòng ghi/ngày** và 5.000.000 dòng đọc/ngày, reset 0
 
 ### `POST /api/auth/send-code` trả 500, hoặc trên Vercel không thấy mã
 Thiếu `AUTH_SECRET` (hoặc ngắn hơn 32 ký tự) trong `.env.local` — console server báo `Thieu AUTH_SECRET`. Thêm vào rồi **khởi động lại** `npm run dev`. Đổi `AUTH_SECRET` sẽ làm mọi cookie cũ mất hiệu lực — đăng nhập lại.
-Trên **Vercel**: `SMS_PROVIDER=mock` + production thì mã **không** hiện ra — đặt `SMS_MOCK_EXPOSE_CODE=true` rồi redeploy.
+Trên **Vercel**: `SMS_PROVIDER=mock` + production thì mã **không** hiện ra — đặt `SMS_MOCK_EXPOSE_CODE=true` rồi redeploy. Thiếu cờ thì `POST /api/auth/send-code` trả **503** "Chưa cấu hình gửi mã xác thực (SMS)" (và log tên biến cần đặt), không còn báo "đã gửi" câm.
 
 ### `D1 tu choi cau lenh: 10000 Authentication error`
 `CLOUDFLARE_API_TOKEN` sai, đã bị thu hồi, hoặc không có quyền **D1 → Edit** trên đúng account (`CLOUDFLARE_ACCOUNT_ID`). Tạo token mới ở dash.cloudflare.com → My Profile → API Tokens; trên Vercel nhớ redeploy sau khi đổi biến.
