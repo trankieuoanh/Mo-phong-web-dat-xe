@@ -21,6 +21,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const result = await sendCode(input.value.phone);
+    if (!result.ok && 'notConfigured' in result) {
+      console.error('[POST /api/auth/send-code] SMS_PROVIDER=mock tren production nhung thieu SMS_MOCK_EXPOSE_CODE=true — dat bien nay roi redeploy');
+      return Response.json({ error: 'Chưa cấu hình gửi mã xác thực (SMS)' }, { status: 503 });
+    }
     if (!result.ok) {
       const seconds = Math.ceil(result.retryAfterMs / 1000);
       return Response.json(
