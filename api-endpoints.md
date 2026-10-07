@@ -328,7 +328,7 @@ Files: `app/api/auth/*/route.ts` → `lib/server/validators/auth.validator.ts` �
 | `POST /api/auth/logout` | — | `200 { ok }`, xoá cookie |
 
 - Mã sống **5 phút**, sai tối đa **5 lần** thì phải gửi lại mã. **Không dùng database:** `send-code` đặt cookie httpOnly `gsm_otp` (path `/api/auth`) chứa `{phone, hash(mã), hết hạn, nonce}` ký HMAC; `verify` kiểm cookie đó rồi xoá. Cooldown và đếm lần sai nằm trong bộ nhớ tiến trình — trên serverless nhiều instance thì giới hạn này lỏng hơn. `users/{phone}` ghi best effort.
-- `dev_code` chỉ có khi `SMS_PROVIDER=mock` **và** (không phải production **hoặc** `SMS_MOCK_EXPOSE_CODE=true`). Production + mock mà thiếu cờ này thì `send-code` trả **503** (không tin nào được gửi, mã cũng không hiện).
+- `dev_code` có khi `SMS_PROVIDER=mock` (mọi môi trường), trừ khi `SMS_MOCK_EXPOSE_CODE` được đặt tường minh là `false`/`0`/`no`/`off` — khi đó `send-code` trả **503** (không tin nào được gửi, mã cũng không hiện).
 - Cookie = `base64url(phone|hết hạn).HMAC-SHA256(AUTH_SECRET)`. Không lưu session ở DB; đổi `AUTH_SECRET` là đăng xuất mọi người.
 - **Không còn `middleware.ts`**: khách duyệt mọi trang. Hộp thoại đăng nhập (`LoginModal`) chỉ hiện khi bấm Đặt xe / Đặt đơn (`requireLogin` trong `lib/app-context.tsx`). Chữ ký cookie kiểm ở `GET /api/auth/me` (401 → chỉ xoá bản sao SĐT, không chuyển trang) và `POST /api/events`.
 

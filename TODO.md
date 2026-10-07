@@ -4,5 +4,5 @@
 - [ ] Check sync 11 table if receive new data
 - [ ] Landing Page
 - [ ] production like needed
-- [x] login behavior
+- [ ] login behavior
 - [ ] clean prj

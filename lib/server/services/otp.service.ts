@@ -76,6 +76,18 @@ export type SendCodeResult =
   | { ok: false; retryAfterMs: number }
   | { ok: false; notConfigured: true };
 
+/**
+ * Mock KHONG gui gi, nen mac dinh tra ma ve giao dien o MOI moi truong (ke ca production tren Vercel):
+ * khong co SMS that thi day la cach duy nhat de dang nhap. Dong nghia: ai cung dang nhap duoc bang so
+ * bat ky — chap nhan duoc cho app mo phong khong co du lieu that. Muon dong lai: `SMS_MOCK_EXPOSE_CODE=false`
+ * (hoac 0/no/off). Doc khoang trang va hoa/thuong de mot cai `" True "` go nham tren Vercel khong lam hong.
+ */
+function shouldExposeCode(sender: { isMock: boolean }): boolean {
+  if (!sender.isMock) return false;
+  const flag = (process.env.SMS_MOCK_EXPOSE_CODE ?? '').trim().toLowerCase().replace(/^["']|["']$/g, '');
+  return !['false', '0', 'no', 'off'].includes(flag);
+}
+
 export async function sendCode(phone: string): Promise<SendCodeResult> {
   const now = Date.now();
   prune(now);
@@ -85,12 +97,10 @@ export async function sendCode(phone: string): Promise<SendCodeResult> {
     return { ok: false, retryAfterMs: RESEND_COOLDOWN_MS - (now - lastSent) };
   }
 
-  // Mock ma KHONG hien ma (production thieu SMS_MOCK_EXPOSE_CODE) = khong tin nhan nao den va ma
-  // cung khong hien. Bao loi ro rang thay vi tra `ok:true` ("da gui") lam nguoi dung ket.
+  // Mock + cong tat tuong minh (SMS_MOCK_EXPOSE_CODE=false) = khong tin nhan nao den va ma cung khong
+  // hien. Bao loi ro rang thay vi tra `ok:true` ("da gui") lam nguoi dung ket.
   const sender = getSmsSender();
-  const exposeCode =
-    sender.isMock &&
-    (process.env.NODE_ENV !== 'production' || process.env.SMS_MOCK_EXPOSE_CODE === 'true');
+  const exposeCode = shouldExposeCode(sender);
   if (sender.isMock && !exposeCode) return { ok: false, notConfigured: true };
 
   const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
@@ -104,12 +114,6 @@ export async function sendCode(phone: string): Promise<SendCodeResult> {
 
   const challenge = seal(JSON.stringify({ p: phone, h: hashCode(phone, nonce, code), e: expiresAt, n: nonce }));
 
-  // Chi tra ma ve giao dien khi KHONG co tin nao duoc gui that, va khong phai
-  // ban production — de test bang so that ma khong can nhin console.
-  // Ngoai le OPT-IN: SMS_MOCK_EXPOSE_CODE=true (dat tren Vercel cho ban demo). Thieu
-  // no thi production + mock = khong tin nhan nao den va ma cung khong hien => khong ai
-  // dang nhap duoc. Bat no nghia la AI CUNG dang nhap duoc bang so bat ky — chap nhan
-  // duoc cho app mo phong khong co du lieu that; can chat hon thi viet sender SMS that.
   return { ok: true, challenge, devCode: exposeCode ? code : undefined };
 }
 
