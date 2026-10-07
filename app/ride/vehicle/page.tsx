@@ -14,7 +14,7 @@
  */
 
 import { useRouter } from 'next/navigation';
-import { DEFAULT_PICKUP, VEHICLES, calcFare, type Vehicle } from '@/lib/shared';
+import { DEFAULT_PICKUP, VEHICLES, calcFare, isRoadRoute, type Vehicle } from '@/lib/shared';
 import { BackButton } from '@/components/BackButton';
 import { FlowGuard } from '@/components/FlowGuard';
 import { Icon, type IconName } from '@/components/Icon';
@@ -22,7 +22,6 @@ import { MapCanvas } from '@/components/MapCanvas';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { ScreenShell } from '@/components/ScreenShell';
 import { useApp } from '@/lib/app-context';
-import { routeOrFallback } from '@/lib/use-route';
 import { formatVnd } from '@/lib/format';
 import { trackEvent, useScreenView } from '@/lib/track';
 
@@ -31,7 +30,7 @@ const ICONS: Record<Vehicle['type'], IconName> = { bike: 'bike', car: 'car' };
 export default function VehiclePage() {
   const { ride } = useApp();
   return (
-    <FlowGuard ready={Boolean(ride.destination)} fallback="/ride/address">
+    <FlowGuard ready={Boolean(ride.destination) && isRoadRoute(ride.route)} fallback="/ride/address">
       <VehicleContent />
     </FlowGuard>
   );
@@ -43,7 +42,8 @@ function VehicleContent() {
   const { ride, setRide } = useApp();
 
   const pickup = ride.pickup ?? DEFAULT_PICKUP;
-  const route = routeOrFallback(pickup, ride.destination!, ride.route);
+  // FlowGuard da bao dam co tuyen DUONG THAT trong draft (tinh o /ride/pickup).
+  const route = ride.route!;
 
   function selectVehicle(id: string, type: Vehicle['type'], fare: number) {
     trackEvent({

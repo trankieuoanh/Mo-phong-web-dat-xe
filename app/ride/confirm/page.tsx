@@ -12,7 +12,7 @@
  */
 
 import { useRouter } from 'next/navigation';
-import { DEFAULT_PICKUP, calcFare, calcRideTotals, getPromo, getVehicle } from '@/lib/shared';
+import { DEFAULT_PICKUP, calcFare, calcRideTotals, getPromo, getVehicle, isRoadRoute } from '@/lib/shared';
 import { BackButton } from '@/components/BackButton';
 import { FlowGuard } from '@/components/FlowGuard';
 import { Icon, type IconName } from '@/components/Icon';
@@ -20,7 +20,6 @@ import { MapCanvas } from '@/components/MapCanvas';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { ScreenShell } from '@/components/ScreenShell';
 import { useApp, type PaymentMethod } from '@/lib/app-context';
-import { routeOrFallback } from '@/lib/use-route';
 import { formatVnd } from '@/lib/format';
 import { trackEvent, useScreenView } from '@/lib/track';
 
@@ -33,7 +32,7 @@ export default function RideConfirmPage() {
   const { ride } = useApp();
   return (
     <FlowGuard
-      ready={Boolean(ride.destination && ride.vehicleId && ride.promoId !== undefined)}
+      ready={Boolean(ride.destination && ride.vehicleId && ride.promoId !== undefined) && isRoadRoute(ride.route)}
       fallback="/ride/address"
     >
       <RideConfirmContent />
@@ -53,7 +52,7 @@ function RideConfirmContent() {
   const promo = ride.promoId ? (getPromo(ride.promoId) ?? null) : null;
   const paymentMethod = ride.paymentMethod ?? 'cash';
 
-  const route = routeOrFallback(pickup, destination, ride.route);
+  const route = ride.route!; // FlowGuard bao dam tuyen duong that — cung hinh hoc voi preview o /ride/pickup
 
   // Cung mot ham voi luc ghi event — man hinh va du lieu KHONG THE lech nhau.
   const totals = calcRideTotals(vehicle ? calcFare(vehicle, route.distanceKm) : 0, promo);

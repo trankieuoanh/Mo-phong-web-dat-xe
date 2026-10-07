@@ -7,6 +7,15 @@
  * chan IP giua luc demo chu khong phai mot test do.
  */
 import 'server-only';
+import { setDefaultAutoSelectFamilyAttemptTimeout } from 'node:net';
+
+/**
+ * Node (>= 20) thu IPv4 roi IPv6 ("happy eyeballs") va CHI CHO MOI DUONG 250 ms mac dinh. Toi mot may chu o
+ * chau Au (router.project-osrm.org, Photon, Overpass...) tu Viet Nam, bat tay TCP hay mat > 250 ms nen lan
+ * dau bi `AggregateError ETIMEDOUT` (IPv4 chua kip, IPv6 `ENETUNREACH`) roi lan sau lai chay — dung la loi
+ * "tuyen duong hom nay tinh duoc, hom sau khong". Noi len 2 giay cho MOI process goi cac dich vu ngoai.
+ */
+setDefaultAutoSelectFamilyAttemptTimeout(2000);
 
 interface GateOptions {
   /** Khoang cach toi thieu giua hai lan goi upstream, don vi ms. */

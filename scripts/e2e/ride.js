@@ -67,8 +67,8 @@ const api = (p, init) => fetch(B + p, init).then((r) => r.json());
 
     // /history
     await page.goto(B + '/history', { waitUntil: 'networkidle2' }); await sleep(2500);
-    const hist = await text(page);
-    check('/history hiện chuyến vừa đặt', hist.includes('Nhà') || hist.includes('Trần Duy Hưng') || /1\s*$/.test(hist) , hist.slice(0, 160));
+    const hist = await page.evaluate(() => document.body.innerText.replace(/\s+/g, ' '));
+    check('/history hiện chuyến vừa đặt', /Tổng số chuyến 1\b/.test(hist), hist.slice(hist.indexOf('Tổng số'), hist.indexOf('Tổng số') + 60));
     const mine = await api(`/api/events?user_id=${encodeURIComponent(phoneE164)}`);
     check('GET /api/events?user_id= trả đúng lịch sử của người đó', mine.some((e) => e.event_name === 'confirm_ride'), `${mine.length} event`);
 

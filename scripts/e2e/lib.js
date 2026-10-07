@@ -4,10 +4,13 @@ exports.launch = async () => {
   const dir = process.env.HOME + '/ffprof-pptr';
   fs.rmSync(dir, { recursive: true, force: true }); fs.mkdirSync(dir, { recursive: true });
   // Khong co GPS trong headless: tat geolocation de app lui ve DEFAULT_PICKUP ngay thay vi doi mai.
-  fs.writeFileSync(dir + '/user.js', 'user_pref("geo.enabled", false);\nuser_pref("permissions.default.geo", 2);\n');
+  fs.writeFileSync(dir + '/user.js', 'user_pref("geo.enabled", false);\nuser_pref("permissions.default.geo", 2);\n' + (process.env.W ? `user_pref("layout.css.devPixelsPerPx", "${800 / Number(process.env.W)}");\n` : ''));
   const browser = await puppeteer.launch({ browser: 'firefox', executablePath: '/snap/bin/firefox', headless: true,
-    args: ['--no-remote', '--profile', process.env.HOME + '/ffprof-pptr', '--width=1440', '--height=900'], protocol: 'webDriverBiDi' });
+    args: ['--no-remote', '--profile', process.env.HOME + '/ffprof-pptr', '--width=1440', '--height=900'], protocol: 'webDriverBiDi',
+    env: { ...process.env, ...(process.env.W ? { MOZ_HEADLESS_WIDTH: process.env.W, MOZ_HEADLESS_HEIGHT: process.env.H || '900' } : {}) } });
   const page = await browser.newPage();
+  // Firefox/BiDi khong ho tro page.setViewport (emulation.setScreenOrientationOverride): goi thang browsingContext.
+  if (process.env.W) await page.mainFrame().browsingContext.setViewport({ viewport: { width: Number(process.env.W), height: Number(process.env.H || 900) } });
   return { browser, page };
 };
 exports.text = (page) => page.evaluate(() => document.body.innerText.replace(/\n+/g, ' | ').slice(0, 400));

@@ -169,7 +169,7 @@ Bảng này được mã hoá **một lần duy nhất** thành `SCREENS` trong 
 >
 > `payment_method` là `"cash"` hoặc `"qr"`, mặc định `"cash"`. Ghi lại vì đây là một lựa chọn của người dùng ở bước cuối — không ghi thì không biết ai đổi khỏi mặc định.
 >
-> **`route_source`** là `"osrm"` (tuyến đường thật, lấy từ `GET /api/route`) hoặc `"straight"` (dịch vụ định tuyến không trả lời nên đã suy biến về đường nối thẳng, quãng đường tính theo đường chim bay).
+> **`route_source`** là `"osrm"` (tuyến đường thật, lấy từ `GET /api/route`) hoặc `"straight"` (**chỉ còn ở dữ liệu cũ**: trước 10/2026 khi dịch vụ định tuyến không trả lời thì giao diện suy biến về đường nối thẳng, quãng đường theo đường chim bay). Từ 10/2026 giao diện **chặn đặt** cho tới khi có tuyến OSRM thật, nên event mới luôn là `"osrm"`; khi phân tích dữ liệu trộn cũ + mới vẫn phải lọc `route_source == 'osrm'`.
 >
 > **Bắt buộc phải có khoá này.** Thiếu nó thì một chuyến 8 km đường thật và một chuyến 8 km đường chim bay trông giống hệt nhau trong dữ liệu, mà đường chim bay luôn ngắn hơn đường thật đáng kể. Mọi phân tích theo quãng đường sẽ trộn lẫn hai loại và không có cách nào tách ra về sau. Khi phân tích, lọc `route_source == 'osrm'` trước khi so sánh quãng đường hay giá.
 >

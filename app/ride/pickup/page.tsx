@@ -51,7 +51,10 @@ function PickupContent() {
   // draft. Man chon xe va man xac nhan chi DOC lai — hai lan fetch co the ra hai
   // quang duong hoi khac nhau, va khi do gia tren man hinh khong khop gia trong
   // event (xem ghi chu o RideDraft.route).
-  const { route } = useRoute(pickup, destination);
+  // `route` CHI la tuyen OSRM that (hoac null khi dang tai / loi). Truoc day hook dat duong thang tam
+  // thoi va effect nay luu NGUYEN no vao draft — bam "Chon diem don nay" nhanh la ca vehicle/promo/
+  // confirm dung duong chim bay. Gio chua co tuyen that thi nut o duoi bi khoa.
+  const { route, status: routeStatus, retry: retryRoute } = useRoute(pickup, destination);
 
   useEffect(() => {
     if (route) setRide({ route });
@@ -60,7 +63,9 @@ function PickupContent() {
   function choosePickup(place: Place) {
     // CHUA ban event — `confirm_pickup` o nut duoi moi la moc do, va nho vay
     // moi session co dung MOT `confirm_pickup` du nguoi dung doi qua doi lai.
-    setRide({ pickup: place });
+    // Doi diem don → tuyen cu khong con dung nua: bo no de man sau khong dung nham, tuyen moi se duoc
+    // tinh lai boi useRoute o tren.
+    setRide({ pickup: place, route: undefined });
     setPickingPickup(false);
     setPickingPickupBySearch(false);
   }
@@ -77,6 +82,8 @@ function PickupContent() {
   }
 
   function confirmPickup() {
+    // Khong co tuyen that thi khong di tiep (nut cung da bi khoa): gia o cac man sau tinh tu quang duong nay.
+    if (!route) return;
     const driverNote = note.trim();
     trackEvent({
       eventName: 'confirm_pickup',
@@ -115,6 +122,8 @@ function PickupContent() {
           pickup={pickup}
           destination={destination}
           route={route}
+          routeStatus={routeStatus}
+          onRetry={retryRoute}
           label={pickingPickup ? 'Bấm lên bản đồ để chọn điểm đón' : undefined}
           fill
           onPick={pickingPickup ? pickPickupOnMap : undefined}
@@ -122,7 +131,11 @@ function PickupContent() {
       }
       title="Xác nhận điểm đón"
       leading={<BackButton from="pickup_confirm" to="address_selection" href="/ride/address" />}
-      footer={<PrimaryButton onClick={confirmPickup}>Chọn điểm đón này</PrimaryButton>}
+      footer={
+        <PrimaryButton onClick={confirmPickup} disabled={routeStatus !== 'success'}>
+          {routeStatus === 'loading' ? 'Đang tính tuyến đường…' : 'Chọn điểm đón này'}
+        </PrimaryButton>
+      }
     >
       {pickingPickup ? (
         <>

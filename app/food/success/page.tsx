@@ -7,7 +7,10 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { calcFoodTotals, getFoodItem, getOffer } from '@/lib/shared';
+import { calcFoodTotals, getFoodItem, getOffer, type Place } from '@/lib/shared';
+import { MapCanvas } from '@/components/MapCanvas';
+import { useRoute } from '@/lib/use-route';
+import { simulationDurationMs, useVehicleSimulation } from '@/lib/use-vehicle-simulation';
 import { Icon } from '@/components/Icon';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { ScreenShell } from '@/components/ScreenShell';
@@ -28,17 +31,26 @@ interface OrderSummary {
 export default function FoodSuccessPage() {
   useScreenView('food_success');
   const router = useRouter();
-  const { cart, offerId, hydrated, sessionId, clearCart, resetAll } = useApp();
+  const { cart, offerId, food, hydrated, sessionId, clearCart, resetAll } = useApp();
 
   // Chup tom tat truoc khi xoa gio — neu khong, man hinh trong rong ngay
   // sau khi clearCart() chay.
   const [summary, setSummary] = useState<OrderSummary | null>(null);
+
+  // Quan + dia chi giao de mo phong xe giao hang: chup TRUOC clearCart() (xoa ca `food`). Tuyen lay lai
+  // bang useRoute — CUNG cap toa do voi man xac nhan nen trung cache module, KHONG goi them OSRM.
+  const [delivery, setDelivery] = useState<{ restaurant: Place; destination: Place } | null>(null);
+  const { route, status: routeStatus, retry: retryRoute } = useRoute(delivery?.restaurant, delivery?.destination);
+  const sim = useVehicleSimulation(route?.geometry ?? null, route ? simulationDurationMs(route.durationMin) : 0);
 
   useEffect(() => {
     if (!hydrated || summary) return;
 
     const offer = offerId ? (getOffer(offerId) ?? null) : null;
     const totals = calcFoodTotals(cart, offer, getFoodItem);
+    if (food.restaurantPlace && food.origin) {
+      setDelivery({ restaurant: food.restaurantPlace, destination: food.origin });
+    }
     setSummary({
       itemCount: totals.itemCount,
       total: formatVnd(totals.finalTotal),
@@ -47,7 +59,7 @@ export default function FoodSuccessPage() {
 
     // Clear `cart` + `offerId` sau place_order — screen-map.md muc 3.
     clearCart();
-  }, [hydrated, cart, offerId, sessionId, summary, clearCart]);
+  }, [hydrated, cart, offerId, food, sessionId, summary, clearCart]);
 
   function backToHome() {
     trackEvent({ eventName: 'back_to_home', screenName: 'food_success' });
@@ -81,6 +93,30 @@ export default function FoodSuccessPage() {
           Đơn của bạn đang được nhà hàng chuẩn bị
         </p>
       </div>
+
+      {delivery ? (
+        <div className="mb-lg">
+          <p className="t-body-sm-strong mb-sm text-center" aria-live="polite">
+            {route
+              ? sim.status === 'arrived'
+                ? 'Đơn hàng đã đến nơi'
+                : `Đang giao hàng · còn khoảng ${Math.max(1, Math.ceil((1 - sim.progress) * route.durationMin))} phút`
+              : routeStatus === 'error'
+                ? 'Chưa có tuyến giao hàng'
+                : 'Đang tính tuyến giao hàng…'}
+          </p>
+          <MapCanvas
+            pickup={delivery.restaurant}
+            destination={delivery.destination}
+            route={route}
+            routeStatus={routeStatus}
+            onRetry={retryRoute}
+            vehicle={sim.position}
+            originKind="restaurant"
+          />
+          <p className="t-caption mt-xs text-center text-mute">Mô phỏng hành trình — không phải vị trí thật của người giao.</p>
+        </div>
+      ) : null}
 
       <div className="rounded-xl bg-canvas-soft p-lg sm:p-2xl [&>*]:flex-wrap [&>*]:gap-sm [&>*>span]:min-w-0 [&>*>span:last-child]:text-right">
         {/* Trong luc `summary` con null thi day la SKELETON, khong phai chuoi

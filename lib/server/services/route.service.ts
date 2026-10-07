@@ -15,7 +15,13 @@ import { roundKm } from '@/lib/shared';
 import type { RouteQuery } from '../validators/route.validator';
 import { createUpstreamGate } from './upstream';
 
-const OSRM_URL = 'https://router.project-osrm.org/route/v1/driving';
+/**
+ * May chu dinh tuyen. Mac dinh la MAY CHU DEMO CONG CONG cua OSRM: khong SLA, co gioi han tan suat,
+ * khong co du lieu giao thong. Khi len production nen tu host OSRM va dat `OSRM_BASE_URL`
+ * (vd. `http://osrm.noi-bo:5000/route/v1/driving`). Bien nay cung dung de GIA LAP LOI khi kiem thu
+ * (tro toi cong dong) — xem scripts/e2e/route.js.
+ */
+const OSRM_URL = (process.env.OSRM_BASE_URL || 'https://router.project-osrm.org/route/v1/driving').replace(/\/$/, '');
 
 /** Qua moc nay thi coi nhu OSRM khong tra loi. */
 const UPSTREAM_TIMEOUT_MS = 8000;
@@ -68,6 +74,9 @@ async function callOsrm(query: RouteQuery): Promise<RouteResult> {
   }
 
   const coordinates = route.geometry?.coordinates ?? [];
+  // Mot tuyen it hon 2 diem khong phai "tuyen duong": FE se ve no thanh mot cham/duong thang gia.
+  // Tu choi o day de FE thay mot LOI that (502) thay vi mot tuyen rong vo nghia.
+  if (coordinates.length < 2) throw new Error('upstream trả về tuyến rỗng');
 
   return {
     distanceKm: roundKm((route.distance ?? 0) / 1000),
@@ -78,6 +87,30 @@ async function callOsrm(query: RouteQuery): Promise<RouteResult> {
   };
 }
 
+/**
+ * Loi TAM THOI cua OSRM cong cong: mang timeout (fetch failed / TimeoutError) hoac HTTP 5xx/429. Do that: tu
+ * may dev, lan goi dau toi router.project-osrm.org hay ETIMEDOUT (IPv4 cham, IPv6 khong toi duoc), lan sau
+ * thi nhanh. "Khong co tuyen" (NoRoute/NoSegment) KHONG phai loi tam thoi — thu lai cung vo ich.
+ */
+function isTransient(error: unknown): boolean {
+  if (error instanceof Error) {
+    if (error.name === 'TimeoutError' || error instanceof TypeError) return true;
+    return /^upstream (5\d\d|429)$/.test(error.message);
+  }
+  return false;
+}
+
+/** Mot lan thu lai sau 400 ms cho loi tam thoi. FE co them nut "Thu lai" cho truong hop that bai han. */
+async function callOsrmWithRetry(query: RouteQuery): Promise<RouteResult> {
+  try {
+    return await callOsrm(query);
+  } catch (error) {
+    if (!isTransient(error)) throw error;
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    return callOsrm(query);
+  }
+}
+
 export function findRoute(query: RouteQuery): Promise<RouteResult> {
-  return gate.run(cacheKey(query), () => callOsrm(query));
+  return gate.run(cacheKey(query), () => callOsrmWithRetry(query));
 }

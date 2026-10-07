@@ -54,7 +54,7 @@ Không có test tự động — `techstack.md` đã chốt là kiểm thử b�
    grep -rn "lib/server" app components lib --include=*.ts --include=*.tsx \
      | grep -v "^app/api/" | grep -v "^lib/server/"     # phải rỗng
    ```
-2. **Không dùng tiền tố `NEXT_PUBLIC_`** cho bất kỳ biến Cloudflare/Firebase nào (`CLOUDFLARE_API_TOKEN`, `ANALYTICS_TOKEN`…) — tiền tố đó nhúng giá trị vào bundle trình duyệt. Quy tắc này **quan trọng hơn trước**: biến giờ nằm ở `.env.local` của chính project Next.js, tức đúng nơi tiền tố đó có hiệu lực thật, và không còn package tách biệt nào đỡ giùm.
+2. **Không dùng tiền tố `NEXT_PUBLIC_`** cho bất kỳ biến Cloudflare/Firebase nào (`CLOUDFLARE_API_TOKEN`, `ANALYTICS_TOKEN`…). Ngoại lệ có chủ ý duy nhất: `STADIA_API_KEY` (không tiền tố) được server đọc rồi giao cho trình duyệt qua `GET /api/tiles`, vì thẻ `<img>` tile bắt buộc có key trong URL — nó **không phải bí mật**, nên phải giới hạn key theo domain ở trang quản trị Stadia — tiền tố đó nhúng giá trị vào bundle trình duyệt. Quy tắc này **quan trọng hơn trước**: biến giờ nằm ở `.env.local` của chính project Next.js, tức đúng nơi tiền tố đó có hiệu lực thật, và không còn package tách biệt nào đỡ giùm.
 3. **`trackEvent` trả `void`, không phải Promise.** Không bao giờ `await` trước khi điều hướng. Chi tiết ở `screen-map.md` mục 4.
 4. **Không tự sinh giá trị màu/spacing/radius mới.** Mọi giá trị phải truy được về token trong `DESIGN.md` qua bảng ở `tailwind-theme.md`.
 5. **Không đổi `id` trong `mock-data.md`** (`addr-home`, `banh-mi-01`, `veh-bike`…). Chúng đi thẳng vào `properties` của event; đổi id làm dữ liệu cũ và mới không ghép được.
@@ -115,7 +115,8 @@ lib/
   use-current-place.ts    hook GPS, lùi về DEFAULT_PICKUP khi bị từ chối
   use-tile-providers.ts   hook gọi GET /api/tiles — lọc nhà cung cấp tile đã hỏng
   reverse-place.ts        toạ độ → Place có tên, qua GET /api/reverse
-  use-route.ts            hook gọi GET /api/route + đường lùi straightRoute
+  use-route.ts            hook gọi GET /api/route → {route, status, retry}; CHỈ tuyến OSRM thật (không đường lùi)
+  use-vehicle-simulation.ts  xe chạy dọc tuyến thật (nội suy theo độ dài), dùng cho đặt xe và giao đồ ăn
   format.ts               formatVnd
 
   shared/                 DÙNG CHUNG client + server. KHÔNG import gì từ lib/server.
@@ -124,7 +125,7 @@ lib/
     mock-data.ts          dữ liệu tĩnh
     food.ts               normalizeVi, mealOfHour, menuOf — logic tìm món
     places.ts             Place, PlaceSource, DEFAULT_PICKUP, PRESET_PLACES
-    route.ts              RouteResult, haversineKm, straightRoute
+    route.ts              RouteResult, haversineKm, isRoadRoute, pointAlong/bearingDeg (hình học tuyến)
     tiles.ts              TILE_PROVIDERS + PROBE_TILE
     phone.ts              normalizeVnPhone, formatVnPhone, AUTH_COOKIE, OTP_COOKIE
     pricing.ts            calcFare (giá theo km), calcDiscount, calcRideTotals,

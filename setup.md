@@ -149,7 +149,7 @@ Không cần API key: Nominatim miễn phí. Đổi lại nó giới hạn **1 r
 |---|---|---|---|
 | **Photon** (`photon.komoot.io`) | `GET /api/places`, `GET /api/reverse` — địa chỉ | không | Panel hiện cảnh báo, vẫn liệt kê 5 địa chỉ gợi ý; nhãn địa chỉ lùi về mặc định |
 | **Overpass** (`overpass-api.de`) | `GET /api/restaurants` — quán ăn | không | Dải "Gần bạn" hiện lỗi kèm nút Thử lại; ba cách tìm món còn lại vẫn chạy |
-| **OSRM** (`router.project-osrm.org`) | `GET /api/route` — tuyến đường | không | Dùng đường nối thẳng, ghi `route_source: "straight"` |
+| **OSRM** (`router.project-osrm.org`) | `GET /api/route` — tuyến đường | không | Bản đồ báo "Không tính được tuyến đường" + nút Thử lại; **chặn** nút "Chọn điểm đón này" tới khi có tuyến thật (server tự thử lại 1 lần với lỗi mạng tạm thời) |
 | **Tile Stadia** (`tiles.stadiamaps.com`) | Nền bản đồ trong `MapCanvas` | không — nhưng **chỉ ở localhost** | Tự chuyển sang `tile.openstreetmap.fr`, rồi `tile.openstreetmap.de`; hết đường thì hiện "Không tải được nền bản đồ" |
 
 Cả bốn là **hạ tầng cộng đồng miễn phí**, chỉ hợp cho demo cục bộ.
@@ -177,7 +177,7 @@ Cả bốn là **hạ tầng cộng đồng miễn phí**, chỉ hợp cho demo 
 > Kiểm tra nhanh từ chính máy chạy dự án:
 > ```bash
 > curl -s -o /dev/null -w '%{http_code}\n' -e http://localhost:3000/ \
->   https://tiles.stadiamaps.com/tiles/osm_bright/13/6720/3638.png
+>   "https://tiles.stadiamaps.com/tiles/alidade_smooth/13/6720/3638.png?api_key=$STADIA_API_KEY"
 > curl -s -o /dev/null -w '%{http_code}\n' https://overpass-api.de/api/status
 > curl -s -o /dev/null -w '%{http_code}\n' 'https://photon.komoot.io/reverse?lat=21.03&lon=105.78'
 > ```

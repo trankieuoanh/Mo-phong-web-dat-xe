@@ -82,14 +82,21 @@ async function probe(url: string, origin: string): Promise<boolean> {
  * bat duoc. Nho vay cache 6 gio moi an toan — mot cu chop mang khong con dau
  * doc duoc ca danh sach.
  */
+/** Key Stadia (server-only). Thieu thi nha cung cap `needsKey` bi bo qua, khong bi coi la "hong". */
+function keyFor(providerName: string): string | undefined {
+  return providerName === 'stadia' ? process.env.STADIA_API_KEY || undefined : undefined;
+}
+
 async function probeAll(origin: string): Promise<string[]> {
   const { z, x, y } = PROBE_TILE;
 
   // Ba nha cung cap la ba ten mien khac nhau, goi song song khong ai bi don dap.
   const verdicts = await Promise.all(
     TILE_PROVIDERS.map(async (provider) => {
+      // Chua co key thi khong co gi de do: bo han (khac voi "do khong ket luan duoc" ben duoi).
+      if (provider.needsKey && !keyFor(provider.name)) return null;
       try {
-        return (await probe(provider.url(z, x, y), origin)) ? provider.name : null;
+        return (await probe(provider.url(z, x, y, keyFor(provider.name)), origin)) ? provider.name : null;
       } catch (error) {
         console.error(
           `[GET /api/tiles] ${provider.name} khong do duoc, TAM GIU LAI trong danh sach:`,
@@ -115,4 +122,17 @@ async function probeAll(origin: string): Promise<string[]> {
  */
 export function findUsableTileProviders(origin: string): Promise<string[]> {
   return gate.run(origin, () => probeAll(origin));
+}
+
+/**
+ * Key cua cac nha cung cap `needsKey` DA QUA PHEP DO — de giao cho trinh duyet (the <img> phai co
+ * key trong URL). Chi tra key cua nha cung cap vua chung minh la dung duoc voi key do.
+ */
+export function tileKeysFor(usable: string[]): Record<string, string> {
+  const keys: Record<string, string> = {};
+  for (const name of usable) {
+    const key = keyFor(name);
+    if (key) keys[name] = key;
+  }
+  return keys;
 }

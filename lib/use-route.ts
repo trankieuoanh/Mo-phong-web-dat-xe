@@ -1,86 +1,116 @@
 'use client';
 
 /**
- * Lay tuyen duong that qua `GET /api/route`, voi DUONG LUI bat buoc.
+ * Lay tuyen duong THAT (OSRM) qua `GET /api/route`, dung chung cho dat xe va giao do an.
  *
  * KHONG BAN EVENT NAO — day la tra cuu ha tang, khong phai mot buoc funnel.
+ *
+ * QUY TAC CUA FILE NAY: `route` chi bao gio la tuyen OSRM that, hoac `null`. KHONG co duong lui
+ * "noi thang hai diem" nua. Ban truoc dat duong thang NGAY truoc khi fetch (de man hinh luon co
+ * mot con so) va giu nguyen khi OSRM loi, nen nguoi dung nhin thay mot duong thang trong khi
+ * tuong do la lo trinh — va con so do con bi luu vao draft, di vao gia va vao event
+ * (`route_source: 'straight'`). Gio chua co tuyen that thi `status` la 'loading' / 'error' va noi
+ * nao can tuyen thi phai cho/hien loi (xem app/ride/pickup/page.tsx).
  *
  * `/api/route` la route handler cua chinh app nay (app/api/route/route.ts).
  */
 
-import { useEffect, useState } from 'react';
-import { straightRoute, type Place, type RouteResult } from '@/lib/shared';
+import { useCallback, useEffect, useState } from 'react';
+import type { LatLon, RouteResult } from '@/lib/shared';
 
-/**
- * Tra ve tuyen duong, hoac `null` khi chua du hai diem.
- *
- * Trong luc dang tai van tra ve duong thang tam thoi thay vi `null`: man chon
- * xe can mot con so de tinh gia ngay, va mot o gia trong roi nhay so trong nhu
- * loi. `source` cho biet day co phai con so cuoi cung chua.
- */
-export function useRoute(pickup: Place | undefined, destination: Place | undefined) {
-  const [route, setRoute] = useState<RouteResult | null>(null);
-  const [loading, setLoading] = useState(false);
+export type RouteStatus = 'idle' | 'loading' | 'success' | 'error';
 
-  // Chi phu thuoc toa do, khong phu thuoc ca object: doi nhan ma giu nguyen
-  // toa do thi khong can goi lai.
-  const fromKey = pickup ? `${pickup.lat},${pickup.lon}` : '';
-  const toKey = destination ? `${destination.lat},${destination.lon}` : '';
+export interface RouteState {
+  /** Tuyen OSRM that, hoac `null` (chua co hai diem / dang tai / loi). */
+  route: RouteResult | null;
+  status: RouteStatus;
+  /** Goi lai sau khi that bai. Khong lam gi neu khong o trang thai 'error'. */
+  retry: () => void;
+}
+
+/** Doi nguoi dung ngung bam bao nhieu ms truoc khi hoi OSRM (doi diem lien tuc tren ban do). */
+const DEBOUNCE_MS = 250;
+/** Ban do xuat hien o nhieu man; cache o cap MODULE de doi man khong phai hoi lai. */
+const CACHE_MAX = 50;
+const cache = new Map<string, RouteResult>();
+
+/** 5 chu so thap phan ≈ 1 m: hai lan bam cung mot dia chi phai trung khoa. */
+function keyOf(point: LatLon | undefined): string {
+  return point ? `${point.lat.toFixed(5)},${point.lon.toFixed(5)}` : '';
+}
+
+function remember(key: string, route: RouteResult): void {
+  cache.delete(key);
+  cache.set(key, route);
+  if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value as string);
+}
+
+async function fetchRoute(from: string, to: string, signal: AbortSignal): Promise<RouteResult> {
+  const response = await fetch(`/api/route?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, {
+    signal,
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(body?.error ?? `HTTP ${response.status}`);
+  const route = body as RouteResult;
+  // Phong ve: server da tu choi tuyen < 2 diem, nhung FE khong duoc tin vao do de ve duong thang gia.
+  if (!Array.isArray(route?.geometry) || route.geometry.length < 2) throw new Error('tuyen rong');
+  return route;
+}
+
+export function useRoute(origin: LatLon | undefined, destination: LatLon | undefined): RouteState {
+  const fromKey = keyOf(origin);
+  const toKey = keyOf(destination);
+  const pairKey = fromKey && toKey ? `${fromKey}->${toKey}` : '';
+
+  // Khoi tao tu cache: quay lai mot man da co tuyen thi KHONG nhay qua trang thai 'loading'.
+  const [state, setState] = useState<{ pairKey: string; route: RouteResult | null; status: RouteStatus }>(() => {
+    const hit = pairKey ? cache.get(pairKey) : undefined;
+    return hit ? { pairKey, route: hit, status: 'success' } : { pairKey, route: null, status: pairKey ? 'loading' : 'idle' };
+  });
+  /** Tang len de buoc effect chay lai (nut "Thu lai"). */
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    if (!fromKey || !toKey) {
-      setRoute(null);
+    if (!pairKey) {
+      setState({ pairKey: '', route: null, status: 'idle' });
       return;
     }
 
-    let cancelled = false;
-    setLoading(true);
+    const hit = cache.get(pairKey);
+    if (hit) {
+      setState({ pairKey, route: hit, status: 'success' });
+      return;
+    }
 
-    // Duong lui dat NGAY, truoc khi fetch: neu OSRM cham hoac chet, man hinh
-    // van co quang duong de tinh gia. Se bi ghi de khi tuyen that ve.
-    const fallback = straightRoute(
-      { lat: Number(fromKey.split(',')[0]), lon: Number(fromKey.split(',')[1]) },
-      { lat: Number(toKey.split(',')[0]), lon: Number(toKey.split(',')[1]) },
-    );
-    setRoute(fallback);
+    // Doi diem -> tuyen cu bien mat NGAY (khong de tuyen cua cap diem truoc nam tren ban do).
+    setState({ pairKey, route: null, status: 'loading' });
 
-    fetch(`/api/route?from=${encodeURIComponent(fromKey)}&to=${encodeURIComponent(toKey)}`)
-      .then(async (response) => {
-        const body = await response.json();
-        if (!response.ok) throw new Error(body?.error ?? `HTTP ${response.status}`);
-        return body as RouteResult;
-      })
-      .then((result) => {
-        if (!cancelled) setRoute(result);
-      })
-      .catch(() => {
-        // Giu nguyen duong lui da dat o tren. `route_source: 'straight'` se di
-        // vao event, nen du lieu noi that ve viec con so den tu dau.
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      fetchRoute(fromKey, toKey, controller.signal)
+        .then((route) => {
+          remember(pairKey, route);
+          setState({ pairKey, route, status: 'success' });
+        })
+        .catch((error: unknown) => {
+          if (controller.signal.aborted) return; // request cu bi huy vi da doi diem — khong phai loi
+          // Chi tiet ky thuat cho nguoi phat trien; nguoi dung chi thay thong bao chung.
+          console.warn('[useRoute] khong lay duoc tuyen duong:', error instanceof Error ? error.message : error);
+          setState({ pairKey, route: null, status: 'error' });
+        });
+    }, DEBOUNCE_MS);
 
     return () => {
-      cancelled = true;
+      clearTimeout(timer);
+      controller.abort();
     };
-  }, [fromKey, toKey]);
+  }, [pairKey, fromKey, toKey, attempt]);
 
-  return { route, loading };
-}
+  const retry = useCallback(() => setAttempt((n) => n + 1), []);
 
-/**
- * Tuyen duong de TINH GIA o cac man sau man 2.
- *
- * Draft co the CHUA CO `route` neu nguoi dung vao thang mot URL giua luong roi F5.
- * Khi do tinh duong thang ngay tai cho thay vi de man hinh khong co gia:
- * FlowGuard da bao dam co `destination`, nen KHONG BAO GIO co trang thai
- * "khong tinh duoc gia".
- */
-export function routeOrFallback(
-  pickup: Place,
-  destination: Place,
-  route: RouteResult | undefined,
-): RouteResult {
-  return route ?? straightRoute(pickup, destination);
+  // `state` co the cu mot nhip (render dau sau khi doi diem, truoc khi effect chay): chi tin neu khop.
+  if (state.pairKey !== pairKey) {
+    return { route: null, status: pairKey ? 'loading' : 'idle', retry };
+  }
+  return { route: state.status === 'success' ? state.route : null, status: state.status, retry };
 }

@@ -87,6 +87,12 @@ export interface FoodDraft {
   origin?: Place;
   restaurantId?: string;
   restaurantName?: string;
+  /**
+   * Toa do + nhan cua quan dang chon — de ve tuyen QUAN → KHACH (app/food/confirm) va cho xe giao hang chay
+   * (app/food/success). Chi them field tuy chon: draft cu trong sessionStorage thieu no van doc duoc, va
+   * mon mock khong chon quan thi khong co tuyen (chi ghim dia chi giao nhu truoc).
+   */
+  restaurantPlace?: Place;
 }
 
 interface StoredState {

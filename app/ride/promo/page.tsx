@@ -13,7 +13,6 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
-  DEFAULT_PICKUP,
   PROMOS,
   calcDiscount,
   calcFare,
@@ -21,6 +20,7 @@ import {
   ruleBlock,
   type DiscountRule,
   type RuleContext,
+  isRoadRoute,
 } from '@/lib/shared';
 import { BackButton } from '@/components/BackButton';
 import { DiscountCodeInput } from '@/components/DiscountCodeInput';
@@ -29,7 +29,6 @@ import { Icon } from '@/components/Icon';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { ScreenShell } from '@/components/ScreenShell';
 import { useApp } from '@/lib/app-context';
-import { routeOrFallback } from '@/lib/use-route';
 import { formatRuleBlock, formatVnd } from '@/lib/format';
 import { trackEvent, useScreenView } from '@/lib/track';
 
@@ -37,7 +36,7 @@ export default function PromoPage() {
   const { ride } = useApp();
   return (
     <FlowGuard
-      ready={Boolean(ride.destination && ride.vehicleId)}
+      ready={Boolean(ride.destination && ride.vehicleId) && isRoadRoute(ride.route)}
       fallback="/ride/address"
     >
       <PromoContent />
@@ -53,7 +52,7 @@ function PromoContent() {
   // BAT BUOC dung calcFare, khong doc mot gia co dinh nao: `minOrder` cua promo
   // xet tren SO TIEN THAT cua chuyen. Doc nham la promo bi disable/enable sai.
   const vehicle = getVehicle(ride.vehicleId!);
-  const route = routeOrFallback(ride.pickup ?? DEFAULT_PICKUP, ride.destination!, ride.route);
+  const route = ride.route!; // FlowGuard bao dam tuyen duong that
   const basePrice = vehicle ? calcFare(vehicle, route.distanceKm) : 0;
 
   const [picked, setPicked] = useState<string | null>(ride.promoId ?? null);

@@ -309,7 +309,7 @@ export const FIXED_PICKUP = {
 
 **`FIXED_ROUTE = { distanceKm: 15, durationMin: 34 }` đã bị xoá.** Quãng đường và thời gian giờ lấy từ `GET /api/route` (OSRM) theo đúng hai điểm người dùng chọn, nên chúng biến thiên và **đi vào event**: `confirm_ride` mang `distance_km`, `duration_min`, `route_source`.
 
-`route_source` là `'osrm'` hoặc `'straight'`. Bắt buộc phải có: đường chim bay luôn ngắn hơn đường bộ đáng kể — đo thực tế Cầu Giấy → Nội Bài là **20,3 km** so với **25 km** đường thật — nên trộn hai loại sẽ kéo mọi thống kê quãng đường xuống một cách vô hình.
+`route_source` là `'osrm'` hoặc `'straight'` (**từ 10/2026 event mới luôn `'osrm'`**: `/ride/pickup` chặn tới khi có tuyến thật; `'straight'` chỉ còn ở dữ liệu cũ). Bắt buộc phải có: đường chim bay luôn ngắn hơn đường bộ đáng kể — đo thực tế Cầu Giấy → Nội Bài là **20,3 km** so với **25 km** đường thật — nên trộn hai loại sẽ kéo mọi thống kê quãng đường xuống một cách vô hình.
 
 ### 5.3 Toạ độ trong `Address`
 

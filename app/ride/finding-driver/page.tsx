@@ -15,7 +15,6 @@ import { FlowGuard } from '@/components/FlowGuard';
 import { Icon } from '@/components/Icon';
 import { ScreenShell } from '@/components/ScreenShell';
 import { useApp } from '@/lib/app-context';
-import { routeOrFallback } from '@/lib/use-route';
 import { trackEvent, useScreenView } from '@/lib/track';
 import {
   DEFAULT_PICKUP,
@@ -24,6 +23,7 @@ import {
   getPromo,
   getRandomDriver,
   getVehicle,
+  isRoadRoute,
 } from '@/lib/shared';
 
 export default function FindingDriverPage() {
@@ -33,6 +33,7 @@ export default function FindingDriverPage() {
       ride.destination &&
       ride.vehicleId &&
       ride.promoId !== undefined &&
+      isRoadRoute(ride.route) &&
       // Chap nhan CA 'assigned': khi tim thay tai xe, man nay goi setRide({driverStatus:'assigned'})
       // roi router.push('/ride/success'). Neu chi chap nhan 'searching' thi canEnter ngay lap tuc
       // thanh false va FlowGuard goi router.replace('/ride/address') CHAY DUA voi push — replace thang,
@@ -126,7 +127,7 @@ function FindingDriverContent({ leavingRef }: { leavingRef: MutableRefObject<boo
     // object chi co `id` nen luon ra 'car' ke ca voi xe may. Khong man nao doc
     // `cancel_ride` nen loi khong co trieu chung — no chi lam moi chuyen huy dong gop
     // doanh thu 0d va noi 100% chuyen huy la o to.
-    const route = routeOrFallback(pickup, destination, ride.route);
+    const route = ride.route!; // canEnter bao dam tuyen duong that
     const totals = calcRideTotals(vehicle ? calcFare(vehicle, route.distanceKm) : 0, promo);
 
     trackEvent({
