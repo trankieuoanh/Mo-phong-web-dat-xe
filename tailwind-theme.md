@@ -212,3 +212,7 @@ Dựng sẵn thành `components/FoodThumb.tsx` — **không viết lại markup 
 Hai biến thể: `cover` (4:3, trên thẻ món và màn chi tiết) và `tile` (`size-14`, trong hàng giỏ hàng và màn xác nhận).
 
 `FoodItem` có trường `image?: string` **để trống ở cả 29 món**. Khi có ảnh thật, thả file vào `public/food/<id>.webp` rồi điền đường dẫn — `FoodThumb` tự đổi sang thẻ `<img>`, không phải sửa component nào.
+
+## Màu bản đồ (`MapCanvas`)
+
+Tile bản đồ giữ nguyên màu thật của nhà cung cấp (không nhuộm). Lớp phủ của app chỉ dùng token sẵn có: tuyến = viền `canvas` + nét `primary-dark` + quầng `primary` 22%; điểm đón = chấm vòng `primary-dark`; điểm đến/xe = `ink`. Chi tiết: `fe-structure.md` mục `MapCanvas`.

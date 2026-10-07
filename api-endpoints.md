@@ -303,12 +303,12 @@ File: `app/api/tiles/route.ts` → `lib/server/services/tiles.service.ts`. Khôn
 | Nhà cung cấp | Kích thước tile biển | Kết luận |
 |---|---|---|
 | `osmfr`, `osmde` | 103 B | sạch |
-| Stadia (`alidade_smooth`, đang dùng) | 156 B | sạch |
+| Stadia (`osm_bright`, đang dùng) | 495 B | sạch |
 | Stadia (`osm_bright`, tone cũ) | 495 B | sạch |
 | CARTO | **1718 B** | có watermark |
 | Stadia, referer bản deploy | 14.885 B | 401 — loại ở bước mã trạng thái |
 
-Ngưỡng `PROBE_MAX_BYTES = 800` nằm giữa khe hở 495 → 1718 (`alidade_smooth` 156 B có thêm biên an toàn). **Đổi tone bản đồ thì phải đo lại con số này** — tone có màu nặng hơn tone xám ngay cả ở giữa biển (`alidade_smooth` 156 B → `osm_bright` 495 B). Một nhà cung cấp bị loại khi **đã trả lời** mà tile quá lớn, sai `content-type`, hoặc trả mã lỗi.
+Ngưỡng `PROBE_MAX_BYTES = 800` nằm giữa khe hở 495 → 1718 (`osm_bright` 495 B còn biên an toàn 305 B). **Đổi tone bản đồ thì phải đo lại con số này** — tone có màu nặng hơn tone xám ngay cả ở giữa biển (`alidade_smooth` 156 B → `osm_bright` 495 B). Một nhà cung cấp bị loại khi **đã trả lời** mà tile quá lớn, sai `content-type`, hoặc trả mã lỗi.
 
 > **Lỗi mạng KHÔNG phải là bằng chứng hỏng.** Không kết nối được thì nhà cung cấp đó vẫn được **giữ lại** trong danh sách. Việc của phép dò là *loại thứ đã chứng minh là hỏng*, không phải *chỉ nhận thứ đã chứng minh là tốt* — kết quả được cache 6 giờ, nên nếu một cú chớp mạng cũng đủ loại một nhà cung cấp thì danh sách dự phòng sẽ bị đầu độc cả buổi. Trường hợp nhà cung cấp chết thật thì `onError` ở FE vẫn bắt được.
 

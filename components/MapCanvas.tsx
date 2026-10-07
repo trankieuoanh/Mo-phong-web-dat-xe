@@ -26,6 +26,11 @@ const MAX_ZOOM = 18;
 /** Chua le quanh tuyen de ghim khong dinh sat mep. */
 const PADDING_RATIO = 0.12;
 
+/** Quang sang quanh tuyen (nam duoi vien trang) de tuyen noi tren nen ban do nhieu mau. */
+const ROUTE_HALO_WIDTH = 18;
+const ROUTE_CASING_WIDTH = 11;
+const ROUTE_LINE_WIDTH = 6;
+
 /**
  * Bang nha cung cap tile nam o `lib/shared/tiles.ts` — phep do phai do dung
  * cai danh sach ma man hinh nay se hien.
@@ -222,7 +227,7 @@ function VehicleMarker({ x, y, heading }: { x: number; y: number; heading: numbe
 /** Giot nuoc cam vao (x, y) — day nhon cham dung toa do do. */
 function Pin({ x, y, tone }: { x: number; y: number; tone: string }) {
   return (
-    <g data-testid="destination" transform={`translate(${x} ${y})`}>
+    <g data-testid="destination" transform={`translate(${x} ${y})`} style={{ filter: 'drop-shadow(0 1px 2px rgb(0 0 0 / 0.25))' }}>
       <ellipse cx="0" cy="2" rx="10" ry="3.5" fill="var(--color-ink)" opacity="0.2" />
       <path
         d="M0 0 C -8 -11, -11 -16, -11 -21 a11 11 0 1 1 22 0 c0 5 -3 10 -11 21 Z"
@@ -401,15 +406,12 @@ export function MapCanvas({
 
   /**
    * Lop tile — bao bang useMemo de moi lan xe nhich (re-render MapCanvas ~20 lan/giay) React KHONG phai
-   * doi chieu lai hang chuc the <img>. Nha cung cap chua `calm` (OSM raster) duoc giam bao hoa/do tuong
-   * phan bang CSS de nen khong choi mat; style da diu san (Stadia alidade_smooth) giu nguyen.
+   * doi chieu lai hang chuc the <img>. Giu NGUYEN mau cua nha cung cap (cong vien xanh, song xanh duong,
+   * duong pho co mau) — khong nhuom, khong loc — de nguoi dung nhin ra minh dang di qua dau.
    */
   const tileLayer = useMemo(
     () => (
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={provider.calm ? undefined : { filter: 'saturate(0.55) contrast(0.92) brightness(1.04)' }}
-      >
+      <div className="pointer-events-none absolute inset-0" style={{ background: 'var(--color-canvas-soft)' }}>
         {tiles.map((tile) => (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -427,7 +429,7 @@ export function MapCanvas({
         ))}
       </div>
     ),
-    [tiles, handleTileError, provider.calm],
+    [tiles, handleTileError],
   );
 
   const routeLine = useMemo(() => {
@@ -549,12 +551,21 @@ export function MapCanvas({
         >
           {routeLine ? (
             <>
-              {/* Vien trang ben duoi de tuyen noi tren nen tile; mau lay tu token (quy tac 4). */}
+              {/* Quang sang + vien trang ben duoi de tuyen noi tren nen ban do nhieu mau; mau lay tu token (quy tac 4). */}
+              <polyline
+                points={routeLine}
+                fill="none"
+                stroke="var(--color-primary)"
+                strokeOpacity="0.22"
+                strokeWidth={ROUTE_HALO_WIDTH}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
               <polyline
                 points={routeLine}
                 fill="none"
                 stroke="var(--color-canvas)"
-                strokeWidth="11"
+                strokeWidth={ROUTE_CASING_WIDTH}
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
@@ -563,7 +574,7 @@ export function MapCanvas({
                 points={routeLine}
                 fill="none"
                 stroke="var(--color-primary-dark)"
-                strokeWidth="6"
+                strokeWidth={ROUTE_LINE_WIDTH}
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />

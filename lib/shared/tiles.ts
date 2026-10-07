@@ -19,11 +19,6 @@ export interface TileProvider {
    * `GET /api/tiles`). Thieu key thi khong dua vao bang: tile se tra 401 va chi lang phi nhip thu lai.
    */
   needsKey?: boolean;
-  /**
-   * Style ban do da DIU MAT san (nen nhat, duong pho xam, nhan thua) — khong can loc them. Nha cung
-   * cap khong `calm` (OSM raster mac dinh) duoc MapCanvas giam bao hoa bang CSS de khong choi mat.
-   */
-  calm?: boolean;
   /** Ten hien trong dong ghi cong, canh `© OpenStreetMap`. */
   credit?: { label: string; href: string };
 }
@@ -81,14 +76,13 @@ export interface TileProvider {
 export const TILE_PROVIDERS: TileProvider[] = [
   {
     name: 'stadia',
-    // `alidade_smooth`: nen sang, it nhieu, duong pho trung tinh — hop ban do goi xe hon `osm_bright`.
+    // `osm_bright`: nen co mau that (cong vien xanh, song xanh duong, duong pho co mau) de de nhin.
     // Key di THEO URL (the <img> khong gui duoc header), nen trinh duyet THAY key: phai gioi han key
     // theo domain o trang quan tri Stadia.
     url: (z, x, y, key) =>
-      `https://tiles.stadiamaps.com/tiles/alidade_smooth/${z}/${x}/${y}.png${key ? `?api_key=${encodeURIComponent(key)}` : ''}`,
+      `https://tiles.stadiamaps.com/tiles/osm_bright/${z}/${x}/${y}.png${key ? `?api_key=${encodeURIComponent(key)}` : ''}`,
     credit: { label: '© Stadia Maps', href: 'https://stadiamaps.com/attribution/' },
     needsKey: true,
-    calm: true,
   },
   {
     // Du phong: cung du lieu OSM, khac ha tang va khac ten mien.
@@ -108,7 +102,6 @@ export const TILE_PROVIDERS: TileProvider[] = [
     name: 'carto',
     url: (z, x, y) => `https://basemaps.cartocdn.com/light_all/${z}/${x}/${y}.png`,
     credit: { label: '© CARTO', href: 'https://carto.com/attributions' },
-    calm: true,
   },
 ];
 
@@ -129,8 +122,8 @@ export const PROBE_TILE = { z: 13, x: 6707, y: 3740 } as const;
  * | Nha cung cap             | Kich thuoc | Ket luan            |
  * |--------------------------|------------|---------------------|
  * | osmfr, osmde             |     103 B  | sach                |
- * | Stadia `alidade_smooth`  |     156 B  | sach (DANG DUNG)    |
- * | Stadia `osm_bright`      |     495 B  | sach (tone cu)      |
+ * | Stadia `osm_bright`      |     495 B  | sach (DANG DUNG)    |
+ * | Stadia `alidade_smooth`  |     156 B  | sach (tone cu)      |
  * | CARTO                    |    1718 B  | CO WATERMARK        |
  * | Stadia, referer prod     |   14885 B  | 401 — loai tu `!ok` |
  *
