@@ -177,7 +177,7 @@ Cả bốn là **hạ tầng cộng đồng miễn phí**, chỉ hợp cho demo 
 > Kiểm tra nhanh từ chính máy chạy dự án:
 > ```bash
 > curl -s -o /dev/null -w '%{http_code}\n' -e http://localhost:3000/ \
->   "https://tiles.stadiamaps.com/tiles/alidade_smooth/13/6720/3638.png?api_key=$STADIA_API_KEY"
+>   "https://tiles.stadiamaps.com/tiles/osm_bright/13/6720/3638.png?api_key=$STADIA_API_KEY"
 > curl -s -o /dev/null -w '%{http_code}\n' https://overpass-api.de/api/status
 > curl -s -o /dev/null -w '%{http_code}\n' 'https://photon.komoot.io/reverse?lat=21.03&lon=105.78'
 > ```
