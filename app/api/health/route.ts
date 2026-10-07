@@ -1,8 +1,8 @@
 /**
- * GET /api/health — KHONG cham Firestore.
+ * GET /api/health — KHONG cham D1.
  *
  * Muc dich: xac nhan app chay dung TRUOC khi credential vao cuoc. Neu bo route
- * nay thi loi Firebase va loi cua chinh Next se tron vao nhau va rat kho tach.
+ * nay thi loi D1 va loi cua chinh Next se tron vao nhau va rat kho tach.
  * Xem setup.md Phase 0.
  *
  * Day cung la route duy nhat tra loi duoc khi chua co `.env.local` — vi vay no
@@ -16,6 +16,6 @@ export const dynamic = 'force-dynamic';
 
 export function GET() {
   // `events_cache` chi la bo dem hit/miss, khong chua credential hay du lieu event.
-  // events-cache.ts khong import db/, nen route nay van khong cham Firestore.
+  // events-cache.ts khong import db/, nen route nay van khong cham D1.
   return Response.json({ status: 'ok', events_cache: getEventsCacheStats() });
 }

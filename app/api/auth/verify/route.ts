@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
         { status: 401 },
       );
     }
-    // Khong chan dang nhap vi Firestore (vd. RESOURCE_EXHAUSTED) — xem user.service.ts.
+    // Khong chan dang nhap vi D1 (vd. het han muc ghi trong ngay) — xem user.service.ts.
     await recordLogin(input.value.phone).catch((error) => {
       console.warn('[POST /api/auth/verify] khong ghi duoc users/{phone}:', error);
     });

@@ -3,8 +3,9 @@
 /**
  * Chip nguoi dung goc phai top bar — theo sample_ui/homepage.png.
  *
- * Hien so dien thoai da dang nhap (chinh la `user_id` cua moi event, va la khoa
- * ma man /history dung de tra lich su) + nut "Dang xuat".
+ * Da dang nhap: hien so dien thoai (chinh la `user_id` cua moi event, va la khoa ma
+ * man /history dung de tra lich su) + nut "Dang xuat".
+ * Khach: nut "Dang nhap" mo LoginModal — khong ep dang nhap truoc khi dat.
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -14,7 +15,7 @@ import { useApp } from '@/lib/app-context';
 import { formatVnPhone } from '@/lib/shared';
 
 export function UserMenu() {
-  const { userId, signOut } = useApp();
+  const { userId, isAuthed, signOut, requireLogin } = useApp();
   const displayPhone = userId.startsWith('+84') ? formatVnPhone(userId) : '—';
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -28,6 +29,21 @@ export function UserMenu() {
     document.addEventListener('mousedown', onPointerDown);
     return () => document.removeEventListener('mousedown', onPointerDown);
   }, [open]);
+
+  if (!isAuthed) {
+    return (
+      <div className="ml-auto shrink-0">
+        <PrimaryButton
+          variant="secondary"
+          fullWidth={false}
+          className="min-h-11 py-sm"
+          onClick={() => requireLogin(() => {})}
+        >
+          Đăng nhập
+        </PrimaryButton>
+      </div>
+    );
+  }
 
   return (
     <div ref={ref} className="relative ml-auto shrink-0">

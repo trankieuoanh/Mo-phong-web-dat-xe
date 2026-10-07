@@ -1,193 +1,95 @@
 # db-design.md — GSM ride-booking simulation
 
-## Nguyên tắc thiết kế
-Firestore là **NoSQL document database** — không có bảng/cột cố định như Postgres. Dữ liệu tổ chức theo **collection** (giống "thư mục") chứa nhiều **document** (giống 1 file JSON). Project này chỉ cần **1 collection**: `events`.
+> **Database: Cloudflare D1** (SQLite) — gọi từ app bằng REST (`lib/server/db/d1.ts`). Trước 10/2026 dự án dùng Firestore; lý do và quá trình chuyển ở `docs/d1-schema-design.md`, `docs/firebase-audit.md`. File này mô tả **schema hiện tại**; DDL chính thức nằm ở `migrations/*.sql`.
 
-Vì Firestore document vốn đã linh hoạt (thêm field nào cũng được, không cần khai báo trước), ta **không cần** kỹ thuật "cột `properties` JSONB" như ở thiết kế Postgres trước theo đúng nghĩa kỹ thuật — nhưng vẫn nên gom các field đặc thù theo từng flow vào 1 field `properties` dạng map, để giữ cấu trúc gọn và dễ đọc, nhất quán giữa 2 luồng.
+## Nguyên tắc
+- **Hai nhóm bảng:** bảng của **app** (`events`, `users`, do app ghi) và **11 bảng phân tích** (`dim_*`, `fact_*`, nạp từ `powerBI/*.csv`, chỉ đọc).
+- Thay đổi schema = **migration mới** (`migrations/000N_*.sql`, `npx wrangler d1 migrations apply gsm-db --local` rồi `--remote`). Không sửa file migration đã áp, không `DROP` trên dữ liệu thật.
+- Mọi SQL **tham số hoá** (`?` + params). Không bao giờ nối chuỗi.
+- Hạn mức gói Free: **100.000 dòng ghi/ngày**, mỗi index tính thêm 1 lượt ghi/dòng → một event = 4 lượt ghi (1 dòng + 3 index). Hết hạn mức D1 từ chối cả đọc lẫn ghi.
+- Kiểu dữ liệu: id/chuỗi `TEXT`; số nguyên (tiền VNĐ, đếm, `step_index`) `INTEGER`; số thực `REAL`; boolean `INTEGER` 0/1 (có `CHECK`); mọi thời điểm là `TEXT` ISO-8601 **UTC micro-giây cố định độ rộng** `YYYY-MM-DDTHH:MM:SS.ffffffZ` (so sánh chuỗi = so sánh thời gian).
 
-## Cấu trúc document trong collection `events`
-```
-events (collection)
- └─ {auto-id} (document)
-     ├─ session_id: string
-     ├─ user_id: string
-     ├─ flow: "ride" | "food" | "none"   // "none" chi o man home
-     ├─ event_name: string
-     ├─ screen_name: string
-     ├─ previous_screen: string | null
-     ├─ step_index: number
-     ├─ platform: string          // "web"
-     ├─ properties: map           // field đặc thù theo loại event
-     └─ created_at: timestamp     // Firestore server timestamp
-```
-
-### `user_id` = số điện thoại đăng nhập
-
-Từ khi có đăng nhập, `user_id` là số điện thoại dạng **E.164** (`+84912345678`), do **server** gán từ cookie `gsm_auth` — không phải giá trị client tự sinh. Event cũ trước khi có đăng nhập vẫn mang `mock-user-*` và **không được gộp** vào tài khoản nào.
-
-> Số điện thoại là **dữ liệu cá nhân** và nằm thẳng trong mọi event. Đừng xuất collection `events` ra ngoài nhóm; nếu cần chia sẻ, băm `user_id` trước.
-
-## Collection `users`
+## Bảng `events`
 
 ```
-users/{phone}              ← doc id = E.164
-  phone: string
-  created_at: timestamp    (lần đăng nhập đầu)
-  last_login_at: timestamp
+id               TEXT PK        ← 20 ký tự [A-Za-z0-9] do server sinh (id cũ của Firestore được giữ nguyên)
+session_id       TEXT NOT NULL
+user_id          TEXT NOT NULL  ← SĐT E.164 | anon-<uuid> (khách) | mock-user-* (event cũ)
+flow             TEXT NOT NULL  ← CHECK IN ('ride','food','none')   ("none" chỉ ở màn home)
+event_name       TEXT NOT NULL  ← 26 giá trị (lib/shared/types.ts) — không CHECK để thêm event không cần migration
+screen_name      TEXT NOT NULL
+previous_screen  TEXT NULL
+step_index       INTEGER NOT NULL  ← CHECK >= 0
+properties       TEXT NOT NULL DEFAULT '{}'  ← JSON (CHECK json_valid); khoá khác nhau theo event_name
+platform         TEXT NOT NULL DEFAULT 'web' ← server gán
+created_at       TEXT NOT NULL  ← server gán lúc ghi (UTC, µs)
+seed_batch       TEXT NULL      ← CHỈ có ở event do scripts/seed-events.js sinh
 ```
 
-Ghi **best effort** sau khi xác thực mã (`lib/server/services/user.service.ts`) — Firestore hết quota thì vẫn đăng nhập được, chỉ thiếu dòng sổ sách.
+Index: `idx_events_created_at (created_at, id)`, `idx_events_session_step (session_id, step_index)`, `idx_events_user_created_at (user_id, created_at)`. Bảng `WITHOUT ROWID`.
 
-Mã OTP **không** lưu ở Firestore: thử thách (hash của mã + hạn + nonce) nằm trong cookie httpOnly `gsm_otp` được ký HMAC. Lý do: đăng nhập là bắt buộc, không được để hết quota free tier chặn cửa.
+`properties` đọc bằng `json_extract(properties, '$.vehicle_type')`. Hình dạng từng `event_name` do `event-taxonomy.md` quy định — đó là nguồn sự thật, file này chỉ mô tả cột.
 
-## Ví dụ document — luồng Đặt xe
+### `user_id`
+Từ khi đăng nhập là SĐT dạng **E.164** (`+84912345678`), do **server** gán từ cookie `gsm_auth` — không phải giá trị client tự sinh. Khách chưa đăng nhập mang `anon-<uuid>` (client sinh, server chỉ nhận đúng dạng này); `confirm_ride`/`place_order` luôn có SĐT. Event rất cũ mang `mock-user-*` và không gộp được vào tài khoản nào.
+
+> Số điện thoại là **dữ liệu cá nhân** và nằm thẳng trong mọi event. Đừng xuất bảng `events` ra ngoài nhóm; nếu cần chia sẻ, băm `user_id` trước. Đặt `ANALYTICS_TOKEN` để khoá `GET /api/events`.
+
+### Ví dụ — luồng Đặt xe
 ```json
 {
-  "session_id": "abc-123",
-  "user_id": "+84912345678",
-  "flow": "ride",
-  "event_name": "select_vehicle",
-  "screen_name": "vehicle_selection",
-  "previous_screen": "pickup_confirm",
-  "step_index": 3,
-  "platform": "web",
-  "properties": { "vehicle_type": "bike" },
-  "created_at": "2026-09-15T10:12:03Z"
+  "id": "yoz8j6LlYbb5GvufFtmM", "session_id": "abc-123", "user_id": "+84912345678",
+  "flow": "ride", "event_name": "select_vehicle", "screen_name": "vehicle_selection",
+  "previous_screen": "pickup_confirm", "step_index": 3, "platform": "web",
+  "properties": { "vehicle_id": "veh-bike", "vehicle_type": "bike", "base_price": 30000, "distance_km": 3.8 },
+  "created_at": "2026-09-15T10:12:03.482000Z"
 }
 ```
+### Ví dụ — `confirm_ride` / `place_order`
+Hai event kết thúc funnel, **tự mô tả đủ một chuyến/đơn** (nguồn duy nhất dựng nên màn `/history`): `address_label`, `address_source`, giá, `payment_method`… Chi tiết khoá: `event-taxonomy.md`. `address_id` kiểu `osm-<type><id>` không có bảng nào tra ra tên → luôn ghi kèm `address_label`.
 
-## Ví dụ document — luồng Food
-```json
-{
-  "session_id": "abc-124",
-  "user_id": "+84987654321",
-  "flow": "food",
-  "event_name": "add_to_cart",
-  "screen_name": "food_item_detail",
-  "previous_screen": "food_menu",
-  "step_index": 3,
-  "platform": "web",
-  "properties": {
-    "item_id": "banh-mi-01",
-    "item_name": "Bánh mì thịt nướng",
-    "price": 35000,
-    "quantity": 1,
-    "cart_size_after": 1,
-    "cart_total_after": 35000
-  },
-  "created_at": "2026-09-15T10:14:20Z"
-}
+`platform` và `created_at` do `lib/server/services/event.service.ts` tự gắn, **không** nằm trong request body (xem `api-endpoints.md`).
+
+## Bảng `users`
+```
+phone          TEXT PK        ← E.164
+created_at     TEXT NOT NULL  ← lần đăng nhập đầu (không đổi)
+last_login_at  TEXT NOT NULL
+```
+Upsert **best effort** sau khi xác thực mã (`user.service.ts`): D1 hết hạn mức thì vẫn đăng nhập được, chỉ thiếu dòng sổ sách. Mã OTP **không** lưu trong database: thử thách (hash của mã + hạn + nonce) nằm trong cookie httpOnly `gsm_otp` ký HMAC.
+
+## 11 bảng phân tích (`dim_*`, `fact_*`)
+Nạp từ `powerBI/*.csv` bằng `scripts/migrate-firebase-to-d1.js`; đọc qua `GET /api/analytics/<table>` (`api-endpoints.md` mục 4b). Cột và kiểu: `migrations/0002_analytics_schema.sql`.
+
+| Bảng | Khoá chính | Nạp |
+|---|---|---|
+| `dim_region`, `dim_hex`, `dim_promo`, `dim_promo_cap_history`, `dim_date`, `dim_merchant`, `dim_user` | khoá tự nhiên | đủ |
+| `fact_promo_budget` (324) | `month_start, service, hex_id, segment` | đủ |
+| `fact_ride` (41.783) | `session_id` | đủ |
+| `fact_food` | `session_id` | **tập con mock** (7.232/64.968) |
+| `fact_promo_burn` | `burn_event_id` | **tập con mock** (3.000/26.040, chỉ các dòng có session tồn tại) |
+
+Đây là dữ liệu **mô phỏng tĩnh**, tách hẳn khỏi `events` (user `U00001…`, không phải SĐT). Quy tắc tập con: `scripts/lib/mock-subset.js`; muốn nạp hết: `node scripts/migrate-firebase-to-d1.js --all-rows`. Khoá ngoại có hiệu lực (D1 bật `foreign_keys`) nên nạp theo thứ tự dim → fact.
+
+## Cách ghi 1 event (trong `lib/server/services/event.service.ts`)
+```ts
+await d1Query(
+  `INSERT INTO events (id, session_id, user_id, flow, event_name, screen_name, previous_screen,
+                       step_index, properties, platform, created_at)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  [id, p.session_id, p.user_id, p.flow, p.event_name, p.screen_name, p.previous_screen,
+   p.step_index, JSON.stringify(p.properties), 'web', createdAt],
+);
 ```
 
-## Ví dụ document — `confirm_ride` với địa chỉ tự tìm
-
-Event kết thúc funnel ride, và là **nguồn duy nhất** dựng nên một dòng ở màn `/history`:
-
-```json
-{
-  "session_id": "abc-125",
-  "user_id": "+84987654321",
-  "flow": "ride",
-  "event_name": "confirm_ride",
-  "screen_name": "ride_confirm",
-  "previous_screen": "promo_selection",
-  "step_index": 5,
-  "platform": "web",
-  "properties": {
-    "address_id": "osm-R198437",
-    "address_label": "Hồ Hoàn Kiếm",
-    "address_source": "search",
-    "pickup_id": "pickup-current",
-    "pickup_label": "Vị trí hiện tại",
-    "vehicle_id": "veh-bike",
-    "vehicle_type": "bike",
-    "promo_id": null,
-    "base_price": 35000,
-    "discount_amount": 0,
-    "final_price": 35000,
-    "payment_method": "cash"
-  },
-  "created_at": "2026-09-15T10:20:11Z"
-}
+## Cách đọc lại theo session (replay / phân tích)
+```sql
+SELECT * FROM events WHERE session_id = ? ORDER BY step_index, created_at, id;
 ```
+Hoặc `GET /api/events?session_id=<id>`; hoặc `analysis/fetch_events.py` → `output/events.csv`.
 
-> `address_id` ở đây **không** thuộc tập `addr-*` của `mock-data.md` — người dùng tự tìm địa chỉ qua `GET /api/places`, id là `osm-<osm_type><osm_id>`. Vì vậy `address_label` phải được ghi kèm: **không có bảng nào tra id đó ra tên**. `address_source` cho biết nên gom nhóm theo id (`preset`) hay theo nhãn (`search`).
-
-> Giá trị `screen_name`, `previous_screen`, `step_index` và cấu trúc `properties` của **mọi** event được quy định trong `event-taxonomy.md` — đó là nguồn sự thật, file này chỉ minh hoạ hình dạng document.
-
-`platform` do `lib/server` tự gắn, **không** nằm trong request body (xem `api-endpoints.md`).
-
-## Cách ghi 1 document (trong `lib/server/services/event.service.ts`, dùng Admin SDK)
-```js
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-
-const db = getFirestore();
-await db.collection('events').add({
-  session_id: 'abc-123',
-  user_id: '+84912345678',
-  flow: 'ride',
-  event_name: 'select_vehicle',
-  screen_name: 'vehicle_selection',
-  previous_screen: 'pickup_confirm',
-  step_index: 3,
-  platform: 'web',
-  properties: { vehicle_type: 'bike' },
-  created_at: FieldValue.serverTimestamp(),
-});
-```
-`.add()` tự sinh document id — không cần tự tạo id như `event_id` ở bản Postgres trước.
-
-## Cách đọc lại theo session (dùng cho phân tích/replay)
-```js
-const snapshot = await db.collection('events')
-  .where('session_id', '==', 'abc-123')
-  .orderBy('step_index')
-  .get();
-
-const events = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-```
-
-## Field thứ 10: `seed_batch` — chỉ có ở dữ liệu giả lập
-
-`scripts/seed-events.js` ghi thẳng vào collection `events` bằng `firebase-admin`, bỏ qua cả Next.js lẫn Express, để sinh hàng nghìn document trải theo ngày cho Power BI. Mỗi document nó sinh ra mang **thêm một field top-level**:
-
-```
-seed_batch: "seed-2026-09-22T07-41-12-345Z"   // chỉ có ở document do script sinh
-```
-
-Đây là lệch có chủ ý so với 9 field ở trên. Lý do: event do người thật click **không có** field này, nên tách dữ liệu giả khỏi dữ liệu thật chỉ là một điều kiện lọc, và dọn lại thì chính xác tuyệt đối — `node scripts/seed-events.js --clear` truy vấn bằng `.orderBy('seed_batch')`, mà Firestore **chỉ trả về document có field được orderBy**, nên event click tay nằm ngoài kết quả một cách tự nhiên, không cần điều kiện `!=` nào và không có cách nào xoá nhầm.
-
-Script cũng phải tự gán `platform: 'web'` và `created_at: Timestamp.fromDate(...)` (thay vì `serverTimestamp()`) — hai việc mà `event.service.ts` làm hộ khi đi qua API, và `serverTimestamp()` thì sẽ dồn toàn bộ event vào đúng thời điểm chạy script, mất sạch trục thời gian.
-
-Phân tích muốn **chỉ lấy dữ liệu thật** thì lọc `seed_batch` vắng mặt; muốn **chỉ lấy dữ liệu giả** thì lọc nó có mặt. `fetch_events.py` kéo hết cả hai và có `seed_batch` trong `TOP_LEVEL_FIELDS`, nên cột này ra thẳng `events.csv` — rỗng (`NaN`) ở mọi event do người thật click.
-
-## Sink BigQuery cho `events`
-
-`events` được đồng bộ **một chiều, tăng dần** sang BigQuery `gsm_analytics.fact_events` bằng `scripts/bigquery/sync-events.js` (schema và cách chạy: `docs/BIGQUERY_SETUP.md`). Firestore vẫn là nguồn sự thật; API `/api/events` không đổi. `event_id` = document ID Firestore, `seed_batch` được giữ để tách dữ liệu giả.
-
-Checkpoint lưu ở doc `system/bigquery_events_sync` (`cursor` là Timestamp, `last_run_at`, `last_summary`). Đây là collection hệ thống của script, **không** phải dữ liệu app — đừng xoá khi chưa muốn đồng bộ lại từ đầu (xoá thì chạy `--backfill`).
-
-## Collection `pbi_*` — dữ liệu Power BI
-
-`scripts/import-powerbi.js` nạp 11 CSV trong `powerBI/` thành 11 collection `pbi_<tên file>` (`pbi_dim_user`, `pbi_fact_ride`, `pbi_fact_food`, `pbi_fact_promo_burn`…). Tách hẳn khỏi `events`/`users`: schema khác (user `U00001`, không phải SĐT) và không được trộn vào funnel.
-
-- Doc id = khoá tự nhiên (`R0000001`, `U00001`, `WELCOME30-v1`, `20260601`; budget = `<month_start>_<service>_<hex_id>_<segment>`) → chạy lại là ghi đè, không nhân đôi.
-- `session_start`, `event_datetime` là `Timestamp` (giờ VN, +07:00); các cột ngày còn lại giữ chuỗi `YYYY-MM-DD`; id luôn là chuỗi.
-- Mỗi document có `import_batch`; `--clear` xoá đúng những document có field này.
-- Gói Spark (20k write/ngày): mặc định mỗi lần ghi tối đa 18.000, tiến độ lưu ở `scripts/.import-powerbi-state.json` (gitignored) — chạy lại cùng lệnh để nạp tiếp (~8 ngày cho 137k document).
-
-```bash
-node scripts/import-powerbi.js --dry-run   # xem trước, không cần credential
-node scripts/import-powerbi.js             # nạp tiếp
-node scripts/import-powerbi.js --clear     # xoá toàn bộ pbi_*
-```
-
-## Lưu ý về index
-Firestore tự tạo index đơn giản (theo 1 field), nhưng khi query kết hợp `where` + `orderBy` trên 2 field khác nhau (như ví dụ trên), hoặc nhiều `where` cùng lúc (lọc theo `flow` và khoảng `created_at`), Firestore sẽ **yêu cầu tạo composite index** — lần đầu chạy sẽ báo lỗi kèm link để tạo index đó ngay trên console, không cần tự đoán trước.
+## Field `seed_batch` — chỉ có ở dữ liệu giả lập
+`scripts/seed-events.js` ghi thẳng vào `events` (qua REST, bỏ qua Next.js) để sinh hàng nghìn event trải 90 ngày cho Power BI; mỗi dòng mang `seed_batch = "seed-<timestamp>"`. Event người thật click **không có** field này, nên tách dữ liệu giả khỏi thật chỉ là một điều kiện lọc (`seed_batch IS NULL`), và `--clear` xoá chính xác (`WHERE seed_batch IS NOT NULL`, tuỳ chọn `--batch`). Script tự gán `created_at` quá khứ và `platform='web'`. Lưu ý: 9.000 event seed = 36.000 lượt ghi — gần nửa hạn mức một ngày.
 
 ## Về danh sách 17 trường của mentor (chưa confirm)
-Khi có list thật, chỉ cần thêm field vào object khi ghi document — không có bước "migrate schema" như SQL (`ALTER TABLE`). Field nào dùng để lọc/sắp xếp thường xuyên thì để ở top-level document (như `flow`, `session_id`), field đặc thù ít dùng để lọc thì gom vào `properties`.
-
-Cụ thể phải sửa: `EventPayload` trong `lib/shared/types.ts`, rồi `lib/server/validators/event.validator.ts` (whitelist hiện chỉ lấy đúng 8 field — field mới không thêm vào đây sẽ bị loại im lặng).
-
-Quy trình chi tiết khi list được chốt: xem `event-taxonomy.md` mục 6.
+Khi có list thật: field **dùng để lọc/sắp xếp thường xuyên** → thêm **cột** bằng migration (kèm index nếu cần, nhớ chi phí ghi); field đặc thù ít lọc → thêm khoá vào `properties` (không cần migration). Phải sửa: `EventPayload` trong `lib/shared/types.ts`, `lib/server/validators/event.validator.ts` (whitelist hiện chỉ lấy đúng 8 field — field mới không thêm vào đây sẽ bị loại im lặng), và `INSERT` trong `event.service.ts`. Quy trình: `event-taxonomy.md` mục 6.

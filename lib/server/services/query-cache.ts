@@ -1,5 +1,5 @@
 /**
- * Cache ket qua doc Firestore: TTL + single-flight + tra ban cu khi loi.
+ * Cache ket qua doc D1: TTL + single-flight + tra ban cu khi loi.
  *
  * Ly do ton tai: moi `GET /api/events` khong loc la MOT LAN DOC TOAN BO
  * collection (~9.000 luot doc), ma free tier chi co 50.000 luot/ngay. Power BI
@@ -8,7 +8,7 @@
  * Khac `upstream.ts` o ba cho, nen KHONG dung lai no:
  *   1. Khong co hang doi noi tiep — hai khoa khac nhau duoc doc song song.
  *   2. Single-flight THEO KHOA: 10 request cung luc cho cung mot khoa chi sinh
- *      MOT query Firestore; 9 request con lai cho chung mot promise.
+ *      MOT query D1; 9 request con lai cho chung mot promise.
  *   3. Muc het han KHONG bi xoa ngay — no la duong lui khi lan lam moi that bai.
  *
  * Cache nam trong bo nho tien trinh: mat khi restart, va tren Vercel moi lambda

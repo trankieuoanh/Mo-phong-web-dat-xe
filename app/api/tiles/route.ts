@@ -2,13 +2,13 @@
  * GET /api/tiles — nha cung cap tile nao con dung duoc. Hop dong o
  * api-endpoints.md muc 3d.
  *
- * KHONG cham Firestore, KHONG ghi event nao.
+ * KHONG cham database (D1), KHONG ghi event nao.
  *
  * Khong co validator vi endpoint nay khong nhan tham so nao — nhung no VAN doc
  * mot thu tu request: origin. Xem duoi.
  */
 import type { NextRequest } from 'next/server';
-import { findUsableTileProviders } from '@/lib/server/services/tiles.service';
+import { findUsableTileProviders, tileKeysFor } from '@/lib/server/services/tiles.service';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -44,7 +44,9 @@ export async function GET(request: NextRequest) {
 
   try {
     const providers = await findUsableTileProviders(origin);
-    return Response.json({ providers });
+    // `keys`: chi key cua nha cung cap da qua phep do (Stadia). Trinh duyet PHAI co key de tai tile,
+    // nen day khong phai bi mat — hay gioi han key theo domain o trang quan tri Stadia.
+    return Response.json({ providers, keys: tileKeysFor(providers) });
   } catch (error) {
     // KHONG tra mang rong o day. FE coi mot loi la "khong biet gi" va lui ve
     // dung ca bang TILE_PROVIDERS, nen mot mang rong va mot loi 502 dan toi hai

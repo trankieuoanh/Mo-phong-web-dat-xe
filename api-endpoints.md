@@ -15,7 +15,11 @@ POST /api/events
 ```
 File: `app/api/events/route.ts` → `lib/server/validators/event.validator.ts` → `lib/server/services/event.service.ts`.
 
-**Bắt buộc đăng nhập.** Thiếu cookie `gsm_auth` hợp lệ → `401 { "error": "Chưa đăng nhập" }`. `user_id` client gửi lên bị **ghi đè** bằng số điện thoại trong cookie (E.164, vd `+84912345678`) trước khi validate — client không giả mạo được người dùng.
+**Đăng nhập chỉ bắt buộc ở bước xác nhận.**
+- **Có** cookie `gsm_auth` hợp lệ: `user_id` client gửi lên bị **ghi đè** bằng số điện thoại trong cookie (E.164, vd `+84912345678`) trước khi validate — client không giả mạo được người dùng.
+- **Không** cookie (khách): chỉ nhận khi `user_id` có dạng `anon-<id>` (`isAnonUserId`, `lib/shared/phone.ts`), giá trị khác → `401 { "error": "Chưa đăng nhập" }`.
+- `confirm_ride` và `place_order` (`AUTH_REQUIRED_EVENTS`) **luôn cần cookie** → khách nhận `401 { "error": "Cần đăng nhập để đặt" }`.
+- `session_id` giữ nguyên qua lúc đăng nhập nên event `anon-…` và event `+84…` của cùng một lượt vẫn nối được.
 
 **Request body:**
 ```json
@@ -38,9 +42,9 @@ File: `app/api/events/route.ts` → `lib/server/validators/event.validator.ts` �
   "created_at": "2026-09-15T10:12:03Z"
 }
 ```
-`event_id` giờ là Firestore document id tự sinh (từ `.add()`), không phải UUID tự tạo như bản Postgres.
+`event_id` là id 20 ký tự `[A-Za-z0-9]` do server sinh (cùng dạng với auto-id cũ của Firestore; id của event đã migrate được giữ nguyên), không phải UUID.
 
-> **Về `created_at` trong response:** document được ghi bằng `FieldValue.serverTimestamp()`, nên lúc `.add()` trả về, giá trị thật chưa tồn tại phía client. Response trả `new Date().toISOString()` tính tại route — **giá trị xấp xỉ**, lệch vài mili-giây. Giá trị chuẩn dùng cho phân tích là field `created_at` trong Firestore, không phải giá trị trong response này. Không đọc lại document sau khi ghi (tốn thêm 1 read mà client cũng bỏ qua response).
+> **Về `created_at` trong response:** là giá trị **thật** app đã ghi vào D1 (UTC, micro-giây cố định độ rộng, vd `2026-10-01T17:34:17.818000Z`) — app gán trước khi `INSERT`, không còn là giờ commit của database như thời `serverTimestamp()`. Không đọc lại dòng sau khi ghi.
 
 **Validate — field bắt buộc và kiểu:**
 
@@ -60,7 +64,7 @@ File: `app/api/events/route.ts` → `lib/server/validators/event.validator.ts` �
 > `flow: "none"` chỉ dành cho `screen_view` ở màn `home` — lúc đó người dùng chưa chọn luồng nào. Xem `event-taxonomy.md` mục 1.
 
 Field do **server tự gắn**, client gửi lên cũng bị bỏ qua:
-- `platform: "web"` — vì vậy request body không chứa field này, dù document trong Firestore có (xem `db-design.md`).
+- `platform: "web"` — vì vậy request body không chứa field này, dù dòng trong D1 có (xem `db-design.md`).
 - `created_at: FieldValue.serverTimestamp()` — luôn dùng giờ server, không tin giờ máy client.
 
 Route dùng **whitelist**: chỉ lấy đúng 8 field ở bảng trên từ body, mọi field lạ khác bị loại bỏ im lặng (không trả lỗi).
@@ -89,14 +93,14 @@ File: `app/api/events/route.ts`, handler `GET`.
 > curl -s "localhost:3000/api/events?session_id=$SID" | jq 'sort_by(.created_at)'
 > ```
 
-`created_at` được đổi sang **chuỗi ISO** ngay tại service. Timestamp của Firestore serialize ra JSON thành `{_seconds, _nanoseconds}` mà cả `jq` lẫn pandas đều không đọc được.
+`created_at` trả về là **chuỗi ISO** UTC micro-giây (cột TEXT trong D1) — `jq` và pandas đọc thẳng được.
 
 ### 3. Lấy event theo user / flow / khoảng thời gian
 ```
 GET /api/events?user_id=mock-user-1a2b3c4d
 GET /api/events?flow=ride&from=2026-09-01&to=2026-09-15
 ```
-Cùng file, cùng handler `GET`, chỉ khác điều kiện `where` khi query Firestore. Mọi param đều optional, kết hợp được.
+Cùng file, cùng handler `GET`, chỉ khác điều kiện `WHERE` khi query D1. Mọi param đều optional, kết hợp được.
 
 | Param | Kiểu | Ghi chú |
 |---|---|---|
@@ -119,20 +123,20 @@ GET /api/events?flat=1
 
 Tiền tố `prop_` **cố ý trùng** với `analysis/fetch_events.py`, nên hai đường đọc dữ liệu cho ra cùng tên cột và biểu đồ Power BI nói về cùng một thứ với biểu đồ matplotlib.
 
-> **`limit` đi vào query Firestore, không cắt sau khi lấy về** — mỗi document đọc lên là một lượt đọc tính vào hạn mức (free tier 50.000/ngày). Ngoại lệ duy nhất là nhánh `user_id` (sắp trong bộ nhớ): ở đó không thể limit phía Firestore vì "200 document đầu theo thứ tự tuỳ ý" không phải "200 document đầu theo thời gian".
+> **`limit` đi thẳng vào câu `SELECT … LIMIT ?`** — D1 chỉ đọc (và tính hạn mức đọc 5.000.000 dòng/ngày) đúng số dòng đó; kể cả khi lọc `user_id` (có `idx_events_user_created_at`).
 
-> **Hạn mức đọc là thứ chặn trước tiên khi nối BI.** Một lần refresh toàn bộ ≈ số document trong collection. Với ~7.800 document: 1 lần/ngày = thoải mái, 6 lần/ngày = sát trần 50.000, mỗi giờ = vượt gần 4 lần. Dùng `from=` để chỉ kéo phần mới nếu cần refresh dày.
+> **Kích thước phản hồi mới là thứ chặn trước tiên khi nối BI.** Hạn mức đọc D1 rất rộng (5.000.000 dòng/ngày) nên không còn là vấn đề, nhưng hàm serverless của Vercel giới hạn thân phản hồi ~4,5 MB: `GET /api/events` không lọc với ~9.160 event ≈ 3,56 MB — sát trần. Dùng `from=`/`to=` (Power BI incremental refresh) để mỗi request chỉ kéo một khoảng ngày — xem `docs/POWERBI_D1.md`.
 
-> **`GET /api/events` có cache 5 phút trong bộ nhớ server** (`lib/server/services/events-cache.ts`). Khoá cache = bộ tham số đi vào query Firestore (`session_id`, `user_id`, `flow`, `from`, `to`, `limit`) — `flat` **không** nằm trong khoá, nên `?flat=1` và dạng lồng nhau dùng chung một lần đọc. Hệ quả cho Power BI: refresh đầu ≈ số document, mọi refresh trong 5 phút sau = **0 lượt đọc**, nhiều request cùng lúc khi cache trống/hết hạn chỉ sinh **một** query Firestore (single-flight). Header `X-Cache: HIT|MISS|REFRESH|WAIT|STALE` cho biết request vừa rồi đi đường nào; body không đổi.
+> **`GET /api/events` có cache 5 phút trong bộ nhớ server** (`lib/server/services/events-cache.ts`). Khoá cache = bộ tham số đi vào query D1 (`session_id`, `user_id`, `flow`, `from`, `to`, `limit`) — `flat` **không** nằm trong khoá, nên `?flat=1` và dạng lồng nhau dùng chung một lần đọc. Hệ quả cho Power BI: refresh đầu ≈ số dòng, mọi refresh trong 5 phút sau = **0 lượt đọc**, nhiều request cùng lúc khi cache trống/hết hạn chỉ sinh **một** query D1 (single-flight). Header `X-Cache: HIT|MISS|REFRESH|WAIT|STALE` cho biết request vừa rồi đi đường nào; body không đổi.
 >
-> - **Hết 5 phút KHÔNG có nghĩa là đọc lại toàn bộ** (`lib/server/services/events-sync.ts`). Với khoá không lọc `session_id`/`user_id`/`limit` — đúng đường Power BI gọi — server chỉ đọc document có `created_at >=` mốc lớn nhất đã thấy (≈ số event mới), rồi đếm `count()` (~1 lượt đọc / 1.000 document) để đối chiếu. Lệch số lượng — tức có seed ghi lùi ngày hoặc có xoá ngoài API — thì mới đọc lại toàn bộ. Ngoài ra đối chiếu toàn bộ mỗi **24 giờ** (`EVENTS_FULL_RECONCILIATION_INTERVAL_MS`) để bắt thứ duy nhất `count()` không thấy: sửa tay trên console mà không đổi số lượng.
-> - Aggregation `count()` với `flow=` cần cùng composite index `(flow, created_at)` mà `?flow=` vốn đã cần.
+> - **Hết 5 phút KHÔNG có nghĩa là đọc lại toàn bộ** (`lib/server/services/events-sync.ts`). Với khoá không lọc `session_id`/`user_id`/`limit` — đúng đường Power BI gọi — server chỉ đọc dòng có `created_at >=` mốc lớn nhất đã thấy **lùi 5 giây** (≈ số event mới — cửa sổ gối đầu vì `created_at` do app gán), rồi `COUNT(*)` để đối chiếu. Lệch số lượng — tức có seed ghi lùi ngày hoặc có xoá ngoài API — thì mới đọc lại toàn bộ. Ngoài ra đối chiếu toàn bộ mỗi **24 giờ** (`EVENTS_FULL_RECONCILIATION_INTERVAL_MS`) để bắt thứ duy nhất `count()` không thấy: sửa tay bằng wrangler mà không đổi số lượng.
+> - `COUNT(*)` với `flow=` quét `idx_events_created_at` rồi lọc `flow` — rẻ ở quy mô vài chục nghìn dòng (không có index riêng cho `flow`, xem `docs/d1-schema-design.md`).
 > - Làm mới thất bại mà còn bản cũ → trả bản cũ (`STALE`); không có bản cũ → 500 như trước.
 > - `POST /api/events` thành công chỉ xoá các khoá lọc theo **đúng** `session_id`/`user_id` vừa ghi (màn `/history` thấy ngay). Khoá rộng (không lọc, hoặc chỉ `flow`/`from`/`to`) chỉ hết hạn theo TTL — dữ liệu phân tích trễ tối đa 5 phút.
 > - Cache sống trong **một tiến trình**: mất khi restart/redeploy, và trên Vercel mỗi instance có bản riêng. Bộ đếm hit/miss ở `GET /api/health` (`events_cache`).
-> - `analysis/fetch_events.py` đọc **thẳng** Firestore, **không** đi qua cache này — mỗi lần chạy ≈ số document.
+> - `analysis/fetch_events.py` đọc **thẳng** D1 qua REST (phân trang keyset 2.000 dòng/trang), **không** đi qua cache này — mỗi lần chạy ≈ số dòng.
 
-> **`user_id` cố ý không dùng `orderBy` của Firestore.** Một `where('user_id','==')` cộng một `orderBy('created_at')` trên field khác sẽ bị Firestore từ chối và bắt tạo composite index — tức người chạy dự án phải bấm link, đợi index build, rồi mới demo được. Dữ liệu một người dùng chỉ vài trăm document, nên service lấy về rồi **sắp xếp trong bộ nhớ**. Đổi lại là không phải cấu hình gì thêm sau khi clone.
+> **Lọc `user_id` sắp và `LIMIT` thẳng ở DB.** Thời Firestore, `where('user_id')` + `orderBy('created_at')` buộc phải tạo composite index nên service phải sắp trong bộ nhớ; với D1 có `idx_events_user_created_at (user_id, created_at)` nên ràng buộc đó không còn.
 
 ### 3b. Tìm địa chỉ thật
 ```
@@ -170,7 +174,7 @@ Nguồn: **[Photon](https://photon.komoot.io/)** (komoot), chạy trên dữ li�
 ```
 FE phải **suy biến êm**: hiện cảnh báo nhưng vẫn liệt kê 5 địa chỉ gợi ý để luồng đi tiếp được. Cùng tinh thần với `trackEvent().catch(() => {})` — hạ tầng lỗi không được kẹt người dùng.
 
-Endpoint này **không chạm Firestore** và **không ghi event nào**: gõ phím không phải một bước funnel.
+Endpoint này **không chạm database (D1)** và **không ghi event nào**: gõ phím không phải một bước funnel.
 
 ### 3b-bis. Tìm quán ăn quanh một toạ độ
 ```
@@ -244,7 +248,7 @@ File: `app/api/places.routes.ts` → `validators/place.validator.ts` (`validateR
 
 **FE dùng nó như một bước phụ, không chặn luồng:** toạ độ có trước và dùng được ngay (dải "Gần bạn" không phải chờ), nhãn địa chỉ đẹp hơn đến sau. Photon thất bại thì giữ nhãn mặc định và đi tiếp.
 
-Endpoint này **không chạm Firestore** và **không ghi event nào**.
+Endpoint này **không chạm database (D1)** và **không ghi event nào**.
 
 
 ### 3c. Tìm tuyến đường thật
@@ -271,9 +275,11 @@ Nguồn: [OSRM](https://project-osrm.org/) `router.project-osrm.org`, hồ sơ `
 { "error": "Không tính được tuyến đường lúc này (upstream 429)" }
 ```
 
-> **`router.project-osrm.org` là máy chủ demo công cộng, không cam kết uptime.** Vì vậy FE **bắt buộc có đường lui**: gặp 502 thì gọi `straightRoute()` trong `lib/shared` — nối thẳng hai điểm, quãng đường theo công thức haversine — rồi ghi `route_source: "straight"` vào event. Luồng đặt xe **không bao giờ bị chặn** vì một dịch vụ bên ngoài, và dữ liệu vẫn nói thật về việc con số đến từ đâu.
+> **`router.project-osrm.org` là máy chủ demo công cộng, không cam kết uptime, có giới hạn tần suất và không có dữ liệu giao thông.** Khi lên production nên tự host OSRM và đặt `OSRM_BASE_URL` (mặc định vẫn là máy demo). Service thử lại **một lần** (sau 400 ms) với lỗi tạm thời (timeout mạng, 5xx, 429); `NoRoute` thì không thử lại. Route từ chối tuyến < 2 toạ độ (502).
+>
+> **Giao diện KHÔNG còn đường lui đường chim bay (từ 10/2026).** `lib/use-route.ts` chỉ trả tuyến OSRM thật hoặc `null` kèm `status` (`loading`/`error`); khi chưa có tuyến thật bản đồ **không vẽ đường nào** (hiện "Đang tính tuyến đường…" hoặc thẻ lỗi + nút **Thử lại**), và luồng đặt xe **bị chặn** ở `/ride/pickup` ("Chọn điểm đón này" khoá) cho tới khi có tuyến — vì giá và `confirm_ride` lấy từ quãng đường này. Do đó `route_source` của event mới luôn là `"osrm"`; `"straight"` chỉ còn ở dữ liệu cũ. Giao đồ ăn dùng cùng hook cho tuyến quán → khách nhưng **không chặn** đặt đơn (giá đơn không phụ thuộc quãng đường).
 
-Endpoint này **không chạm Firestore** và **không ghi event nào**.
+Endpoint này **không chạm database (D1)** và **không ghi event nào**.
 
 ### 3d. Dò nhà cung cấp tile bản đồ
 ```
@@ -297,17 +303,18 @@ File: `app/api/tiles/route.ts` → `lib/server/services/tiles.service.ts`. Khôn
 | Nhà cung cấp | Kích thước tile biển | Kết luận |
 |---|---|---|
 | `osmfr`, `osmde` | 103 B | sạch |
-| Stadia (`osm_bright`) | 495 B | sạch |
+| Stadia (`alidade_smooth`, đang dùng) | 156 B | sạch |
+| Stadia (`osm_bright`, tone cũ) | 495 B | sạch |
 | CARTO | **1718 B** | có watermark |
 | Stadia, referer bản deploy | 14.885 B | 401 — loại ở bước mã trạng thái |
 
-Ngưỡng `PROBE_MAX_BYTES = 800` nằm giữa khe hở 495 → 1718. **Đổi tone bản đồ thì phải đo lại con số này** — tone có màu nặng hơn tone xám ngay cả ở giữa biển (`alidade_smooth` 156 B → `osm_bright` 495 B). Một nhà cung cấp bị loại khi **đã trả lời** mà tile quá lớn, sai `content-type`, hoặc trả mã lỗi.
+Ngưỡng `PROBE_MAX_BYTES = 800` nằm giữa khe hở 495 → 1718 (`alidade_smooth` 156 B có thêm biên an toàn). **Đổi tone bản đồ thì phải đo lại con số này** — tone có màu nặng hơn tone xám ngay cả ở giữa biển (`alidade_smooth` 156 B → `osm_bright` 495 B). Một nhà cung cấp bị loại khi **đã trả lời** mà tile quá lớn, sai `content-type`, hoặc trả mã lỗi.
 
 > **Lỗi mạng KHÔNG phải là bằng chứng hỏng.** Không kết nối được thì nhà cung cấp đó vẫn được **giữ lại** trong danh sách. Việc của phép dò là *loại thứ đã chứng minh là hỏng*, không phải *chỉ nhận thứ đã chứng minh là tốt* — kết quả được cache 6 giờ, nên nếu một cú chớp mạng cũng đủ loại một nhà cung cấp thì danh sách dự phòng sẽ bị đầu độc cả buổi. Trường hợp nhà cung cấp chết thật thì `onError` ở FE vẫn bắt được.
 
 **Lỗi (502)** khi bản thân phép dò thất bại. FE coi đây là *"không biết gì"* và lui về dùng nguyên cả bảng `TILE_PROVIDERS` — khác hẳn với `{"providers":[]}`, vốn có nghĩa *"đã dò, không nhà nào dùng được"*.
 
-Endpoint này **không chạm Firestore** và **không ghi event nào**.
+Endpoint này **không chạm database (D1)** và **không ghi event nào**.
 
 ### 5. Đăng nhập bằng số điện thoại (mã SMS 6 số)
 
@@ -320,16 +327,31 @@ Files: `app/api/auth/*/route.ts` → `lib/server/validators/auth.validator.ts` �
 | `GET /api/auth/me` | — | `200 { phone }` · `401` |
 | `POST /api/auth/logout` | — | `200 { ok }`, xoá cookie |
 
-- Mã sống **5 phút**, sai tối đa **5 lần** thì phải gửi lại mã. **Không dùng Firestore:** `send-code` đặt cookie httpOnly `gsm_otp` (path `/api/auth`) chứa `{phone, hash(mã), hết hạn, nonce}` ký HMAC; `verify` kiểm cookie đó rồi xoá. Cooldown và đếm lần sai nằm trong bộ nhớ tiến trình — trên serverless nhiều instance thì giới hạn này lỏng hơn. `users/{phone}` ghi best effort.
-- `dev_code` chỉ có khi `SMS_PROVIDER=mock` **và** không phải production — để test bằng số thật mà không gửi tin nào.
+- Mã sống **5 phút**, sai tối đa **5 lần** thì phải gửi lại mã. **Không dùng database:** `send-code` đặt cookie httpOnly `gsm_otp` (path `/api/auth`) chứa `{phone, hash(mã), hết hạn, nonce}` ký HMAC; `verify` kiểm cookie đó rồi xoá. Cooldown và đếm lần sai nằm trong bộ nhớ tiến trình — trên serverless nhiều instance thì giới hạn này lỏng hơn. `users/{phone}` ghi best effort.
+- `dev_code` chỉ có khi `SMS_PROVIDER=mock` **và** (không phải production **hoặc** `SMS_MOCK_EXPOSE_CODE=true`). Production + mock mà thiếu cờ này thì không tin nào được gửi và mã cũng không hiện — không ai đăng nhập được.
 - Cookie = `base64url(phone|hết hạn).HMAC-SHA256(AUTH_SECRET)`. Không lưu session ở DB; đổi `AUTH_SECRET` là đăng xuất mọi người.
-- `middleware.ts` chuyển mọi trang (trừ `/login`, `/api/*`, asset) về `/login?next=…` khi **không có** cookie. Nó chỉ kiểm tra cookie có mặt (Edge runtime, không được import `lib/server`); chữ ký thật kiểm ở `GET /api/auth/me` và `POST /api/events`.
+- **Không còn `middleware.ts`**: khách duyệt mọi trang. Hộp thoại đăng nhập (`LoginModal`) chỉ hiện khi bấm Đặt xe / Đặt đơn (`requireLogin` trong `lib/app-context.tsx`). Chữ ký cookie kiểm ở `GET /api/auth/me` (401 → chỉ xoá bản sao SĐT, không chuyển trang) và `POST /api/events`.
+
+### 4b. Đọc 11 bảng phân tích (Power BI) — `GET /api/analytics/<table>`
+
+Database là **Cloudflare D1** (xem `docs/d1-schema-design.md`). 11 file CSV cũ trong `powerBI/` = 11 bảng, mỗi bảng một URL:
+`dim_region`, `dim_hex`, `dim_promo`, `dim_promo_cap_history`, `dim_date`, `dim_merchant`, `dim_user`, `fact_promo_budget`, `fact_ride`, `fact_food`, `fact_promo_burn`. Tên khác → `404`.
+
+| Tham số | Ý nghĩa |
+|---|---|
+| `limit` | 1–5000, mặc định 2000 |
+| `after` | `next_cursor` của trang trước (phân trang keyset theo khoá chính — rẻ ở bảng 65k dòng) |
+| `from`, `to` | chỉ `fact_ride`/`fact_food` (theo `session_start`) và `fact_promo_burn` (theo `event_datetime`); bảng khác → `400` |
+
+Phản hồi `200 { "rows": [...], "next_cursor": "..." | null }`; cột boolean trả `true`/`false`. Thân phản hồi được cắt để luôn < 4 MB (giới hạn hàm Vercel) — `next_cursor` luôn trỏ đúng dòng kế tiếp. Chỉ đọc.
+
+**Bảo vệ tuỳ chọn (`ANALYTICS_TOKEN`)** áp cho route này **và** `GET /api/events`: để trống = mở như trước; có giá trị = cần `Authorization: Bearer <token>` (`401` nếu thiếu/sai). Người đã đăng nhập vẫn đọc được lịch sử **của chính mình** (`GET /api/events?user_id=<SĐT của cookie>`) để `/history` không gãy.
 
 ### 4. Health check
 ```
 GET /api/health
 ```
-File: `app/api/health/route.ts`. Response: `{ "status": "ok" }`. **Không chạm Firestore** — Firebase Admin khởi tạo trễ nên route này trả lời được cả khi chưa có credential. Dùng để test ở Phase 0, trước khi setup Firebase.
+File: `app/api/health/route.ts`. Response: `{ "status": "ok" }`. **Không chạm D1** — cấu hình D1 đọc trễ nên route này trả lời được cả khi chưa có credential. Dùng để test ở Phase 0, trước khi cấu hình database.
 
 ## Những gì KHÔNG có trong API này
 - Không có endpoint đặt xe/đặt đồ ăn thật — chỉ lưu event xác nhận như mọi event khác.
@@ -337,7 +359,7 @@ File: `app/api/health/route.ts`. Response: `{ "status": "ok" }`. **Không chạm
 - `GET /api/events` **không** yêu cầu đăng nhập — analysis / Power BI gọi thẳng. Chỉ POST bị chặn.
 
 ### Về authentication
-Ban đầu dự án cố ý không có đăng nhập (`user_id` là `mock-user-*`). Giờ đã có **đăng nhập bắt buộc bằng số điện thoại + mã SMS** (mục 5): `POST /api/events` chỉ nhận request có cookie hợp lệ và `user_id` = số điện thoại. Việc này cũng chặn luôn việc ghi document rác ẩn danh khi deploy công khai — nhưng một người có số điện thoại vẫn ghi được event tuỳ ý dưới tên mình.
+Ban đầu dự án cố ý không có đăng nhập (`user_id` là `mock-user-*`). Giờ có **đăng nhập bằng số điện thoại + mã SMS** (mục 5), bắt buộc ở bước xác nhận: `confirm_ride` / `place_order` cần cookie hợp lệ và mang `user_id` = số điện thoại; các event trước đó của khách mang `anon-<id>`. Server chỉ nhận đúng hai dạng `user_id` đó nên không ghi được document rác tuỳ ý — nhưng một người có số điện thoại (hay một id `anon-…` bất kỳ) vẫn ghi được event tuỳ ý.
 
 Biện pháp đã chọn là **shared secret trong header** (mục ngay dưới). Hai lựa chọn còn lại từng cân nhắc: App Check gắn chặt vào Firebase SDK phía client mà dự án cố tình không có; rate limit theo IP thì chặt hơn nhưng cần thêm state, và `upstream.ts` đã cho thấy state trong bộ nhớ tiến trình là thứ phải tính kỹ. Shared secret là mức vừa đủ cho một app demo.
 
@@ -349,7 +371,8 @@ Gộp một project thì chặng đó biến mất. Trình duyệt gọi thẳng
 
 Muốn chặn thật thì cần thứ khác: rate limit theo IP có state ngoài bộ nhớ tiến trình, hoặc App Check. Cả hai đều ngoài phạm vi dự án 6 tuần.
 
-## Lưu ý riêng cho Firestore
-Credential Firebase Admin SDK (service account key) chỉ sống trong `lib/server` (`.env.local`, đã gitignore). Mọi file ở đó mở đầu bằng `import 'server-only'`, nên kéo một cái vào Client Component là build đỏ ngay — xem `CLAUDE.md` quy tắc 1.
+## Database: Cloudflare D1
 
-Query kết hợp `where` + `orderBy` trên 2 field khác nhau sẽ bị Firestore từ chối **kèm một link tạo index sẵn trong thông báo lỗi**. Vì vậy `GET /api/events` trả nguyên văn message lỗi của Firestore thay vì nuốt đi — nó chứa đường dẫn cần đi (xem `db-design.md`).
+`POST/GET /api/events` **giữ nguyên hợp đồng** so với thời Firestore (cùng tham số, thứ tự, dạng JSON). Khác biệt: `created_at` chính xác tới **micro-giây** (`…03.067000Z`), `seed_batch` chỉ có ở event seed, và lọc `user_id` sắp/`limit` thẳng ở DB. Lỗi D1 trả `500 { "error": "Could not read events" | "Could not write event" | "Could not read table" }` — chi tiết ở log server (không bao giờ chứa token).
+
+Credential D1 (`CLOUDFLARE_API_TOKEN`) chỉ sống trong `lib/server/db/d1.ts` (`.env.local`, đã gitignore). Mọi file trong `lib/server/` mở đầu bằng `import 'server-only'`, nên kéo một cái vào Client Component là build đỏ ngay — xem `CLAUDE.md` quy tắc 1. Thiết kế đầy đủ: `docs/d1-schema-design.md`.

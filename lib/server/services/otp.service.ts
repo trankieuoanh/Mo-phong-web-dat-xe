@@ -1,8 +1,8 @@
 /**
- * Ma xac thuc 6 so — KHONG dung Firestore.
+ * Ma xac thuc 6 so — KHONG dung database.
  *
- * Vi sao: gui/xac thuc ma ma phu thuoc Firestore thi het quota free tier
- * (RESOURCE_EXHAUSTED) la KHONG AI dang nhap duoc, ma dang nhap lai bat buoc.
+ * Vi sao: gui/xac thuc ma ma phu thuoc database thi het han muc free tier
+ * cua D1 la KHONG AI dang nhap duoc, ma dang nhap lai bat buoc.
  *
  * Thu thach OTP nam trong cookie httpOnly `gsm_otp` da ky HMAC:
  *   { p: phone, h: hash(ma), e: het han, n: nonce }
@@ -98,7 +98,13 @@ export async function sendCode(phone: string): Promise<SendCodeResult> {
 
   // Chi tra ma ve giao dien khi KHONG co tin nao duoc gui that, va khong phai
   // ban production — de test bang so that ma khong can nhin console.
-  const exposeCode = sender.isMock && process.env.NODE_ENV !== 'production';
+  // Ngoai le OPT-IN: SMS_MOCK_EXPOSE_CODE=true (dat tren Vercel cho ban demo). Thieu
+  // no thi production + mock = khong tin nhan nao den va ma cung khong hien => khong ai
+  // dang nhap duoc. Bat no nghia la AI CUNG dang nhap duoc bang so bat ky — chap nhan
+  // duoc cho app mo phong khong co du lieu that; can chat hon thi viet sender SMS that.
+  const exposeCode =
+    sender.isMock &&
+    (process.env.NODE_ENV !== 'production' || process.env.SMS_MOCK_EXPOSE_CODE === 'true');
   return { ok: true, challenge, devCode: exposeCode ? code : undefined };
 }
 

@@ -13,7 +13,7 @@ Next.js 15 (App Router), cổng **3000**. File này mô tả **nửa giao diện
 Ba điều quyết định hình dạng của phần này:
 
 - **Mọi page đều `'use client'`.** Vì page nào cũng cần đọc state (giỏ hàng, lựa chọn) và bắn event, không có page nào render được ở server.
-- **Không chạm `firebase-admin`.** Credential sống trong `lib/server/`, và mọi file ở đó mở đầu bằng `import 'server-only'` — kéo một cái vào page là build đỏ ngay. Xem `CLAUDE.md` quy tắc 1.
+- **Không chạm database.** Token Cloudflare D1 sống trong `lib/server/`, và mọi file ở đó mở đầu bằng `import 'server-only'` — kéo một cái vào page là build đỏ ngay. Xem `CLAUDE.md` quy tắc 1.
 - **`/api/*` nằm cùng project** (`app/api/**/route.ts`), nên mọi lời gọi đều same-origin: không proxy, không preflight, không cổng thứ hai.
 
 > Trước đây đây là một package riêng (`apps/web`) nói chuyện với `lib/server` qua proxy. Xem `ARCHITECTURE.md` để biết vì sao gộp lại.
@@ -24,7 +24,7 @@ Ba điều quyết định hình dạng của phần này:
 
 ```
 ./                        gốc repo — một project Next.js duy nhất
-├─ next.config.ts          serverExternalPackages: ['firebase-admin']
+├─ next.config.ts          (trống — không còn serverExternalPackages)
 ├─ postcss.config.mjs      plugin @tailwindcss/postcss
 ├─ eslint.config.mjs
 ├─ tsconfig.json           paths: @/*
@@ -56,7 +56,8 @@ Ba điều quyết định hình dạng của phần này:
 ├─ lib/
 │  ├─ track.ts             trackEvent · trackAddToCart · trackSelectFlow · useScreenView
 │  ├─ use-place-search.ts  hook gọi GET /api/places (debounce + abort)
-│  ├─ use-route.ts         hook gọi GET /api/route + routeOrFallback()
+│  ├─ use-route.ts         hook gọi GET /api/route → { route, status, retry }; CHỈ tuyến OSRM thật, không đường lui
+│  ├─ use-vehicle-simulation.ts  xe chạy dọc tuyến (nội suy theo độ dài, ~20 fps, không phát event)
 │  ├─ use-restaurants.ts   hook gọi GET /api/restaurants — quán gần + tìm theo tên
 │  ├─ use-current-place.ts hook GPS, lui về DEFAULT_PICKUP khi bị từ chối
 │  ├─ use-tile-providers.ts hook gọi GET /api/tiles — lọc nhà cung cấp tile đã hỏng
@@ -153,7 +154,7 @@ flowchart LR
 
 **Không có trong `SCREENS`**, nên `screens.ts` và union `ScreenName` không phải sửa gì. Thêm `useScreenView` vào đây sẽ không compile — `ScreenName` không có giá trị tương ứng.
 
-> **`/login` — NGOÀI FUNNEL.** Đăng nhập bắt buộc bằng SĐT + mã SMS 6 số (`api-endpoints.md` mục 5). `middleware.ts` chuyển về đây khi chưa có cookie; `AppProvider` gọi `GET /api/auth/me` khi mount để kiểm chữ ký, 401 thì về `/login`. `signIn` / `signOut` trong `useApp()` đều mở session mới. `UserMenu` hiện SĐT — chính là `user_id` mà `/history` tra.
+> **`/login` — NGOÀI FUNNEL.** Đăng nhập bằng SĐT + mã SMS 6 số (`api-endpoints.md` mục 5), **chỉ bắt buộc khi bấm Đặt xe / Đặt đơn**: `useApp().requireLogin(then)` mở `components/LoginModal.tsx` (dùng chung `components/LoginForm.tsx` với trang `/login`) rồi chạy `then`. `AppProvider` gọi `GET /api/auth/me` khi mount để kiểm chữ ký; 401 chỉ xoá bản sao SĐT. `signIn` giữ nguyên session, `signOut` mở session mới và về `/`. `UserMenu` hiện SĐT (đã đăng nhập) hoặc nút "Đăng nhập" (khách); `/history` của khách hiện lời mời đăng nhập.
 
 ---
 
@@ -220,12 +221,18 @@ Tiền **luôn** là số nguyên trong dữ liệu, chỉ format khi hiển th�
 | `BackButton` | `from`, `to`, `href`, `icon` | 10 page | **Bắn event `back`** rồi mới `router.push`. `icon` mặc định `'back'`; `/ride/promo` truyền `'close'` cho giống overlay — hình khác nhưng event y hệt |
 | `FlowGuard` | `ready`, `fallback`, `children` | 8 page | Đợi `hydrated` trước khi redirect |
 | `PlacePicker` | `placeholder`, `presetHeading`, `selectedId?`, `onPick`, `leading?` | 2 page | Ô tìm + kết quả. Dùng chung cho điểm đến và điểm đón nên hai chỗ không thể lệch nhau. **Không bắn event** — cha quyết định |
-| `MapCanvas` | `pickup`, `destination?`, `route?`, `label?`, `fill?`, `onPick?` | 4 page | Tile OpenStreetMap thật (`<img>`) + tuyến OSRM vẽ bằng SVG phủ lên. Kéo được ở mọi màn; có `onPick` thì bấm lên bản đồ để chọn vị trí. **Không thư viện bản đồ** (`CLAUDE.md` quy tắc 8). Bắt buộc có dòng ghi công `© OpenStreetMap` |
+| `MapCanvas` | `pickup`, `destination?`, `route?`, `routeStatus?`, `onRetry?`, `vehicle?`, `originKind?`, `label?`, `fill?`, `onPick?` | 6 page | Tile thật (`<img>`; Stadia `alidade_smooth` nếu có `STADIA_API_KEY`, không thì OSM giảm bão hoà) + tuyến OSRM vẽ bằng SVG phủ lên + ghim điểm đón/quán, ghim điểm đến, xe có mũi tên hướng. Kéo được ở mọi màn; có `onPick` thì bấm lên bản đồ để chọn vị trí. **Không thư viện bản đồ** (`CLAUDE.md` quy tắc 8). Bắt buộc có dòng ghi công `© OpenStreetMap` |
 | `InfoCardGrid` | `items` (`{icon, label}[]`) | `/support`, `/terms` | Lưới 2 cột thẻ huy hiệu-icon + nhãn. Thẻ **không bấm được** — không có trang đích thật, và một nút bấm vào im lặng là khoảng mù trong dữ liệu |
 | `Icon` | `name`, `size?`, `className?` | khắp nơi | ~45 icon SVG viết tay. `stroke="currentColor"` nên **không bao giờ phải gõ hex ở chỗ gọi** |
 | `GsmLogo` | `variant`, `size?` | `SideRail` | Một tông cyan — `DESIGN.md` cấm màu accent thứ hai, nên không có vàng như logo thật |
 
 ### `MapCanvas` — bản đồ thật, không thư viện
+
+**Tuyến đường (từ 10/2026).** Nguồn hình học duy nhất là OSRM: `useRoute` → `ride.route` (draft) → preview (`/ride/pickup`), vehicle, promo, confirm, và mô phỏng xe ở `/ride/success` đều dùng **cùng một `geometry`**, không gọi lại OSRM. Khi chưa có tuyến thật `MapCanvas` **không vẽ đường nào** — `routeStatus='loading'` hiện "Đang tính tuyến đường…", `'error'` hiện thẻ "Không tính được tuyến đường" + nút Thử lại; `/ride/pickup` khoá "Chọn điểm đón này" tới khi có tuyến, và các màn sau có `FlowGuard` đòi `isRoadRoute(ride.route)`. Giao đồ ăn: `FoodDraft.restaurantPlace` → tuyến quán → khách ở `/food/confirm` (không chặn đặt đơn) và xe giao hàng ở `/food/success`.
+
+**Xe.** `useVehicleSimulation(geometry, durationMs)` nội suy theo **độ dài tích luỹ** (`pointAlong` trong `lib/shared/route.ts`), cập nhật ~20 fps; thời gian nén `clamp(thời gian chuyến / 10, 20, 45)` giây; tôn trọng `prefers-reduced-motion`. Xe **không nằm trong `points`** quyết định khung nhìn (nếu có, mỗi bước xe sẽ làm bản đồ zoom/pan lại). Mũi tên quay theo heading, icon xe giữ nguyên (icon nhìn ngang, quay 180° sẽ lộn ngược). Không phát event nào.
+
+**Giao diện bản đồ.** Mọi màu lấy từ token `globals.css` (quy tắc 4). Stadia `alidade_smooth` là style sáng/ít nhiễu; nhà cung cấp không `calm` (OSM) được bọc `filter: saturate(.55) contrast(.92) brightness(1.04)` trên **một** lớp tile. Danh sách `<img>` tile bọc `useMemo` để mỗi bước xe không bắt React đối chiếu lại hàng chục thẻ.
 
 Bản trước vẽ lưới phố **bịa** với tuyến hằng số, nên hai chuyến khác hẳn nhau vẫn ra cùng một hình. Giờ: `ResizeObserver` đo khung → chọn zoom vừa khít tuyến → chiếu Web Mercator → xếp lưới `<img>` tile OSM → phủ `<svg>` vẽ polyline và hai ghim.
 

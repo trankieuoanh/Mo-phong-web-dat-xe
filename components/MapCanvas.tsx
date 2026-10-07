@@ -15,9 +15,10 @@
  */
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { LatLon, Place, RouteResult } from '@/lib/shared';
+import type { LatLon, Place, RoutePoint, RouteResult } from '@/lib/shared';
 import { Icon } from '@/components/Icon';
 import { useTileProviders } from '@/lib/use-tile-providers';
+import type { RouteStatus } from '@/lib/use-route';
 
 const TILE_SIZE = 256;
 const MIN_ZOOM = 3;
@@ -77,10 +78,20 @@ interface MapCanvasProps {
    */
   onPick?: (point: LatLon) => void;
   /**
-   * Vi tri tai xe hien tai (dung cho man driver_arriving).
-   * Neu truyen, se ve them mot ghim tai xe (icon xe) tren ban do.
+   * Vi tri + huong cua XE dang chay (xe cong nghe / xe giao hang) — tu `useVehicleSimulation`.
+   * Truyen thi ve them mot huy hieu xe co mui ten chi huong. Xe KHONG tham gia tinh khung nhin: ban do
+   * khong zoom/pan lai moi khi xe nhich mot buoc.
    */
-  driverPosition?: LatLon;
+  vehicle?: RoutePoint | null;
+  /**
+   * Trang thai lay tuyen (tu `useRoute`). 'loading' → "Dang tinh tuyen…"; 'error' → the loi + "Thu lai".
+   * Trong ca hai truong hop KHONG ve duong nao: khong co tuyen that thi khong co tuyen.
+   */
+  routeStatus?: RouteStatus;
+  /** Bam "Thu lai" o the loi tuyen. */
+  onRetry?: () => void;
+  /** Diem xuat phat la quan an (giao do an) hay diem don (dat xe) — chi doi hinh ghim. */
+  originKind?: 'pickup' | 'restaurant';
 }
 
 /**
@@ -162,10 +173,56 @@ function centerOf(points: LatLon[]): LatLon {
   };
 }
 
+/**
+ * Diem xuat phat: dau cham co vien (khac han ghim giot nuoc cua diem den, de nhin la biet dau la dau).
+ * Tam nam dung toa do. Quan an: o vuong bo goc + chu "Q" — cung bang mau token, khong dung emoji.
+ */
+function OriginMarker({ x, y, kind }: { x: number; y: number; kind: 'pickup' | 'restaurant' }) {
+  return (
+    <g data-testid="origin" transform={`translate(${x} ${y})`}>
+      <circle r="15" fill="var(--color-primary-dark)" opacity="0.18" />
+      {kind === 'restaurant' ? (
+        <>
+          <rect x="-11" y="-11" width="22" height="22" rx="7" fill="var(--color-primary-dark)" stroke="var(--color-canvas)" strokeWidth="3" />
+          <path d="M-4 -5v10M0 -5v10M4 -5v10" stroke="var(--color-on-primary)" strokeWidth="1.6" strokeLinecap="round" />
+        </>
+      ) : (
+        <>
+          <circle r="9" fill="var(--color-canvas)" stroke="var(--color-primary-dark)" strokeWidth="4" />
+          <circle r="3" fill="var(--color-primary-dark)" />
+        </>
+      )}
+    </g>
+  );
+}
+
+/**
+ * Xe: huy hieu tron (icon xe TINH) + mui ten nho XOAY theo `heading`. Khong xoay ca icon xe vi icon
+ * ve nhin ngang — quay 180° se bi lon nguoc.
+ */
+function VehicleMarker({ x, y, heading }: { x: number; y: number; heading: number }) {
+  return (
+    <g data-testid="vehicle" transform={`translate(${x} ${y})`}>
+      <ellipse cx="0" cy="14" rx="12" ry="4" fill="var(--color-ink)" opacity="0.2" />
+      <g data-testid="vehicle-heading" transform={`rotate(${heading})`}>
+        <path d="M0 -27 L7 -17 L-7 -17 Z" fill="var(--color-primary-dark)" stroke="var(--color-canvas)" strokeWidth="1.5" strokeLinejoin="round" />
+      </g>
+      <circle r="16" fill="var(--color-ink)" stroke="var(--color-canvas)" strokeWidth="3" />
+      <g transform="translate(-12 -12)">
+        <path d="M5 17h14" stroke="var(--color-on-dark)" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M4 17v-4.2a2 2 0 0 1 .2-.9l1.9-3.8A2 2 0 0 1 7.9 7h8.2a2 2 0 0 1 1.8 1.1l1.9 3.8a2 2 0 0 1 .2.9V17" stroke="var(--color-on-dark)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        <path d="M4 17v2h3v-2M17 17v2h3v-2" stroke="var(--color-on-dark)" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+        <circle cx="7.5" cy="13.5" r="1" fill="var(--color-on-dark)" />
+        <circle cx="16.5" cy="13.5" r="1" fill="var(--color-on-dark)" />
+      </g>
+    </g>
+  );
+}
+
 /** Giot nuoc cam vao (x, y) — day nhon cham dung toa do do. */
 function Pin({ x, y, tone }: { x: number; y: number; tone: string }) {
   return (
-    <g transform={`translate(${x} ${y})`}>
+    <g data-testid="destination" transform={`translate(${x} ${y})`}>
       <ellipse cx="0" cy="2" rx="10" ry="3.5" fill="var(--color-ink)" opacity="0.2" />
       <path
         d="M0 0 C -8 -11, -11 -16, -11 -21 a11 11 0 1 1 22 0 c0 5 -3 10 -11 21 Z"
@@ -185,7 +242,10 @@ export function MapCanvas({
   label,
   fill = false,
   onPick,
-  driverPosition,
+  vehicle,
+  routeStatus,
+  onRetry,
+  originKind = 'pickup',
 }: MapCanvasProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -260,15 +320,17 @@ export function MapCanvas({
     return () => observer.disconnect();
   }, []);
 
-  /** Cac diem quyet dinh khung nhin: ca tuyen neu co, khong thi hai ghim. */
+  /**
+   * Cac diem quyet dinh khung nhin: ca tuyen neu co, khong thi hai ghim.
+   * XE KHONG CO O DAY: neu co, moi buoc xe nhich se doi `points` → doi `pointsKey` → dat lai zoom/pan
+   * (va tinh lai khung) MOI FRAME. Xe nam tren tuyen nen luon nam trong khung da vua khit.
+   */
   const points = useMemo<LatLon[]>(() => {
     if (route && route.geometry.length > 1) {
       return route.geometry.map(([lat, lon]) => ({ lat, lon }));
     }
-    const base = destination ? [pickup, destination] : [pickup];
-    // Them vi tri tai xe de khung nhin om ca tai xe
-    return driverPosition ? [...base, driverPosition] : base;
-  }, [route, pickup, destination, driverPosition]);
+    return destination ? [pickup, destination] : [pickup];
+  }, [route, pickup, destination]);
 
   // Doi tuyen/diem thi bo CA zoom lan pan nguoi dung da chinh tay — neu khong,
   // chuyen moi se ke thua khung nhin cua chuyen truoc va co the nam ngoai khung.
@@ -305,8 +367,7 @@ export function MapCanvas({
     [viewport],
   );
 
-  // Project driver position de dung trong SVG (sau khi project da duoc khai bao)
-  const [driverX, driverY] = driverPosition ? project(driverPosition) : [0, 0];
+  const [vehicleX, vehicleY] = vehicle ? project(vehicle) : [0, 0];
 
   /** Lua the <img> phu kin khung o muc zoom hien tai. */
   const tiles = useMemo(() => {
@@ -337,6 +398,37 @@ export function MapCanvas({
     }
     return out;
   }, [viewport, size.width, size.height, provider]);
+
+  /**
+   * Lop tile — bao bang useMemo de moi lan xe nhich (re-render MapCanvas ~20 lan/giay) React KHONG phai
+   * doi chieu lai hang chuc the <img>. Nha cung cap chua `calm` (OSM raster) duoc giam bao hoa/do tuong
+   * phan bang CSS de nen khong choi mat; style da diu san (Stadia alidade_smooth) giu nguyen.
+   */
+  const tileLayer = useMemo(
+    () => (
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={provider.calm ? undefined : { filter: 'saturate(0.55) contrast(0.92) brightness(1.04)' }}
+      >
+        {tiles.map((tile) => (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            key={tile.key}
+            src={tile.src}
+            alt=""
+            aria-hidden="true"
+            loading="lazy"
+            onError={handleTileError}
+            width={TILE_SIZE}
+            height={TILE_SIZE}
+            className="pointer-events-none absolute max-w-none select-none"
+            style={{ left: tile.left, top: tile.top }}
+          />
+        ))}
+      </div>
+    ),
+    [tiles, handleTileError, provider.calm],
+  );
 
   const routeLine = useMemo(() => {
     if (!viewport || !route || route.geometry.length < 2) return '';
@@ -436,21 +528,7 @@ export function MapCanvas({
           Dung <img> tho chu KHONG dung next/image: tile la anh 256px co san
           trên CDN cua OSM, cho no di qua bo toi uu cua Next chi them mot chang
           proxy va lam hong viec dinh vi tuyet doi theo pixel. */}
-      {tiles.map((tile) => (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          key={tile.key}
-          src={tile.src}
-          alt=""
-          aria-hidden="true"
-          loading="lazy"
-          onError={handleTileError}
-          width={TILE_SIZE}
-          height={TILE_SIZE}
-          className="pointer-events-none absolute max-w-none select-none"
-          style={{ left: tile.left, top: tile.top }}
-        />
-      ))}
+      {tileLayer}
 
       {/* Noi that khi khong con nha cung cap nao tai duoc tile. Truoc day moi
           loi mang deu im lang thoai hoa thanh mot o xam co nut zoom, khong
@@ -471,42 +549,33 @@ export function MapCanvas({
         >
           {routeLine ? (
             <>
-              {/* Vien trang ben duoi de tuyen noi tren nen tile nhieu mau. */}
+              {/* Vien trang ben duoi de tuyen noi tren nen tile; mau lay tu token (quy tac 4). */}
               <polyline
                 points={routeLine}
                 fill="none"
                 stroke="var(--color-canvas)"
-                strokeWidth="9"
+                strokeWidth="11"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
               <polyline
+                data-testid="route-line"
                 points={routeLine}
                 fill="none"
                 stroke="var(--color-primary-dark)"
-                strokeWidth="5"
+                strokeWidth="6"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
             </>
           ) : null}
 
-          <Pin x={pickupX} y={pickupY} tone="var(--color-primary-dark)" />
+          <OriginMarker x={pickupX} y={pickupY} kind={originKind} />
           {/* Diem den dung `ink` — DESIGN.md cam mau accent thu hai. */}
           {destination ? <Pin x={destX} y={destY} tone="var(--color-ink)" /> : null}
 
-          {/* Driver marker — icon xe, mau cam */}
-          {driverPosition ? (
-            <g transform={`translate(${driverX} ${driverY})`}>
-              <ellipse cx="0" cy="2" rx="10" ry="3.5" fill="var(--color-ink)" opacity="0.2" />
-              <circle cx="0" cy="-8" r="18" fill="var(--color-warning)" stroke="var(--color-canvas)" strokeWidth="2" />
-              <path d="M5 17h14" stroke="var(--color-on-warning)" strokeWidth="1.5" strokeLinecap="round" />
-              <path d="M4 17v-4.2a2 2 0 0 1 .2-.9l1.9-3.8A2 2 0 0 1 7.9 7h8.2a2 2 0 0 1 1.8 1.1l1.9 3.8a2 2 0 0 1 .2.9V17" stroke="var(--color-on-warning)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M4 17v2h3v-2M17 17v2h3v-2" stroke="var(--color-on-warning)" strokeWidth="1.5" strokeLinecap="round" />
-              <circle cx="7.5" cy="13.5" r="1" fill="var(--color-on-warning)" />
-              <circle cx="16.5" cy="13.5" r="1" fill="var(--color-on-warning)" />
-            </g>
-          ) : null}
+          {/* Xe ve CUOI CUNG de luon nam tren tuyen va ghim. */}
+          {vehicle ? <VehicleMarker x={vehicleX} y={vehicleY} heading={vehicle.heading} /> : null}
         </svg>
       ) : null}
 
@@ -555,13 +624,37 @@ export function MapCanvas({
               <span className="t-body-sm-strong min-w-0 truncate">
                 {route.durationMin} phút • {route.distanceKm} km
               </span>
-              {route.source === 'straight' ? (
-                // Noi that voi nguoi dung khi con so la duong chim bay — cung thong
-                // tin ma `route_source` ghi vao event.
-                <span className="t-caption block truncate text-mute">ước lượng — đường chim bay</span>
-              ) : null}
             </div>
           ) : null}
+        </div>
+      ) : null}
+
+      {/* Trang thai tuyen. KHONG ve duong nao khi dang tai / loi — tuyen gia moi la thu gay hieu nham. */}
+      {routeStatus === 'loading' ? (
+        <div className="pointer-events-none absolute bottom-3xl left-1/2 z-10 -translate-x-1/2 sm:bottom-lg">
+          <div className="t-body-sm-strong shadow-level-2 flex items-center gap-sm rounded-pill bg-canvas px-lg py-sm text-ink">
+            <span className="size-4 animate-spin rounded-full border-2 border-primary border-t-transparent" aria-hidden="true" />
+            Đang tính tuyến đường…
+          </div>
+        </div>
+      ) : null}
+      {routeStatus === 'error' ? (
+        <div className="absolute right-lg bottom-3xl left-lg z-10 flex justify-center sm:bottom-lg" role="alert">
+          <div className="shadow-level-2 flex min-w-0 max-w-full flex-wrap items-center justify-center gap-md rounded-xl bg-canvas px-lg py-md text-ink">
+            <span className="min-w-0">
+              <span className="t-body-sm-strong block">Không tính được tuyến đường</span>
+              <span className="t-caption block text-mute">Vui lòng thử lại.</span>
+            </span>
+            {onRetry ? (
+              <button
+                type="button"
+                onClick={onRetry}
+                className="t-body-sm-strong min-h-11 shrink-0 rounded-pill bg-primary-dark px-lg text-on-primary hover:bg-primary"
+              >
+                Thử lại
+              </button>
+            ) : null}
+          </div>
         </div>
       ) : null}
 

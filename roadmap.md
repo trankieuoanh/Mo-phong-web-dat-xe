@@ -5,7 +5,7 @@ Kế hoạch 6 tuần. Mỗi tuần có **Definition of Done kiểm chứng đư
 | Tuần | Trọng tâm | Definition of Done |
 |---|---|---|
 | **1** | Phase 0 + nền UI | `npm run dev` lên; `curl localhost:3000/api/health` trả `{"status":"ok"}`; màn Home render panel đặt xe + bản đồ đúng token |
-| **2** | Firestore + luồng Ride | Click hết 5 bước ride → mở Firebase console thấy đủ document, `step_index` 0→6 đúng `event-taxonomy.md` |
+| **2** | D1 + luồng Ride | Click hết 5 bước ride → `GET /api/events?session_id=…` thấy đủ event, `step_index` 0→6 đúng `event-taxonomy.md` |
 | **3** | Luồng Food + giỏ hàng | Thêm/xoá/sửa số lượng, đặt đơn xong → `place_order` có `final_total` khớp với số hiển thị trên màn |
 | **4** | `GET /api/events` + hoàn thiện UI | `curl "localhost:3000/api/events?session_id=..."` trả đúng thứ tự bước; app dùng tốt ở khổ 390px |
 | **5** | Phân tích | `python metrics.py` sinh đủ file trong `output/`; funnel đọc ra được thành câu tiếng Việt có nghĩa |
@@ -23,9 +23,9 @@ Kế hoạch 6 tuần. Mỗi tuần có **Definition of Done kiểm chứng đư
 
 > **Chốt `event-taxonomy.md` với mentor trong tuần này.** Sửa taxonomy sau khi đã sinh dữ liệu đồng nghĩa với vứt dữ liệu cũ. Nhớ hỏi mentor về `flow: "none"` ở màn Home (mục 1 của taxonomy).
 
-## Tuần 2 — Firestore + Ride
+## Tuần 2 — D1 + Ride
 
-1. Firebase project + `.env.local` (theo `setup.md` Phase 1).
+1. Database D1 + `.env.local` (theo `setup.md` Phase 1).
 2. Kiểm tra `POST /api/events` ghi được document thật.
 3. Hoàn thiện UI 6 màn luồng ride — **phần tracking đã nối sẵn, không sửa khi làm UI**.
 4. Kiểm tra guard: mở thẳng `/ride/confirm` ở tab mới phải bị đá về `/ride/address` và không sinh event nào.
@@ -41,7 +41,7 @@ Kế hoạch 6 tuần. Mỗi tuần có **Definition of Done kiểm chứng đư
 ## Tuần 4 — Đọc dữ liệu + hoàn thiện
 
 1. Kiểm tra `GET /api/events` với đủ 4 tổ hợp param: `session_id` / `flow` / `from` / `to`.
-2. Tạo composite index khi Firestore báo lỗi kèm link (message lỗi được trả nguyên văn, chứa link).
+2. Thêm index bằng migration mới khi truy vấn chậm (`EXPLAIN QUERY PLAN`), nhớ mỗi index tốn thêm 1 lượt ghi/dòng.
 3. Rà lại toàn bộ UI theo `tailwind-theme.md` — không còn giá trị hardcode ngoài token.
 4. Test khổ 390px và 430px.
 5. `npm run build` và `npm run typecheck` sạch lỗi.

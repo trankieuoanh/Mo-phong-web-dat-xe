@@ -7,8 +7,11 @@
  * hydration mismatch cua Next.js.
  */
 
+import { ANON_USER_PREFIX } from '@/lib/shared/phone';
+
 const SESSION_KEY = 'gsm_session_id';
 const USER_KEY = 'gsm_user_id';
+const ANON_KEY = 'gsm_anon_id';
 
 /**
  * Cac khoa draft bi xoa khi reset session.
@@ -51,6 +54,26 @@ export function getSessionId(): string {
 export function getUserId(): string {
   if (!isBrowser()) return '';
   return localStorage.getItem(USER_KEY) ?? '';
+}
+
+/**
+ * `user_id` tam cho khach CHUA dang nhap — `anon-<uuid>`, ben qua F5/tab (localStorage).
+ * Server chi nhan no khi khong co cookie; sau khi dang nhap server ghi de bang SDT,
+ * con `session_id` giu nguyen nen funnel van lien mach.
+ */
+export function getAnonId(): string {
+  if (!isBrowser()) return '';
+  try {
+    let id = localStorage.getItem(ANON_KEY);
+    if (!id) {
+      id = `${ANON_USER_PREFIX}${crypto.randomUUID()}`;
+      localStorage.setItem(ANON_KEY, id);
+    }
+    return id;
+  } catch {
+    // Storage bi chan: van phai co id hop le de event khong bi 401.
+    return `${ANON_USER_PREFIX}${crypto.randomUUID()}`;
+  }
 }
 
 export function setUserId(phone: string): void {

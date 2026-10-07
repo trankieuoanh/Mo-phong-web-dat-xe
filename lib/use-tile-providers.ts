@@ -19,14 +19,19 @@ import { TILE_PROVIDERS, type TileProvider } from '@/lib/shared';
  * lan mount la hai request (cung cai bay da lam hong so lieu funnel, xem
  * screen-map.md muc 4).
  */
-let probePromise: Promise<string[]> | null = null;
+interface Probe {
+  names: string[];
+  keys: Record<string, string>;
+}
 
-function fetchUsableNames(): Promise<string[]> {
+let probePromise: Promise<Probe> | null = null;
+
+function fetchUsableNames(): Promise<Probe> {
   probePromise ??= fetch('/api/tiles')
     .then(async (response) => {
       const body = await response.json();
       if (!response.ok) throw new Error(body?.error ?? `HTTP ${response.status}`);
-      return body.providers as string[];
+      return { names: body.providers as string[], keys: (body.keys ?? {}) as Record<string, string> };
     })
     .catch((error) => {
       // Do that bai KHAC HAN "khong nha nao dung duoc". Nem tiep de hook ben
@@ -47,22 +52,28 @@ function fetchUsableNames(): Promise<string[]> {
  * `MapCanvas` van lo duoc.
  */
 export function useTileProviders(): TileProvider[] {
-  const [providers, setProviders] = useState<TileProvider[]>(TILE_PROVIDERS);
+  // Chua do xong thi bo qua nha cung cap `needsKey` (Stadia): chua co key thi tile chi tra 401 va
+  // ban do se nhap nhay qua lai khi phep do ve.
+  const [providers, setProviders] = useState<TileProvider[]>(() => TILE_PROVIDERS.filter((p) => !p.needsKey));
 
   useEffect(() => {
     let cancelled = false;
 
     fetchUsableNames()
-      .then((names) => {
+      .then(({ names, keys }) => {
         if (cancelled) return;
-        const usable = TILE_PROVIDERS.filter((provider) => names.includes(provider.name));
+        // Gan key vao `url` cua nha cung cap can key; giu nguyen thu tu uu tien cua TILE_PROVIDERS.
+        const usable = TILE_PROVIDERS.filter((provider) => names.includes(provider.name)).map((provider) =>
+          provider.needsKey ? { ...provider, url: (z: number, x: number, y: number) => provider.url(z, x, y, keys[provider.name]) } : provider,
+        );
         // Mang rong nghia la KHONG nha nao dung duoc. Van giu ca bang: thu mot
         // nha cung cap co the hong con hon mot khung xam trong, va `tilesDead`
         // cua MapCanvas se noi that voi nguoi dung neu that su khong tai duoc.
         if (usable.length > 0) setProviders(usable);
+        else setProviders(TILE_PROVIDERS.filter((p) => !p.needsKey));
       })
       .catch(() => {
-        // Giu nguyen ca bang da dat o `useState`.
+        // Giu nguyen bang (khong co Stadia) da dat o `useState`.
       });
 
     return () => {

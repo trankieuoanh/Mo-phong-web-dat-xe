@@ -11,9 +11,11 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
+import { LoginModal } from '@/components/LoginModal';
 import {
   DEFAULT_PICKUP,
   type CartLine,
@@ -85,6 +87,12 @@ export interface FoodDraft {
   origin?: Place;
   restaurantId?: string;
   restaurantName?: string;
+  /**
+   * Toa do + nhan cua quan dang chon — de ve tuyen QUAN → KHACH (app/food/confirm) va cho xe giao hang chay
+   * (app/food/success). Chi them field tuy chon: draft cu trong sessionStorage thieu no van doc duoc, va
+   * mon mock khong chon quan thi khong co tuyen (chi ghim dia chi giao nhu truoc).
+   */
+  restaurantPlace?: Place;
 }
 
 interface StoredState {
@@ -113,9 +121,16 @@ interface AppContextValue extends StoredState {
   /** Bam "Ve trang chu" o man success: session moi + xoa sach draft. */
   resetAll: () => void;
 
-  /** Man /login goi sau khi xac thuc ma thanh cong. Mo session moi. */
+  /** true khi da dang nhap (userId la SDT E.164). Khach thi userId la chuoi rong. */
+  isAuthed: boolean;
+  /**
+   * Chay `then` ngay neu da dang nhap; chua thi mo LoginModal va chay `then` SAU khi
+   * xac thuc xong. Dung cho "Dat xe" / "Dat don" — cho DUY NHAT bat buoc dang nhap.
+   */
+  requireLogin: (then: () => void) => void;
+  /** Sau khi xac thuc ma thanh cong. GIU NGUYEN session_id va draft de funnel lien mach. */
   signIn: (phone: string) => void;
-  /** Xoa cookie + ban sao SDT, mo session moi, ve /login. */
+  /** Xoa cookie + ban sao SDT, mo session moi, ve trang chu. */
   signOut: () => Promise<void>;
 }
 
@@ -184,17 +199,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /**
-   * Middleware chi kiem cookie CO MAT; chu ky that kiem o day. Cookie het han /
-   * gia -> xoa ban sao SDT va ve /login. Loi mang thi bo qua: khong duoc lam vo
-   * luong UI chi vi mot request kiem tra (POST /api/events van tu chan 401).
+   * Kiem chu ky cookie that. Khach duyet tu do nen 401 KHONG chuyen trang: chi xoa
+   * ban sao SDT (cookie het han / gia) de event sau do mang id an danh. Loi mang thi
+   * bo qua: khong duoc lam vo luong UI chi vi mot request kiem tra.
    */
   useEffect(() => {
-    if (window.location.pathname === '/login') return;
     fetch('/api/auth/me')
       .then(async (res) => {
         if (res.status === 401) {
           clearUser();
-          window.location.replace('/login');
+          setUserId('');
           return;
         }
         if (!res.ok) return;
@@ -275,22 +289,56 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setFoodState({});
   }, []);
 
-  const signIn = useCallback(
-    (phone: string) => {
-      storeUserId(phone);
-      setUserId(phone);
-      resetAll();
-    },
-    [resetAll],
-  );
+  // Khong resetAll: dang nhap giua luong khong duoc cat doi session hay xoa lua chon.
+  const signIn = useCallback((phone: string) => {
+    storeUserId(phone);
+    setUserId(phone);
+  }, []);
 
   const signOut = useCallback(async () => {
     await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
     clearUser();
     setUserId('');
     resetAll();
-    window.location.replace('/login');
+    window.location.replace('/');
   }, [resetAll]);
+
+  const isAuthed = userId.startsWith('+84');
+
+  // Hanh dong dang cho dang nhap xong. Ref (khong phai state): dat roi doc ngay
+  // trong handler, khong can render lai.
+  const pendingRef = useRef<(() => void) | null>(null);
+  const [loginOpen, setLoginOpen] = useState(false);
+
+  const requireLogin = useCallback(
+    (then: () => void) => {
+      if (isAuthed) {
+        then();
+        return;
+      }
+      pendingRef.current = then;
+      setLoginOpen(true);
+    },
+    [isAuthed],
+  );
+
+  const closeLogin = useCallback(() => {
+    pendingRef.current = null;
+    setLoginOpen(false);
+  }, []);
+
+  const onLoggedIn = useCallback(
+    (phone: string) => {
+      signIn(phone);
+      const then = pendingRef.current;
+      pendingRef.current = null;
+      setLoginOpen(false);
+      // Cookie da duoc server dat trong response cua /api/auth/verify nen event
+      // trong `then` (confirm_ride / place_order) di kem cookie moi.
+      then?.();
+    },
+    [signIn],
+  );
 
   const value = useMemo<AppContextValue>(
     () => ({
@@ -310,6 +358,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setFood,
       clearCart,
       resetAll,
+      isAuthed,
+      requireLogin,
       signIn,
       signOut,
     }),
@@ -330,12 +380,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setFood,
       clearCart,
       resetAll,
+      isAuthed,
+      requireLogin,
       signIn,
       signOut,
     ],
   );
 
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+  return (
+    <AppContext.Provider value={value}>
+      {children}
+      {loginOpen ? <LoginModal onClose={closeLogin} onSuccess={onLoggedIn} /> : null}
+    </AppContext.Provider>
+  );
 }
 
 export function useApp(): AppContextValue {

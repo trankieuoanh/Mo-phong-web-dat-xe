@@ -1,5 +1,8 @@
 /**
- * Sinh event gia lap ghi THANG vao Firestore bang firebase-admin.
+ * Sinh event gia lap ghi THANG vao Cloudflare D1 (qua REST — scripts/lib/d1-rest.js).
+ *
+ * LUU Y HAN MUC: moi event ghi ton 4 luot ghi D1 (1 dong + 3 index); goi Free chi co
+ * 100.000 luot/ngay, tuc ~25.000 event/ngay — mac dinh 600 session ≈ 9.000 event ≈ 36.000 luot.
  *
  *   node scripts/seed-events.js               # 600 session / 90 ngay
  *   node scripts/seed-events.js --dry-run     # khong ghi gi, chi in ra de doi chieu
@@ -11,15 +14,15 @@
  * session bo do o nhieu buoc: "chi sinh session hoan thanh thi funnel phang
  * 100% va khong noi len dieu gi".
  *
- * KHONG GOI POST /api/events. Route do gan `created_at = serverTimestamp()`,
+ * KHONG GOI POST /api/events. Route do gan `created_at` = gio hien tai,
  * tuc moi event se mang dung thoi diem chay script — mat sach truc thoi gian,
- * thu duy nhat lam dashboard co nghia. Script vi vay tu gan `Timestamp` qua khu,
+ * thu duy nhat lam dashboard co nghia. Script vi vay tu gan thoi diem qua khu,
  * va cung phai tu gan `platform: 'web'` (viec cua event.service.ts).
  *
  * MOI DOCUMENT CO THEM FIELD `seed_batch`. Day la field thu 10, lech
  * `db-design.md` (9 field) MOT CACH CO CHU Y: event do nguoi that click khong co
  * field nay, nen loc du lieu gia ra khoi du lieu that chi la mot dieu kien, va
- * `--clear` xoa lai duoc chinh xac ma khong cham vao document that.
+ * `--clear` xoa lai duoc chinh xac (`WHERE seed_batch IS NOT NULL`) ma khong cham vao event that.
  *
  * NGUON SU THAT cho moi thu duoi day la `event-taxonomy.md`. Sua file do truoc,
  * roi moi sua file nay.
@@ -32,13 +35,7 @@ const path = require('node:path');
 const readline = require('node:readline');
 
 const ROOT = path.resolve(__dirname, '..');
-const KEY_PATH = path.join(ROOT, 'serviceAccountKey.json');
 const MOCK_DATA_PATH = path.join(ROOT, 'lib/shared/mock-data.ts');
-
-const EVENTS_COLLECTION = 'events';
-
-/** Gioi han cung cua Firestore: 500 thao tac moi batch. */
-const BATCH_LIMIT = 500;
 
 /** Gio dia phuong cua du lieu. metrics.py convert sang dung mui nay. */
 const TZ_OFFSET_HOURS = 7;
@@ -112,7 +109,7 @@ function parseArgs(argv) {
 
 function printUsage() {
   console.log(`
-Sinh event giả lập vào Firestore.
+Sinh event giả lập vào Cloudflare D1.
 
   node scripts/seed-events.js [tham số]
 
@@ -1322,7 +1319,7 @@ function generate(opts, batchId) {
 // Tu kiem tra
 //
 // Chay TRUOC moi lan ghi. Mot event sai bat bien khong lam app do — no chi lam
-// funnel sai, va sai o Firestore thi phai xoa ca dot seed di lam lai.
+// funnel sai, va sai o D1 thi phai xoa ca dot seed di lam lai.
 // ─────────────────────────────────────────────────────────────
 
 /** Khoa mang so tien — deu phai la SO NGUYEN VND (event-taxonomy.md muc 1). */
@@ -1485,147 +1482,76 @@ function printTimeline(session, title) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Firestore
+// Cloudflare D1
 // ─────────────────────────────────────────────────────────────
 
-/**
- * Credential Firestore — thu HAI duong, theo thu tu.
- *
- *   1. serviceAccountKey.json o goc repo.
- *   2. Ba bien FIREBASE_* trong .env.local — DUNG NGUON MA app DANG DUNG.
- *
- * Duong 2 ton tai vi mot ly do rat cu the: ai chay duoc `npm run dev` thi da co
- * credential roi. Bat ho tai them mot service account key nua chi de chay script
- * nay la tao ra mot file bi mat thu hai phai quan ly, cho cung mot quyen truy cap.
- *
- * `process.loadEnvFile` la built-in cua Node (tu 20.12) — KHONG them thu vien
- * nao (CLAUDE.md quy tac 8), va no parse dung gia tri nhieu dong trong ngoac kep,
- * cho nen khong phai tu viet parser .env (cho de vo nhat voi mot PEM).
- */
-function readCredential() {
-  const { cert } = require('firebase-admin/app');
+const d1 = require('./lib/d1-rest.js');
 
-  if (fs.existsSync(KEY_PATH)) {
-    return { credential: cert(require(KEY_PATH)), source: path.relative(ROOT, KEY_PATH) };
-  }
+const ID_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
-  const envPath = path.join(ROOT, '.env.local');
-  if (!fs.existsSync(envPath)) {
-    fail(
-      'Không tìm thấy credential Firebase ở cả hai nơi:\n' +
-        `  1. ${path.relative(ROOT, KEY_PATH)}  (service account key JSON)\n` +
-        `  2. ${path.relative(ROOT, envPath)}  (3 biến FIREBASE_*)\n\n` +
-        'Cách nhanh nhất: chép .env.example thành .env.local rồi điền giá trị\n' +
-        '(setup.md Phase 1) — cùng file mà `npm run dev` đang dùng.\n' +
-        'Muốn xem trước dữ liệu mà chưa cần credential thì chạy với --dry-run.',
-    );
-  }
-
-  if (typeof process.loadEnvFile !== 'function') {
-    fail(
-      `Node ${process.version} quá cũ để đọc ${path.relative(ROOT, envPath)} ` +
-        '(cần process.loadEnvFile, có từ Node 20.12).\n' +
-        `Nâng Node lên, hoặc đặt service account key JSON vào:\n  ${KEY_PATH}`,
-    );
-  }
-
-  process.loadEnvFile(envPath);
-
-  const projectId = process.env.FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY;
-
-  const missing = [
-    !projectId && 'FIREBASE_PROJECT_ID',
-    !clientEmail && 'FIREBASE_CLIENT_EMAIL',
-    !privateKey && 'FIREBASE_PRIVATE_KEY',
-  ].filter(Boolean);
-
-  if (missing.length > 0) {
-    fail(
-      `${path.relative(ROOT, envPath)} thiếu biến: ${missing.join(', ')}.\n` +
-        'Xem setup.md Phase 1.',
-    );
-  }
-
-  return {
-    credential: cert({
-      projectId,
-      clientEmail,
-      // Giu dong replace nay giong lib/server/db/firebase-admin.ts: file .env
-      // cua may nay luu newline that, nhung may khac co the luu dang literal `\n`.
-      // Thieu no se loi: error:1E08010C:DECODER routines::unsupported
-      privateKey: privateKey.replace(/\\n/g, '\n'),
-    }),
-    source: path.relative(ROOT, envPath),
-  };
+/** 20 ky tu [A-Za-z0-9] — cung dang voi id event that (lib/server/services/event.service.ts). */
+function newId() {
+  const bytes = require('node:crypto').randomBytes(20);
+  let id = '';
+  for (const b of bytes) id += ID_ALPHABET[b % ID_ALPHABET.length];
+  return id;
 }
 
-function connect() {
-  // `firebase-admin` la dependency cua chinh du an, nam o node_modules o
-  // node_modules/ o goc — script khong them dependency nao (CLAUDE.md quy tac 8).
-  let appModule;
-  let firestoreModule;
-  try {
-    appModule = require('firebase-admin/app');
-    firestoreModule = require('firebase-admin/firestore');
-  } catch {
-    fail("Không import được 'firebase-admin'. Chạy `npm install` ở thư mục gốc rồi thử lại.");
-  }
-
-  const { getApps, initializeApp } = appModule;
-  const { getFirestore, Timestamp } = firestoreModule;
-
-  const { credential, source } = readCredential();
-  console.log(`Credential Firebase lấy từ: ${source}`);
-
-  // getApps() truoc initializeApp — cung ly do voi lib/server/db/firebase-admin.ts.
-  const app = getApps()[0] ?? initializeApp({ credential });
-
-  return { db: getFirestore(app), Timestamp };
+/** `YYYY-MM-DDTHH:MM:SS.ffffffZ` — khop cot `created_at` cua bang `events`. */
+function toIsoMicros(date) {
+  return `${date.toISOString().slice(0, 23)}000Z`;
 }
+
+const INSERT_EVENT_SQL =
+  'INSERT INTO events (id, session_id, user_id, flow, event_name, screen_name, previous_screen, ' +
+  'step_index, properties, platform, created_at, seed_batch) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+
+/** So cau lenh moi request REST (moi cau 12 tham so, gioi han D1 la 100 tham so/cau). */
+const D1_BATCH = 100;
 
 async function write(sessions, batchId) {
-  const { db, Timestamp } = connect();
-  const collection = db.collection(EVENTS_COLLECTION);
+  const cfg = d1.config();
 
-  const docs = [];
+  const rows = [];
   for (const s of sessions) {
     for (const e of s.events) {
-      docs.push({ ...e, created_at: Timestamp.fromDate(e.created_at) });
+      rows.push([
+        newId(), e.session_id, e.user_id, e.flow, e.event_name, e.screen_name,
+        e.previous_screen ?? null, e.step_index, JSON.stringify(e.properties ?? {}),
+        e.platform ?? 'web', toIsoMicros(e.created_at), e.seed_batch,
+      ]);
     }
   }
 
-  console.log(`\nĐang ghi ${docs.length} document vào collection "${EVENTS_COLLECTION}"…`);
+  console.log(`\nĐang ghi ${rows.length} event vào D1 (bảng "events"; ~${rows.length * 4} lượt ghi trong hạn mức ngày)…`);
 
-  for (let i = 0; i < docs.length; i += BATCH_LIMIT) {
-    const chunk = docs.slice(i, i + BATCH_LIMIT);
-    const batch = db.batch();
-    for (const doc of chunk) batch.set(collection.doc(), doc);
-    await batch.commit();
-    process.stdout.write(`\r  ${Math.min(i + BATCH_LIMIT, docs.length)}/${docs.length}`);
+  let written = 0;
+  for (let i = 0; i < rows.length; i += D1_BATCH) {
+    const chunk = rows.slice(i, i + D1_BATCH);
+    const results = await d1.batch(cfg, chunk.map((params) => ({ sql: INSERT_EVENT_SQL, params })));
+    written += d1.rowsWritten(results);
+    process.stdout.write(`\r  ${Math.min(i + D1_BATCH, rows.length)}/${rows.length}`);
   }
 
-  console.log(`\n\nXong. seed_batch = ${batchId}`);
+  console.log(`\n\nXong. seed_batch = ${batchId}  (${written} lượt ghi D1)`);
   console.log(`Xoá lại bằng:  node scripts/seed-events.js --clear --batch ${batchId}`);
 }
 
 /**
  * Xoa du lieu seed.
  *
- * Meo quan trong: `.orderBy('seed_batch')` chi tra ve document CO field do.
- * Event do nguoi that click khong co `seed_batch` nen nam ngoai ket qua mot cach
- * tu nhien — khong can dieu kien `!=` nao, va khong co cach nao xoa nham.
+ * `WHERE seed_batch IS NOT NULL`: event do nguoi that click khong co `seed_batch` nen nam
+ * ngoai tap xoa mot cach tu nhien — khong co cach nao xoa nham.
+ * Luu y: xoa cung tinh vao han muc ghi cua D1 (moi dong + index bi xoa = luot ghi).
  */
 async function clear(opts) {
-  const { db } = connect();
-  const collection = db.collection(EVENTS_COLLECTION);
+  const cfg = d1.config();
+  const where = opts.batch ? 'seed_batch = ?' : 'seed_batch IS NOT NULL';
+  const params = opts.batch ? [opts.batch] : [];
+  const target = opts.batch ? `đợt seed "${opts.batch}"` : 'TOÀN BỘ event có seed_batch';
 
-  const query = opts.batch
-    ? collection.where('seed_batch', '==', opts.batch).limit(BATCH_LIMIT)
-    : collection.orderBy('seed_batch').limit(BATCH_LIMIT);
-
-  const target = opts.batch ? `đợt seed "${opts.batch}"` : 'TOÀN BỘ document có field seed_batch';
+  const [{ results }] = await d1.batch(cfg, [{ sql: `SELECT COUNT(*) AS n FROM events WHERE ${where}`, params }]);
+  const count = Number(results[0].n);
 
   if (!opts.yes) {
     if (!process.stdin.isTTY) {
@@ -1633,7 +1559,7 @@ async function clear(opts) {
     }
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
     const answer = await new Promise((resolve) => {
-      rl.question(`\nXoá ${target} trong collection "${EVENTS_COLLECTION}"? [y/N] `, resolve);
+      rl.question(`\nXoá ${target} trong bảng "events" (${count} dòng, ~${count * 4} lượt ghi)? [y/N] `, resolve);
     });
     rl.close();
     if (!/^y(es)?$/i.test(answer.trim())) {
@@ -1642,22 +1568,8 @@ async function clear(opts) {
     }
   }
 
-  let deleted = 0;
-  for (;;) {
-    const snapshot = await query.get();
-    if (snapshot.empty) break;
-
-    const batch = db.batch();
-    for (const doc of snapshot.docs) batch.delete(doc.ref);
-    await batch.commit();
-
-    deleted += snapshot.size;
-    process.stdout.write(`\r  đã xoá ${deleted}`);
-
-    if (snapshot.size < BATCH_LIMIT) break;
-  }
-
-  console.log(`\n\nXong. Đã xoá ${deleted} document. Event do click tay không bị ảnh hưởng.`);
+  const [result] = await d1.batch(cfg, [{ sql: `DELETE FROM events WHERE ${where}`, params }]);
+  console.log(`\nXong. Đã xoá ${result.meta.changes ?? count} event. Event do click tay không bị ảnh hưởng.`);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -1693,7 +1605,7 @@ async function main() {
     const foodSample = sessions.find((s) => s.events.some((e) => e.event_name === 'place_order'));
     if (rideSample) printTimeline(rideSample, 'Mẫu: một session ride hoàn chỉnh');
     if (foodSample) printTimeline(foodSample, 'Mẫu: một session food hoàn chỉnh');
-    console.log('\n--dry-run: không ghi gì vào Firestore.\n');
+    console.log('\n--dry-run: không ghi gì vào D1.\n');
     return;
   }
 

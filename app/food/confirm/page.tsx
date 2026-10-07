@@ -14,6 +14,7 @@ import { FlowGuard } from '@/components/FlowGuard';
 import { FoodThumb } from '@/components/FoodThumb';
 import { Icon } from '@/components/Icon';
 import { MapCanvas } from '@/components/MapCanvas';
+import { useRoute } from '@/lib/use-route';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { ScreenShell } from '@/components/ScreenShell';
 import { SummaryRow } from '@/components/SummaryRow';
@@ -41,11 +42,16 @@ export default function FoodConfirmPage() {
 function FoodConfirmContent() {
   useScreenView('food_confirm');
   const router = useRouter();
-  const { cart, offerId, food } = useApp();
+  const { cart, offerId, food, requireLogin } = useApp();
 
   // Man nay co the mo lai o mot tab moi sau khi storage bi xoa — khi do khong
   // co `origin`, va DEFAULT_PICKUP la dia chi mac dinh cua ca app.
   const origin = food.origin ?? DEFAULT_PICKUP;
+
+  // Tuyen QUAN → KHACH (chi khi da chon mot quan that co toa do). Route chi de HIEN THI: gia don khong phu
+  // thuoc quang duong nen KHONG chan nut "Dat don" — loi thi hien the loi + Thu lai.
+  const restaurant = food.restaurantPlace;
+  const { route, status: routeStatus, retry: retryRoute } = useRoute(restaurant, restaurant ? origin : undefined);
 
   const offer = offerId ? (getOffer(offerId) ?? null) : null;
   // Cung mot ham voi luc ghi event — `final_total` trong event LUON khop
@@ -87,7 +93,7 @@ function FoodConfirmContent() {
         </span>
       }
       footer={
-        <PrimaryButton className="whitespace-normal" onClick={placeOrder}>
+        <PrimaryButton className="whitespace-normal" onClick={() => requireLogin(placeOrder)}>
           Đặt đơn
         </PrimaryButton>
       }
@@ -109,7 +115,18 @@ function FoodConfirmContent() {
         </div>
 
         <div className="mt-lg h-[min(44dvh,320px)] overflow-hidden rounded-xl lg:h-auto [&>div]:h-full lg:[&>div]:h-auto [&_button]:size-11">
-          <MapCanvas pickup={origin} label={origin.label} />
+          {restaurant ? (
+            <MapCanvas
+              pickup={restaurant}
+              destination={origin}
+              route={route}
+              routeStatus={routeStatus}
+              onRetry={retryRoute}
+              originKind="restaurant"
+            />
+          ) : (
+            <MapCanvas pickup={origin} label={origin.label} />
+          )}
         </div>
 
         <div className="mt-lg flex flex-wrap items-center gap-sm">

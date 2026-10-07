@@ -281,7 +281,7 @@ Cùng interface `DiscountRule` với Promo, áp lên **tiền hàng** (`cart_tot
 base_price  = round((openingFare + max(0, distance_km - 2) × pricePerKm) / 1000) × 1000
 final_price = base_price - discount_amount
 ```
-`distance_km` lấy từ `GET /api/route` (OSRM). Khi dịch vụ định tuyến không trả lời, nó là khoảng cách đường chim bay và `route_source` ghi `"straight"` — giá vẫn tính bằng đúng công thức trên, chỉ đầu vào kém chính xác hơn.
+`distance_km` lấy từ `GET /api/route` (OSRM). Giao diện không còn dùng khoảng cách đường chim bay: chưa có tuyến OSRM thật thì `/ride/pickup` chặn đặt (xem `api-endpoints.md` mục 3c), nên `route_source` của event mới luôn là `"osrm"` (`"straight"` chỉ còn ở dữ liệu cũ).
 
 **Food** (`food_confirm`):
 ```

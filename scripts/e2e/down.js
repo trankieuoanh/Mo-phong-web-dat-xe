@@ -1,0 +1,22 @@
+const { launch, text, clickText, sleep } = require('./lib');
+const B = 'http://localhost:3000';
+(async () => {
+  const { browser, page } = await launch();
+  const errs = [];
+  page.on('pageerror', (e) => errs.push(String(e).slice(0, 120)));
+  await page.goto(B + '/', { waitUntil: 'networkidle2' }); await sleep(1500);
+  await clickText(page, 'Đặt xe', { exact: true }); await sleep(2500);
+  await clickText(page, 'Nhà'); await sleep(2500);
+  console.log('PASS?', 'luồng tiếp tục dù D1 lỗi (event bị bỏ im lặng):', page.url().includes('/ride/pickup'));
+  await clickText(page, 'Đăng nhập', { exact: true }); await sleep(1000);
+  const phone = '0914' + String(Math.floor(Math.random() * 1e6)).padStart(6, '0');
+  await page.type('input[type=tel]', phone); await clickText(page, 'Gửi mã'); await sleep(2500);
+  const code = /mã của bạn:\s*(\d{6})/.exec(await page.evaluate(() => document.querySelector('[role=dialog]').innerText.replace(/\s+/g, ' ')))[1];
+  await page.type('input[autocomplete=one-time-code]', code); await clickText(page, 'Xác nhận', { exact: true }); await sleep(3000);
+  console.log('PASS?', 'đăng nhập vẫn được khi D1 lỗi:', !(await page.evaluate(() => !!document.querySelector('[role=dialog]'))) && page.url().includes('/ride/pickup'));
+  await page.goto(B + '/history', { waitUntil: 'networkidle2' }); await sleep(3000);
+  const t = await page.evaluate(() => document.body.innerText.replace(/\s+/g, ' '));
+  console.log('PASS?', '/history hiện trạng thái lỗi rõ ràng, không trắng trang:', t.includes('Không đọc được dữ liệu'), '|', t.slice(t.indexOf('Không đọc'), t.indexOf('Không đọc') + 110));
+  console.log('page errors:', errs.length, errs[0] || '');
+  await browser.close();
+})().catch((e) => { console.error('FAIL', e.message.slice(0, 300)); process.exit(1); });

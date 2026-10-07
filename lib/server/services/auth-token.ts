@@ -2,7 +2,7 @@
  * Cookie dang nhap `gsm_auth` = `<payload>.<chu ky>`, payload la
  * base64url(`<phone>|<het han ms>`), chu ky HMAC-SHA256 bang AUTH_SECRET.
  *
- * Khong luu session o Firestore: xac thuc la mot phep bam, khong ton luot doc.
+ * Khong luu session o database: xac thuc la mot phep bam, khong ton luot doc.
  * Doi lai khong thu hoi tung token duoc — doi AUTH_SECRET la dang xuat tat ca.
  */
 import 'server-only';

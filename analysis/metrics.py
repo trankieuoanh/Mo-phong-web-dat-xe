@@ -1,6 +1,6 @@
 """Tinh 6 nhom chi so tu output/events.csv — dinh nghia o analysis-spec.md.
 
-Doc CSV, KHONG cham mang: sua cong thuc khong phai goi lai Firestore.
+Doc CSV, KHONG cham mang: sua cong thuc khong phai goi lai D1.
 
     python fetch_events.py && python metrics.py
     python metrics.py --replay <session_id>    # Nhom 6, in dong thoi gian 1 phien
@@ -119,7 +119,7 @@ def has_events(df: pd.DataFrame, flow: str) -> bool:
 def column(df: pd.DataFrame, name: str) -> pd.Series:
     """Cot prop_* co the CHUA ton tai (chua ai bat event do lan nao).
 
-    Firestore khong can migrate — document cu thieu field moi la chuyen binh thuong
+    D1 khong can migrate khi them khoa vao `properties` — event cu thieu khoa moi la chuyen binh thuong
     (db-design.md). Tra ve Series rong thay vi nem KeyError.
     """
     if name not in df.columns:

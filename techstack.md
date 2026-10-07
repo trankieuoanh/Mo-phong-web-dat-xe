@@ -6,9 +6,9 @@
 |---|---|---|
 | Frontend | React (web, Vite) | **Next.js** (App Router) |
 | Backend | Node/Express (`server/` riêng) | **Next.js Route Handlers** (`app/api/**`) — xem mục "Kiến trúc" bên dưới |
-| Database | Postgres (Supabase-hosted) | **Firestore** (Firebase) |
-| Platform | chưa chốt | **Firebase** |
-| Phân tích | Python/pandas đọc Postgres | Python/pandas đọc Firestore (qua Firebase Admin SDK) |
+| Database | Postgres (Supabase-hosted) → Firestore | **Cloudflare D1** (SQLite, gọi qua REST) |
+| Platform | chưa chốt → Firebase | **Vercel** (app) + **Cloudflare** (D1) |
+| Phân tích | Python/pandas đọc Postgres | Python/pandas đọc D1 qua REST (`urllib`) |
 
 ## Các lựa chọn còn lại (mình chọn giúp, theo hướng đơn giản nhất cho quy mô 6 tuần)
 
@@ -20,7 +20,7 @@
 | Gọi API từ client | **`fetch` có sẵn của trình duyệt** | Không cần cài thêm axios cho vài endpoint đơn giản |
 | Package manager | **npm** | Một `package.json` duy nhất. Từng dùng npm workspaces cho bản hai app; gộp lại thì không còn gì để workspace |
 | Hosting (nếu cần deploy) | **Vercel** | Tự nhận Next.js ở gốc repo, không cần `vercel.json`. Một project = **một nơi deploy**, và đó chính là thứ sửa được lỗi bản deploy cũ |
-| Phân tích BI | **BigQuery** (sink bổ sung, Firestore không đổi) | Power BI đọc SQL thay vì gọi API; sync tăng dần bằng `scripts/bigquery/sync-events.js` + GitHub Actions. Thư viện `@google-cloud/bigquery` là `devDependency` chỉ script dùng, app không import. Xem `docs/BIGQUERY_SETUP.md` |
+| Phân tích BI | **Power BI đọc API của chính app** | `GET /api/events?flat=1` (incremental refresh theo `from/to`) và `GET /api/analytics/<table>`; không dùng BigQuery. Xem `docs/POWERBI_D1.md` |
 | Testing framework | **Không cần** | Quy mô 6 tuần, tự test bằng cách click tay qua từng luồng là đủ, không cần viết test tự động |
 
 Lưu ý: không bắt buộc phải deploy public trong 6 tuần này — chạy local (`next dev`) để demo cho mentor là đủ. Chỉ cần deploy khi muốn có link truy cập từ xa; các bước và biến môi trường ở `setup.md` mục "Deploy".
@@ -39,7 +39,7 @@ Lưu ý: không bắt buộc phải deploy public trong 6 tuần này — chạy
 app/            giao diện + app/api/** (route handler)
 lib/shared/     hợp đồng dữ liệu dùng chung
 lib/server/     validator · service · db — chỉ app/api/** được import
-analysis/       Python, đọc thẳng Firestore
+analysis/       Python, đọc thẳng D1 qua REST
 ```
 
 **Thứ đã lật quyết định lần 3 không phải sở thích, mà là một lỗi thật trên bản deploy.** Tách hai app nghĩa là phải deploy hai nơi. Deploy mỗi `apps/web` lên Vercel thì `rewrites` vẫn trỏ về `http://localhost:4000`, và Vercel trả `404 DNS_HOSTNAME_RESOLVED_PRIVATE` cho **mọi** `/api/*`. Triệu chứng nhìn thấy: bản đồ 401, ô tìm địa chỉ không ra gì — và **không một event nào được ghi**, im lặng, vì `lib/track.ts` cố ý nuốt lỗi để không kẹt UI.
@@ -53,7 +53,7 @@ Với một dự án mà sản phẩm cuối là dữ liệu funnel, "im lặng 
 - Phép dò tile lấy origin từ **chính request** thay vì một biến môi trường phải khai tay — bớt hẳn một cách cấu hình sai.
 
 **Mất gì (chấp nhận, và đã cân nhắc):**
-- **Hàng rào credential yếu đi một bậc.** Bản tách có hàng rào vật lý: package giao diện không có `firebase-admin` nên không import nổi. Giờ thay bằng `server-only` — vẫn chặn ở mức **build đỏ**, nhưng là quy ước được công cụ ép chứ không phải bất khả thi vật lý.
+- **Hàng rào credential yếu đi một bậc.** Bản tách có hàng rào vật lý: package giao diện không có credential nên không import nổi. Giờ thay bằng `server-only` — vẫn chặn ở mức **build đỏ**, nhưng là quy ước được công cụ ép chứ không phải bất khả thi vật lý.
 - **Hàng đợi rate-limit trong `upstream.ts` chỉ còn hiệu lực per-instance** trên serverless. Chi tiết và cách nhận biết ở `ARCHITECTURE.md` mục cuối.
 - Giao diện và server nằm chung một repo tree, nên khi chia việc trong nhóm phải tự giữ kỷ luật ranh giới `lib/server/` (CLAUDE.md quy tắc 1).
 
@@ -61,7 +61,7 @@ Với một dự án mà sản phẩm cuối là dữ liệu funnel, "im lặng 
 
 `fetch('/api/events')` tới thẳng `app/api/events/route.ts` của chính app này. Same-origin, nên **không có preflight `OPTIONS`** — điều này quan trọng vì `confirm_ride` và `place_order` bắn ngay trước `router.push` và phải kịp đi trước khi trang chuyển. Bản tách phải dựng hẳn một proxy `rewrites` để đạt được đúng tính chất mà bản này có sẵn.
 
-**Quy tắc "client không chạm database trực tiếp" vẫn giữ nguyên** — component React gọi `fetch('/api/events')`, route handler gọi `lib/server/`, và chỉ ở đó Firebase Admin SDK mới vào cuộc. Trình duyệt không bao giờ cầm credential.
+**Quy tắc "client không chạm database trực tiếp" vẫn giữ nguyên** — component React gọi `fetch('/api/events')`, route handler gọi `lib/server/`, và chỉ ở đó token Cloudflare D1 mới vào cuộc. Trình duyệt không bao giờ cầm credential.
 
 ### Vì sao `lib/shared` không có bước build
 
@@ -69,15 +69,16 @@ Nó là thư mục TypeScript thường trong cùng project, import qua alias `@
 
 Hệ quả cần nhớ: **import tương đối không bao giờ ghi đuôi `.js`** — webpack của Next không resolve `.ts` từ đuôi `.js`, và lỗi này chỉ hiện ở `npm run build`, không hiện ở `npm run dev`.
 
-## Firestore khác Postgres ở điểm nào — ảnh hưởng trực tiếp tới db-design
-- Không có bảng/cột cố định — dữ liệu là **document** (dạng giống JSON) nằm trong **collection** (ví dụ collection `events`, mỗi event là 1 document).
-- Không cần "giả lập" tính linh hoạt bằng cột `properties` JSONB như ở Postgres nữa — mỗi document trong Firestore vốn đã linh hoạt sẵn, muốn thêm field nào cũng được mà không cần khai báo trước.
-- Không có `JOIN` giữa các bảng — nhưng project này chỉ có 1 loại dữ liệu (event) nên không cần tới.
-- Truy vấn được bằng `where` và `orderBy`, nhưng không mạnh bằng SQL cho các phép tính gộp phức tạp (group by, aggregate) → cách đã lên kế hoạch từ trước (kéo raw data ra rồi tính bằng pandas, không tính toán ngay trong DB) vẫn đúng, không cần đổi hướng phân tích.
+## D1 (SQLite) khác Firestore ở điểm nào — ảnh hưởng trực tiếp tới db-design
+- **Có bảng/cột cố định, có `JOIN` và khoá ngoại** (D1 bật `foreign_keys`) — thêm cột là một migration (`migrations/*.sql`), nhưng khoá khác nhau theo từng loại event vẫn nằm trong cột `properties` (JSON TEXT, đọc bằng `json_extract`).
+- **Index khai báo tay** và **mỗi index tốn thêm 1 lượt ghi/dòng** trong hạn mức Free 100.000 dòng/ngày — nên `events` chỉ có 3 index (xem `docs/d1-schema-design.md`).
+- Truy vấn gộp bằng SQL được, nhưng cách đã chốt từ trước (kéo raw data ra rồi tính bằng pandas) vẫn đúng, không cần đổi.
+- **Thời gian** là chuỗi ISO UTC micro-giây cố định độ rộng; `created_at` do app gán (không phải giờ commit của DB như `serverTimestamp()`), nên đọc tăng dần phải lui lại một đoạn ngắn (`SYNC_OVERLAP_SECONDS`).
+- Vì sao chọn D1: hạn mức ghi cao hơn Spark (100.000 so với 20.000 dòng/ngày), SQL chuẩn, REST gọi được từ Vercel, một database dùng được cho cả event lẫn dữ liệu phân tích.
 
 ## Trạng thái tài liệu
 
-Đã xong theo Next.js/Firestore: `ARCHITECTURE.md`, `db-design.md`, `api-endpoints.md`, `DESIGN.md` (đã có khối design token).
+Đã xong theo Next.js/D1: `ARCHITECTURE.md`, `db-design.md`, `api-endpoints.md`, `DESIGN.md` (đã có khối design token).
 
 Đã bổ sung: `CLAUDE.md`, `event-taxonomy.md`, `mock-data.md`, `screen-map.md`, `tailwind-theme.md`, `setup.md`, `analysis-spec.md`, `roadmap.md`.
 

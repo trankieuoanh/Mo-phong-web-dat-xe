@@ -268,7 +268,7 @@ export default function FoodMenuPage() {
     setFilter({ kind: 'restaurant', place });
     // Len context de ten quan song qua dieu huong — man chi tiet mon va man
     // confirm deu can no.
-    setFood({ restaurantId: place.id, restaurantName: place.label });
+    setFood({ restaurantId: place.id, restaurantName: place.label, restaurantPlace: place });
     trackEvent({
       eventName: 'select_restaurant',
       screenName: 'food_menu',

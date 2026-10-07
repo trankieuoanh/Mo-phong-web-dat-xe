@@ -1,19 +1,18 @@
 /**
- * Ghi `users/{phone}` sau khi dang nhap — BEST EFFORT.
+ * Ghi `users` sau khi dang nhap — BEST EFFORT.
  *
- * Firestore het quota hay mat mang thi van cho dang nhap: doc `users` chi la
- * so sach (lan dau / lan cuoi dang nhap), khong phai dieu kien xac thuc.
+ * D1 het han muc hay mat mang thi van cho dang nhap: dong `users` chi la so sach
+ * (lan dau / lan cuoi dang nhap), khong phai dieu kien xac thuc.
  */
 import 'server-only';
-import { FieldValue } from 'firebase-admin/firestore';
-import { USERS_COLLECTION, getDb } from '../db/firebase-admin';
+import { d1Query } from '../db/d1';
 
 export async function recordLogin(phone: string): Promise<void> {
-  const ref = getDb().collection(USERS_COLLECTION).doc(phone);
-  // Hai lenh ghi, khong doc: `create` chi thanh cong lan dau (giu created_at),
-  // `set merge` cap nhat last_login_at. Tiet kiem luot doc — thu dang het.
-  await ref
-    .create({ phone, created_at: FieldValue.serverTimestamp() })
-    .catch(() => {});
-  await ref.set({ phone, last_login_at: FieldValue.serverTimestamp() }, { merge: true });
+  const now = `${new Date().toISOString().slice(0, 23)}000Z`;
+  // Mot lenh: chen moi (created_at = lan dau), hoac chi cap nhat last_login_at neu da co.
+  await d1Query(
+    `INSERT INTO users (phone, created_at, last_login_at) VALUES (?, ?, ?)
+     ON CONFLICT(phone) DO UPDATE SET last_login_at = excluded.last_login_at`,
+    [phone, now, now],
+  );
 }

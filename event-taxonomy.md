@@ -1,6 +1,6 @@
 # event-taxonomy.md — GSM ride-booking simulation
 
-> Đây là **hợp đồng dữ liệu** của toàn dự án. Mọi event ghi vào Firestore phải khớp bảng dưới. Khi thêm màn/hành động mới, cập nhật file này TRƯỚC khi code.
+> Đây là **hợp đồng dữ liệu** của toàn dự án. Mọi event ghi vào D1 (bảng `events`) phải khớp bảng dưới. Khi thêm màn/hành động mới, cập nhật file này TRƯỚC khi code.
 
 ## 1. Quy tắc chung
 
@@ -169,7 +169,7 @@ Bảng này được mã hoá **một lần duy nhất** thành `SCREENS` trong 
 >
 > `payment_method` là `"cash"` hoặc `"qr"`, mặc định `"cash"`. Ghi lại vì đây là một lựa chọn của người dùng ở bước cuối — không ghi thì không biết ai đổi khỏi mặc định.
 >
-> **`route_source`** là `"osrm"` (tuyến đường thật, lấy từ `GET /api/route`) hoặc `"straight"` (dịch vụ định tuyến không trả lời nên đã suy biến về đường nối thẳng, quãng đường tính theo đường chim bay).
+> **`route_source`** là `"osrm"` (tuyến đường thật, lấy từ `GET /api/route`) hoặc `"straight"` (**chỉ còn ở dữ liệu cũ**: trước 10/2026 khi dịch vụ định tuyến không trả lời thì giao diện suy biến về đường nối thẳng, quãng đường theo đường chim bay). Từ 10/2026 giao diện **chặn đặt** cho tới khi có tuyến OSRM thật, nên event mới luôn là `"osrm"`; khi phân tích dữ liệu trộn cũ + mới vẫn phải lọc `route_source == 'osrm'`.
 >
 > **Bắt buộc phải có khoá này.** Thiếu nó thì một chuyến 8 km đường thật và một chuyến 8 km đường chim bay trông giống hệt nhau trong dữ liệu, mà đường chim bay luôn ngắn hơn đường thật đáng kể. Mọi phân tích theo quãng đường sẽ trộn lẫn hai loại và không có cách nào tách ra về sau. Khi phân tích, lọc `route_source == 'osrm'` trước khi so sánh quãng đường hay giá.
 >
@@ -368,11 +368,11 @@ Khai báo trong `lib/shared/types.ts`: union type `EventName` (để TypeScript 
 
 ## 6. Chỗ chờ danh sách 17 trường của mentor
 
-`user_id` = số điện thoại đăng nhập dạng E.164 (`+84912345678`), server gán từ cookie — xem `api-endpoints.md` mục 5. Event trước khi có đăng nhập mang `mock-user-*` và không gộp.
+`user_id` = số điện thoại đăng nhập dạng E.164 (`+84912345678`), server gán từ cookie — xem `api-endpoints.md` mục 5. **Khách chưa đăng nhập mang `anon-<uuid>`**; đăng nhập xảy ra ở bước xác nhận nên một session thường có event `anon-…` (các màn trước) rồi `+84…` (`confirm_ride`/`place_order` trở đi), **cùng `session_id`**. Muốn biết người của session: lấy `user_id` bắt đầu `+84` cuối cùng; session bỏ dở không bao giờ có. Event cũ trước khi có đăng nhập mang `mock-user-*` và không gộp.
 
 Schema hiện tại có **9 field top-level** (`session_id`, `user_id`, `flow`, `event_name`, `screen_name`, `previous_screen`, `step_index`, `platform`, `created_at`). Khi mentor chốt danh sách 17 trường:
 
 1. Field dùng để **lọc/sắp xếp thường xuyên** → thêm vào top-level document.
 2. Field **đặc thù theo loại event** → thêm vào `properties`.
 3. Cập nhật bảng ở mục 3–4 của file này, rồi `lib/shared/types.ts` (union `EventName` + mảng `EVENT_NAMES`, và `EventPayload` nếu là field top-level), `lib/shared/screens.ts` nếu là màn mới, và `lib/server/validators/event.validator.ts` nếu cần luật kiểm tra riêng.
-4. Firestore **không cần migrate** — document cũ thiếu field mới vẫn đọc được, script pandas xử lý bằng `.fillna()`.
+4. D1 **không cần migrate** khi chỉ thêm khoá vào `properties` (JSON) — event cũ thiếu khoá mới vẫn đọc được, script pandas xử lý bằng `.fillna()`. Thêm **cột** mới thì cần migration (`migrations/*.sql`).

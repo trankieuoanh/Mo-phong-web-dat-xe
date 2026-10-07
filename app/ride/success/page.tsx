@@ -11,12 +11,13 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { DEFAULT_PICKUP, calcFare, calcRideTotals, getPromo, getVehicle } from '@/lib/shared';
+import { calcFare, calcRideTotals, getPromo, getVehicle, isRoadRoute, type Place, type RouteResult } from '@/lib/shared';
 import { Icon } from '@/components/Icon';
 import { PrimaryButton } from '@/components/PrimaryButton';
 import { ScreenShell } from '@/components/ScreenShell';
 import { useApp } from '@/lib/app-context';
-import { routeOrFallback } from '@/lib/use-route';
+import { simulationDurationMs, useVehicleSimulation } from '@/lib/use-vehicle-simulation';
+import { MapCanvas } from '@/components/MapCanvas';
 import { formatVnd } from '@/lib/format';
 import { trackEvent, useScreenView } from '@/lib/track';
 
@@ -39,23 +40,24 @@ export default function RideSuccessPage() {
     driverEta?: number;
   } | null>(null);
 
+  // Chuyen di de MO PHONG xe: chup `pickup/destination/route` TRUOC khi clearRide() (summary chi chua chu).
+  // `route` la CHINH tuyen da dung o preview, vehicle, confirm — KHONG goi lai OSRM.
+  const [trip, setTrip] = useState<{ pickup: Place; destination: Place; route: RouteResult } | null>(null);
+  const sim = useVehicleSimulation(trip?.route.geometry ?? null, trip ? simulationDurationMs(trip.route.durationMin) : 0);
+
   useEffect(() => {
     if (!hydrated || summary) return;
 
     const vehicle = getVehicle(ride.vehicleId ?? '');
     const promo = ride.promoId ? (getPromo(ride.promoId) ?? null) : null;
 
-    // CUNG `routeOrFallback` voi vehicle/promo/confirm. Truoc day man nay suy
-    // bien ve 0 km khi thieu `route`, trong khi ba man kia suy bien ve duong
-    // thang — tong tien o day thanh ra THAP HON so vua ghi vao `confirm_ride`
-    // (calcFare voi 0 km van tra dung gia mo cua, nen con so sai trong rat
-    // hop ly). pricing.ts muc dau: hai cho BAT BUOC ra cung mot con so.
-    //
-    // Man nay khong co FlowGuard nen `destination` co the vang — khi do khong
-    // co gi de tinh va moi dong hien '—'.
-    const route = ride.destination
-      ? routeOrFallback(ride.pickup ?? DEFAULT_PICKUP, ride.destination, ride.route)
-      : null;
+    // CUNG tuyen (`ride.route`) voi vehicle/promo/confirm: pricing.ts muc dau — hai cho BAT BUOC ra cung
+    // mot con so. Man nay khong co FlowGuard nen draft co the thieu tuyen duong that (vao thang URL roi
+    // F5): khi do khong co gi de tinh/ve va moi dong hien '—' — KHONG suy ra duong chim bay.
+    const route = ride.destination && isRoadRoute(ride.route) ? ride.route : null;
+    if (route && ride.destination && ride.pickup) {
+      setTrip({ pickup: ride.pickup, destination: ride.destination, route });
+    }
     const totals = calcRideTotals(vehicle && route ? calcFare(vehicle, route.distanceKm) : 0, promo);
 
     setSummary({
@@ -105,6 +107,18 @@ export default function RideSuccessPage() {
           Tài xế sẽ liên hệ với bạn trong ít phút
         </p>
       </div>
+
+      {trip ? (
+        <div className="mb-lg">
+          <p className="t-body-sm-strong mb-sm text-center" aria-live="polite">
+            {sim.status === 'arrived'
+              ? 'Đã đến nơi'
+              : `Đang trên đường · còn khoảng ${Math.max(1, Math.ceil((1 - sim.progress) * trip.route.durationMin))} phút`}
+          </p>
+          <MapCanvas pickup={trip.pickup} destination={trip.destination} route={trip.route} vehicle={sim.position} />
+          <p className="t-caption mt-xs text-center text-mute">Mô phỏng hành trình — không phải vị trí thật của tài xế.</p>
+        </div>
+      ) : null}
 
       <div className="space-y-lg rounded-xl bg-canvas-soft p-lg md:p-2xl">
         {summary?.driverName && (

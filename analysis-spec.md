@@ -4,7 +4,7 @@
 
 ## Nạp dữ liệu
 
-`fetch_events.py` đọc toàn bộ collection `events` bằng `firebase-admin`, đổ ra `output/events.csv`:
+`fetch_events.py` đọc toàn bộ bảng `events` từ D1 qua REST, đổ ra `output/events.csv`:
 
 ```python
 rows = [{'event_id': d.id, **d.to_dict()} for d in db.collection('events').stream()]
@@ -16,7 +16,7 @@ df = pd.concat([df.drop(columns=['properties']), props.add_prefix('prop_')], axi
 
 `properties.entry_source` được đọc thành cột phẳng `prop_entry_source`. Cột này có thể vắng ở dữ liệu cũ; khi đó các `select_flow` tiếp tục dùng quy tắc legacy để phân biệt flow switch. Seed mặc định bao gồm các phiên direct cho cả Ride và Food, đồng thời giữ các phiên chọn luồng từ `/` để so sánh.
 
-Tách bước tải và bước tính: `fetch_events.py` chạm mạng, `metrics.py` chỉ đọc CSV. Nhờ vậy sửa công thức không phải gọi lại Firestore mỗi lần.
+Tách bước tải và bước tính: `fetch_events.py` chạm mạng, `metrics.py` chỉ đọc CSV. Nhờ vậy sửa công thức không phải gọi lại D1 mỗi lần.
 
 **Lọc trước khi tính** — bỏ các session rác:
 - Session chỉ có đúng 1 event (mở trang rồi đóng ngay).
@@ -95,7 +95,7 @@ Chỉ số này trả lời câu hỏi UX cụ thể: **màn nào khiến ngư�
 | `pickup_change_rate` | tỉ lệ `confirm_pickup` có `prop_pickup_id != 'pickup-current'` — tỉ lệ người đổi khỏi điểm đón do GPS đề xuất |
 | `avg_distance_km` | trung bình `prop_distance_km` trong `confirm_ride`. **Lọc `prop_route_source == 'osrm'` trước** — xem cảnh báo bên dưới |
 | `abandon_rate_by_distance` | chia `prop_distance_km` của `select_vehicle` thành khoảng (0–5, 5–15, >15 km) rồi tính tỉ lệ session **không** có `confirm_ride` trong từng khoảng. Trả lời: *chuyến càng xa (càng đắt) thì càng dễ bỏ dở?* |
-| `route_fallback_rate` | tỉ lệ `confirm_ride` có `prop_route_source == 'straight'` — **chỉ số sức khoẻ hạ tầng, không phải hành vi người dùng**. Cao nghĩa là OSRM hay chết trong đợt thu thập, và mọi số liệu quãng đường của đợt đó kém tin cậy |
+| `route_fallback_rate` | tỉ lệ `confirm_ride` có `prop_route_source == 'straight'` — **chỉ số sức khoẻ hạ tầng, không phải hành vi người dùng** (từ 10/2026 giao diện chặn đặt khi chưa có tuyến thật nên chỉ số này chỉ còn phản ánh dữ liệu **cũ**; dữ liệu mới luôn 0%). Cao nghĩa là OSRM hay chết trong đợt thu thập, và mọi số liệu quãng đường của đợt đó kém tin cậy |
 | `promo_usage` vs `skip_rate` | `select_promo` so với `skip_promo` |
 | `top_items` | `prop_item_id` trong `add_to_cart`, cộng theo `prop_quantity` |
 | `avg_cart_size` / `avg_cart_total` | `prop_cart_size` / `prop_cart_total` trong `proceed_to_offer` |
@@ -150,3 +150,6 @@ Biểu đồ dùng `matplotlib`, một màu `#048589` (primary-dark) cho toàn b
 ## Ngưỡng dữ liệu tối thiểu
 
 Muốn các tỉ lệ có nghĩa, cần ít nhất **30 session mỗi luồng**, trong đó có cả session cố tình bỏ dở ở các bước khác nhau. Sinh dữ liệu toàn phiên hoàn thành sẽ cho funnel phẳng 100% và không nói lên điều gì — kế hoạch sinh dữ liệu ở `roadmap.md` Tuần 6.
+
+
+> **`user_id` ẩn danh.** Khách chưa đăng nhập mang `user_id = anon-<uuid>`; đăng nhập xảy ra ở bước xác nhận nên cùng một `session_id` có thể có cả `anon-…` lẫn `+84…`. Mọi chỉ số funnel nhóm theo `session_id` nên không bị ảnh hưởng; chỉ khi cần "người" của session thì lấy `user_id` bắt đầu `+84` cuối cùng.
